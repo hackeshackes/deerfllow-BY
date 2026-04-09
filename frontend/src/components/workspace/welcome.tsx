@@ -59,7 +59,7 @@ export function Welcome({
           )}
         </div>
       ) : (
-        <div className="text-muted-foreground text-sm">
+        <div className="text-muted-foreground max-w-2xl text-sm leading-7">
           {t.welcome.description.includes("\n") ? (
             <pre className="font-sans whitespace-pre">
               {t.welcome.description}

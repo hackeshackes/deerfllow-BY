@@ -11,10 +11,12 @@ import asyncio
 import logging
 import uuid
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.gateway.deps import get_checkpointer, get_run_manager, get_stream_bridge
+from app.gateway.auth import require_user
+from app.gateway.deps import get_checkpointer, get_run_manager, get_store, get_stream_bridge
+from app.gateway.ownership import is_owner
 from app.gateway.routers.thread_runs import RunCreateRequest
 from app.gateway.services import sse_consumer, start_run
 from deerflow.runtime import serialize_channel_values
@@ -39,7 +41,13 @@ async def stateless_stream(body: RunCreateRequest, request: Request) -> Streamin
     on the given thread so that conversation history is preserved.
     Otherwise a new temporary thread is created.
     """
+    user = require_user(request)
     thread_id = _resolve_thread_id(body)
+    store = get_store(request)
+    if store is not None:
+        existing = await store.aget(("threads",), thread_id)
+        if existing is not None and not is_owner(existing.value, user):
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     record = await start_run(body, thread_id, request)
@@ -64,7 +72,13 @@ async def stateless_wait(body: RunCreateRequest, request: Request) -> dict:
     on the given thread so that conversation history is preserved.
     Otherwise a new temporary thread is created.
     """
+    user = require_user(request)
     thread_id = _resolve_thread_id(body)
+    store = get_store(request)
+    if store is not None:
+        existing = await store.aget(("threads",), thread_id)
+        if existing is not None and not is_owner(existing.value, user):
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     record = await start_run(body, thread_id, request)
 
     if record.task is not None:

@@ -93,16 +93,16 @@ export default function ChatPage() {
         <div className="relative flex size-full min-h-0 justify-between">
           <header
             className={cn(
-              "absolute top-0 right-0 left-0 z-30 flex h-12 shrink-0 items-center px-4",
+              "absolute top-0 right-0 left-0 z-30 flex h-14 shrink-0 items-center px-4",
               isNewThread
                 ? "bg-background/0 backdrop-blur-none"
-                : "bg-background/80 shadow-xs backdrop-blur",
+                : "bg-background/85 border-b shadow-xs backdrop-blur-xl",
             )}
           >
             <div className="flex w-full items-center text-sm font-medium">
               <ThreadTitle threadId={threadId} thread={thread} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-full border bg-background/80 px-2 py-1 shadow-sm">
               <TokenUsageIndicator messages={thread.messages} />
               <ExportTrigger threadId={threadId} />
               <ArtifactTrigger />
@@ -140,7 +140,9 @@ export default function ChatPage() {
                 </div>
                 {mounted ? (
                   <InputBox
-                    className={cn("bg-background/5 w-full -translate-y-4")}
+                    className={cn(
+                      "bg-background/90 w-full -translate-y-4 rounded-[1.75rem] border shadow-xl",
+                    )}
                     isNewThread={isNewThread}
                     threadId={threadId}
                     autoFocus={isNewThread}
@@ -170,7 +172,7 @@ export default function ChatPage() {
                   <div
                     aria-hidden="true"
                     className={cn(
-                      "bg-background/5 h-32 w-full -translate-y-4 rounded-2xl border",
+                      "bg-background/5 h-32 w-full -translate-y-4 rounded-[1.75rem] border",
                     )}
                   />
                 )}

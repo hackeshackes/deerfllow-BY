@@ -19,7 +19,9 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.gateway.deps import get_checkpointer, get_run_manager, get_stream_bridge
+from app.gateway.auth import require_user
+from app.gateway.deps import get_checkpointer, get_run_manager, get_store, get_stream_bridge
+from app.gateway.ownership import is_owner, require_thread_owner
 from app.gateway.services import sse_consumer, start_run
 from deerflow.runtime import RunRecord, serialize_channel_values
 
@@ -94,6 +96,12 @@ def _record_to_response(record: RunRecord) -> RunResponse:
 @router.post("/{thread_id}/runs", response_model=RunResponse)
 async def create_run(thread_id: str, body: RunCreateRequest, request: Request) -> RunResponse:
     """Create a background run (returns immediately)."""
+    user = require_user(request)
+    store = get_store(request)
+    if store is not None:
+        existing = await store.aget(("threads",), thread_id)
+        if existing is not None and not is_owner(existing.value, user):
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     record = await start_run(body, thread_id, request)
     return _record_to_response(record)
 
@@ -106,6 +114,12 @@ async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -
     resource URL, matching the LangGraph Platform protocol.  The
     ``useStream`` React hook uses this to extract run metadata.
     """
+    user = require_user(request)
+    store = get_store(request)
+    if store is not None:
+        existing = await store.aget(("threads",), thread_id)
+        if existing is not None and not is_owner(existing.value, user):
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     record = await start_run(body, thread_id, request)
@@ -128,6 +142,12 @@ async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -
 @router.post("/{thread_id}/runs/wait", response_model=dict)
 async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> dict:
     """Create a run and block until it completes, returning the final state."""
+    user = require_user(request)
+    store = get_store(request)
+    if store is not None:
+        existing = await store.aget(("threads",), thread_id)
+        if existing is not None and not is_owner(existing.value, user):
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     record = await start_run(body, thread_id, request)
 
     if record.task is not None:
@@ -153,6 +173,7 @@ async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> 
 @router.get("/{thread_id}/runs", response_model=list[RunResponse])
 async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
     """List all runs for a thread."""
+    await require_thread_owner(request, thread_id)
     run_mgr = get_run_manager(request)
     records = await run_mgr.list_by_thread(thread_id)
     return [_record_to_response(r) for r in records]
@@ -161,6 +182,7 @@ async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
 @router.get("/{thread_id}/runs/{run_id}", response_model=RunResponse)
 async def get_run(thread_id: str, run_id: str, request: Request) -> RunResponse:
     """Get details of a specific run."""
+    await require_thread_owner(request, thread_id)
     run_mgr = get_run_manager(request)
     record = run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -183,6 +205,7 @@ async def cancel_run(
     - wait=true: Block until the run fully stops, return 204
     - wait=false: Return immediately with 202
     """
+    await require_thread_owner(request, thread_id)
     run_mgr = get_run_manager(request)
     record = run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -208,6 +231,7 @@ async def cancel_run(
 @router.get("/{thread_id}/runs/{run_id}/join")
 async def join_run(thread_id: str, run_id: str, request: Request) -> StreamingResponse:
     """Join an existing run's SSE stream."""
+    await require_thread_owner(request, thread_id)
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     record = run_mgr.get(run_id)
@@ -240,6 +264,7 @@ async def stream_existing_run(
     is present the run is cancelled first; the response then streams any
     remaining buffered events so the client observes a clean shutdown.
     """
+    await require_thread_owner(request, thread_id)
     run_mgr = get_run_manager(request)
     record = run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:

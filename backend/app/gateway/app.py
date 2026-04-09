@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.gateway.auth import get_default_workspace_id_for_user, get_workspace_membership, session_payload_from_request, session_user_from_request
+from app.gateway.auth_context import current_user_email, current_user_id, current_user_role, current_workspace_id, current_workspace_role
 from app.gateway.config import get_gateway_config
 from app.gateway.deps import langgraph_runtime
 from app.gateway.routers import (
@@ -20,6 +22,7 @@ from app.gateway.routers import (
     thread_runs,
     threads,
     uploads,
+    users,
 )
 from deerflow.config.app_config import get_app_config
 
@@ -165,6 +168,37 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # CORS is handled by nginx - no need for FastAPI middleware
 
+    @app.middleware("http")
+    async def attach_current_user(request, call_next):
+        payload = session_payload_from_request(request)
+        user = session_user_from_request(request)
+        request.state.current_user = user
+        active_workspace_id = None
+        active_workspace_role_value = None
+        if user is not None:
+            requested_workspace_id = payload.get("active_workspace_id") if payload else None
+            active_workspace_id = requested_workspace_id or get_default_workspace_id_for_user(user.id)
+            membership = get_workspace_membership(user.id, active_workspace_id) if active_workspace_id else None
+            if membership is None:
+                active_workspace_id = get_default_workspace_id_for_user(user.id)
+                membership = get_workspace_membership(user.id, active_workspace_id) if active_workspace_id else None
+            active_workspace_role_value = membership.role if membership else None
+        request.state.active_workspace_id = active_workspace_id
+        request.state.active_workspace_role = active_workspace_role_value
+        token_id = current_user_id.set(user.id if user else None)
+        token_role = current_user_role.set(user.role if user else None)
+        token_email = current_user_email.set(user.email if user else None)
+        token_workspace_id = current_workspace_id.set(active_workspace_id)
+        token_workspace_role = current_workspace_role.set(active_workspace_role_value)
+        try:
+            return await call_next(request)
+        finally:
+            current_user_id.reset(token_id)
+            current_user_role.reset(token_role)
+            current_user_email.reset(token_email)
+            current_workspace_id.reset(token_workspace_id)
+            current_workspace_role.reset(token_workspace_role)
+
     # Include routers
     # Models API is mounted at /api/models
     app.include_router(models.router)
@@ -189,6 +223,8 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Agents API is mounted at /api/agents
     app.include_router(agents.router)
+
+    app.include_router(users.router)
 
     # Suggestions API is mounted at /api/threads/{thread_id}/suggestions
     app.include_router(suggestions.router)

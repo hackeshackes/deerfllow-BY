@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from deerflow.auth_context import get_current_user_id
 from deerflow.config.agents_config import AGENT_NAME_PATTERN
 from deerflow.config.memory_config import get_memory_config
 from deerflow.config.paths import get_paths
@@ -83,6 +84,10 @@ class FileMemoryStorage(MemoryStorage):
         if agent_name is not None:
             self._validate_agent_name(agent_name)
             return get_paths().agent_memory_file(agent_name)
+
+        current_user_id = get_current_user_id()
+        if current_user_id:
+            return get_paths().user_memory_file(current_user_id)
 
         config = get_memory_config()
         if config.storage_path:

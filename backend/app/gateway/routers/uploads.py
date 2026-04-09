@@ -4,9 +4,10 @@ import logging
 import os
 import stat
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
+from app.gateway.ownership import require_thread_owner
 from deerflow.config.paths import get_paths
 from deerflow.sandbox.sandbox_provider import get_sandbox_provider
 from deerflow.uploads.manager import (
@@ -56,9 +57,11 @@ def _make_file_sandbox_writable(file_path: os.PathLike[str] | str) -> None:
 @router.post("", response_model=UploadResponse)
 async def upload_files(
     thread_id: str,
+    request: Request = None,
     files: list[UploadFile] = File(...),
 ) -> UploadResponse:
     """Upload multiple files to a thread's uploads directory."""
+    await require_thread_owner(request, thread_id)
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -133,8 +136,9 @@ async def upload_files(
 
 
 @router.get("/list", response_model=dict)
-async def list_uploaded_files(thread_id: str) -> dict:
+async def list_uploaded_files(thread_id: str, request: Request = None) -> dict:
     """List all files in a thread's uploads directory."""
+    await require_thread_owner(request, thread_id)
     try:
         uploads_dir = get_uploads_dir(thread_id)
     except ValueError as e:
@@ -151,8 +155,9 @@ async def list_uploaded_files(thread_id: str) -> dict:
 
 
 @router.delete("/{filename}")
-async def delete_uploaded_file(thread_id: str, filename: str) -> dict:
+async def delete_uploaded_file(thread_id: str, filename: str, request: Request = None) -> dict:
     """Delete a file from a thread's uploads directory."""
+    await require_thread_owner(request, thread_id)
     try:
         uploads_dir = get_uploads_dir(thread_id)
     except ValueError as e:

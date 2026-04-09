@@ -3,6 +3,8 @@ import re
 import shutil
 from pathlib import Path, PureWindowsPath
 
+from deerflow.auth_context import get_current_user_id, get_current_workspace_id
+
 # Virtual path prefix seen by agents inside the sandbox
 VIRTUAL_PATH_PREFIX = "/mnt/user-data"
 
@@ -116,14 +118,53 @@ class Paths:
         """Path to the persisted memory file: `{base_dir}/memory.json`."""
         return self.base_dir / "memory.json"
 
+    def _active_user_id(self) -> str | None:
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            return None
+        return get_current_user_id()
+
+    @property
+    def users_file(self) -> Path:
+        return self.base_dir / "users.json"
+
+    @property
+    def users_dir(self) -> Path:
+        return self.base_dir / "users"
+
+    @property
+    def workspaces_file(self) -> Path:
+        return self.base_dir / "workspaces.json"
+
+    @property
+    def workspaces_dir(self) -> Path:
+        return self.base_dir / "workspaces"
+
+    def user_dir(self, user_id: str) -> Path:
+        return self.users_dir / user_id
+
+    def workspace_dir(self, workspace_id: str) -> Path:
+        return self.workspaces_dir / workspace_id
+
+    def user_memory_file(self, user_id: str) -> Path:
+        return self.user_dir(user_id) / "memory.json"
+
+    def user_agents_dir(self, user_id: str) -> Path:
+        return self.user_dir(user_id) / "agents"
+
     @property
     def user_md_file(self) -> Path:
         """Path to the global user profile file: `{base_dir}/USER.md`."""
+        current_user_id = self._active_user_id()
+        if current_user_id:
+            return self.user_dir(current_user_id) / "USER.md"
         return self.base_dir / "USER.md"
 
     @property
     def agents_dir(self) -> Path:
         """Root directory for all custom agents: `{base_dir}/agents/`."""
+        current_user_id = self._active_user_id()
+        if current_user_id:
+            return self.user_agents_dir(current_user_id)
         return self.base_dir / "agents"
 
     def agent_dir(self, name: str) -> Path:
@@ -145,6 +186,12 @@ class Paths:
             ValueError: If `thread_id` contains unsafe characters (path separators
                         or `..`) that could cause directory traversal.
         """
+        current_workspace_id = get_current_workspace_id()
+        if current_workspace_id and not os.getenv("PYTEST_CURRENT_TEST"):
+            return self.workspace_dir(current_workspace_id) / "threads" / _validate_thread_id(thread_id)
+        current_user_id = self._active_user_id()
+        if current_user_id:
+            return self.user_dir(current_user_id) / "threads" / _validate_thread_id(thread_id)
         return self.base_dir / "threads" / _validate_thread_id(thread_id)
 
     def sandbox_work_dir(self, thread_id: str) -> Path:

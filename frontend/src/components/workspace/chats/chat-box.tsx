@@ -137,7 +137,7 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
               threadId={threadId}
             />
           ) : (
-            <div className="relative flex size-full justify-center">
+            <div className="bg-background/90 relative flex size-full justify-center rounded-[1.75rem] border shadow-sm">
               <div className="absolute top-1 right-1 z-30">
                 <Button
                   size="icon-sm"
@@ -158,7 +158,10 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
               ) : (
                 <div className="flex size-full max-w-(--container-width-sm) flex-col justify-center p-4 pt-8">
                   <header className="shrink-0">
-                    <h2 className="text-lg font-medium">Artifacts</h2>
+                    <h2 className="text-lg font-medium">Outputs & artifacts</h2>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Review generated files beside the active conversation.
+                    </p>
                   </header>
                   <main className="min-h-0 grow">
                     <ArtifactFileList
