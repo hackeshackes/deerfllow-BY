@@ -20,7 +20,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_user
+from app.gateway.auth_context import get_current_workspace_id
 from app.gateway.deps import get_checkpointer, get_store
+from app.gateway.ownership import THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, attach_owner_metadata, require_thread_owner
 from deerflow.config.paths import Paths, get_paths
 from deerflow.runtime import serialize_channel_values
 
@@ -221,6 +224,7 @@ async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteRe
     Cleans DeerFlow-managed thread directories, removes checkpoint data,
     and removes the thread record from the Store.
     """
+    await require_thread_owner(request, thread_id)
     # Clean local filesystem
     response = _delete_thread_data(thread_id)
 
@@ -254,13 +258,17 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
     """
     store = get_store(request)
     checkpointer = get_checkpointer(request)
+    user = require_user(request)
     thread_id = body.thread_id or str(uuid.uuid4())
     now = time.time()
+    metadata = attach_owner_metadata(body.metadata, user)
 
     # Idempotency: return existing record from Store when already present
     if store is not None:
         existing_record = await _store_get(store, thread_id)
         if existing_record is not None:
+            if existing_record.get("metadata", {}).get(THREAD_OWNER_KEY) != user.id:
+                raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
             return ThreadResponse(
                 thread_id=thread_id,
                 status=existing_record.get("status", "idle"),
@@ -279,7 +287,7 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
                     "status": "idle",
                     "created_at": now,
                     "updated_at": now,
-                    "metadata": body.metadata,
+                    "metadata": metadata,
                 },
             )
         except Exception:
@@ -296,7 +304,7 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
             "source": "input",
             "writes": None,
             "parents": {},
-            **body.metadata,
+            **metadata,
             "created_at": now,
         }
         await checkpointer.aput(config, empty_checkpoint(), ckpt_metadata, {})
@@ -310,7 +318,7 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
         status="idle",
         created_at=str(now),
         updated_at=str(now),
-        metadata=body.metadata,
+        metadata=metadata,
     )
 
 
@@ -333,6 +341,8 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
     """
     store = get_store(request)
     checkpointer = get_checkpointer(request)
+    user = require_user(request)
+    active_workspace_id = get_current_workspace_id()
 
     # -----------------------------------------------------------------------
     # Phase 1: Store
@@ -348,6 +358,12 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
 
         for item in items:
             val = item.value
+            metadata = val.get("metadata", {})
+            if active_workspace_id:
+                if metadata.get(THREAD_WORKSPACE_KEY) != active_workspace_id:
+                    continue
+            elif metadata.get(THREAD_OWNER_KEY) != user.id:
+                continue
             merged[val["thread_id"]] = ThreadResponse(
                 thread_id=val["thread_id"],
                 status=val.get("status", "idle"),
@@ -383,6 +399,12 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
             ckpt_values = {}
             if title := channel_values.get("title"):
                 ckpt_values["title"] = title
+
+            if active_workspace_id:
+                if user_meta.get(THREAD_WORKSPACE_KEY) != active_workspace_id:
+                    continue
+            elif user_meta.get(THREAD_OWNER_KEY) != user.id:
+                continue
 
             thread_resp = ThreadResponse(
                 thread_id=thread_id,
@@ -422,13 +444,10 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
 @router.patch("/{thread_id}", response_model=ThreadResponse)
 async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Request) -> ThreadResponse:
     """Merge metadata into a thread record."""
+    _, record = await require_thread_owner(request, thread_id)
     store = get_store(request)
     if store is None:
         raise HTTPException(status_code=503, detail="Store not available")
-
-    record = await _store_get(store, thread_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
 
     now = time.time()
     updated = dict(record)
@@ -458,12 +477,15 @@ async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
     status from the checkpointer.  Falls back to the checkpointer alone
     for threads that pre-date Store adoption (backward compat).
     """
+    user = require_user(request)
     store = get_store(request)
     checkpointer = get_checkpointer(request)
 
     record: dict | None = None
     if store is not None:
         record = await _store_get(store, thread_id)
+        if record is not None and record.get("metadata", {}).get(THREAD_OWNER_KEY) != user.id:
+            record = None
 
     # Derive accurate status from the checkpointer
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
@@ -512,6 +534,7 @@ async def get_thread_state(thread_id: str, request: Request) -> ThreadStateRespo
     Channel values are serialized to ensure LangChain message objects
     are converted to JSON-safe dicts.
     """
+    await require_thread_owner(request, thread_id)
     checkpointer = get_checkpointer(request)
 
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
@@ -562,6 +585,7 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
     channel values, then syncs any updated ``title`` field back to the Store
     so that ``/threads/search`` reflects the change immediately.
     """
+    await require_thread_owner(request, thread_id)
     checkpointer = get_checkpointer(request)
     store = get_store(request)
 
@@ -640,6 +664,7 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
 @router.post("/{thread_id}/history", response_model=list[HistoryEntry])
 async def get_thread_history(thread_id: str, body: ThreadHistoryRequest, request: Request) -> list[HistoryEntry]:
     """Get checkpoint history for a thread."""
+    await require_thread_owner(request, thread_id)
     checkpointer = get_checkpointer(request)
 
     config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}

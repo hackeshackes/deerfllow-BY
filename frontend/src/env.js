@@ -11,6 +11,14 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
+    BY_ADMIN_EMAIL:
+      process.env.NODE_ENV === "production"
+        ? z.string().email()
+        : z.string().email().optional(),
+    BY_ADMIN_PASSWORD:
+      process.env.NODE_ENV === "production"
+        ? z.string().min(8)
+        : z.string().min(8).optional(),
     BETTER_AUTH_GITHUB_CLIENT_ID: z.string().optional(),
     BETTER_AUTH_GITHUB_CLIENT_SECRET: z.string().optional(),
     GITHUB_OAUTH_TOKEN: z.string().optional(),
@@ -36,6 +44,8 @@ export const env = createEnv({
    */
   runtimeEnv: {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    BY_ADMIN_EMAIL: process.env.BY_ADMIN_EMAIL,
+    BY_ADMIN_PASSWORD: process.env.BY_ADMIN_PASSWORD,
     BETTER_AUTH_GITHUB_CLIENT_ID: process.env.BETTER_AUTH_GITHUB_CLIENT_ID,
     BETTER_AUTH_GITHUB_CLIENT_SECRET:
       process.env.BETTER_AUTH_GITHUB_CLIENT_SECRET,

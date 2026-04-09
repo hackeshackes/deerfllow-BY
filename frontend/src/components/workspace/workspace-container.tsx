@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
+import { BrandMark } from "@/components/brand/brand-mark";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,7 +16,6 @@ import {
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
-import { GithubIcon } from "./github-icon";
 import { Tooltip } from "./tooltip";
 
 export function WorkspaceContainer({
@@ -91,15 +91,10 @@ export function WorkspaceHeader({
         </Breadcrumb>
       </div>
       <div className="pr-4">
-        <Tooltip content={t.workspace.githubTooltip}>
-          <a
-            href="https://github.com/bytedance/deer-flow"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="opacity-75 transition hover:opacity-100"
-          >
-            <GithubIcon className="size-6" />
-          </a>
+        <Tooltip content={t.workspace.about}>
+          <div className="opacity-90 transition hover:opacity-100">
+            <BrandMark compact />
+          </div>
         </Tooltip>
       </div>
     </header>

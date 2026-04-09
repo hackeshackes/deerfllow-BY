@@ -5,9 +5,10 @@ import re
 import shutil
 
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_user
 from deerflow.config.agents_config import AgentConfig, list_custom_agents, load_agent_config, load_agent_soul
 from deerflow.config.paths import get_paths
 
@@ -94,12 +95,13 @@ def _agent_config_to_response(agent_cfg: AgentConfig, include_soul: bool = False
     summary="List Custom Agents",
     description="List all custom agents available in the agents directory, including their soul content.",
 )
-async def list_agents() -> AgentsListResponse:
+async def list_agents(request: Request) -> AgentsListResponse:
     """List all custom agents.
 
     Returns:
         List of all custom agents with their metadata and soul content.
     """
+    require_user(request)
     try:
         agents = list_custom_agents()
         return AgentsListResponse(agents=[_agent_config_to_response(a, include_soul=True) for a in agents])
@@ -113,7 +115,7 @@ async def list_agents() -> AgentsListResponse:
     summary="Check Agent Name",
     description="Validate an agent name and check if it is available (case-insensitive).",
 )
-async def check_agent_name(name: str) -> dict:
+async def check_agent_name(name: str, request: Request) -> dict:
     """Check whether an agent name is valid and not yet taken.
 
     Args:
@@ -125,6 +127,7 @@ async def check_agent_name(name: str) -> dict:
     Raises:
         HTTPException: 422 if the name is invalid.
     """
+    require_user(request)
     _validate_agent_name(name)
     normalized = _normalize_agent_name(name)
     available = not get_paths().agent_dir(normalized).exists()
@@ -137,7 +140,7 @@ async def check_agent_name(name: str) -> dict:
     summary="Get Custom Agent",
     description="Retrieve details and SOUL.md content for a specific custom agent.",
 )
-async def get_agent(name: str) -> AgentResponse:
+async def get_agent(name: str, request: Request) -> AgentResponse:
     """Get a specific custom agent by name.
 
     Args:
@@ -149,6 +152,7 @@ async def get_agent(name: str) -> AgentResponse:
     Raises:
         HTTPException: 404 if agent not found.
     """
+    require_user(request)
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
 
@@ -169,7 +173,7 @@ async def get_agent(name: str) -> AgentResponse:
     summary="Create Custom Agent",
     description="Create a new custom agent with its config and SOUL.md.",
 )
-async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
+async def create_agent_endpoint(request: AgentCreateRequest, http_request: Request) -> AgentResponse:
     """Create a new custom agent.
 
     Args:
@@ -181,6 +185,7 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
     Raises:
         HTTPException: 409 if agent already exists, 422 if name is invalid.
     """
+    require_user(http_request)
     _validate_agent_name(request.name)
     normalized_name = _normalize_agent_name(request.name)
 
@@ -230,7 +235,7 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
     summary="Update Custom Agent",
     description="Update an existing custom agent's config and/or SOUL.md.",
 )
-async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
+async def update_agent(name: str, request: AgentUpdateRequest, http_request: Request) -> AgentResponse:
     """Update an existing custom agent.
 
     Args:
@@ -243,6 +248,7 @@ async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
     Raises:
         HTTPException: 404 if agent not found.
     """
+    require_user(http_request)
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
 
@@ -309,12 +315,13 @@ class UserProfileUpdateRequest(BaseModel):
     summary="Get User Profile",
     description="Read the global USER.md file that is injected into all custom agents.",
 )
-async def get_user_profile() -> UserProfileResponse:
+async def get_user_profile(request: Request) -> UserProfileResponse:
     """Return the current USER.md content.
 
     Returns:
         UserProfileResponse with content=None if USER.md does not exist yet.
     """
+    require_user(request)
     try:
         user_md_path = get_paths().user_md_file
         if not user_md_path.exists():
@@ -332,7 +339,7 @@ async def get_user_profile() -> UserProfileResponse:
     summary="Update User Profile",
     description="Write the global USER.md file that is injected into all custom agents.",
 )
-async def update_user_profile(request: UserProfileUpdateRequest) -> UserProfileResponse:
+async def update_user_profile(request: UserProfileUpdateRequest, http_request: Request) -> UserProfileResponse:
     """Create or overwrite the global USER.md.
 
     Args:
@@ -341,6 +348,7 @@ async def update_user_profile(request: UserProfileUpdateRequest) -> UserProfileR
     Returns:
         UserProfileResponse with the saved content.
     """
+    require_user(http_request)
     try:
         paths = get_paths()
         paths.base_dir.mkdir(parents=True, exist_ok=True)
@@ -358,7 +366,7 @@ async def update_user_profile(request: UserProfileUpdateRequest) -> UserProfileR
     summary="Delete Custom Agent",
     description="Delete a custom agent and all its files (config, SOUL.md, memory).",
 )
-async def delete_agent(name: str) -> None:
+async def delete_agent(name: str, request: Request) -> None:
     """Delete a custom agent.
 
     Args:
@@ -367,6 +375,7 @@ async def delete_agent(name: str) -> None:
     Raises:
         HTTPException: 404 if agent not found.
     """
+    require_user(request)
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
 

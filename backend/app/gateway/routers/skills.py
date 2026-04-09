@@ -3,9 +3,10 @@ import logging
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_owner_user, require_user
 from app.gateway.path_utils import resolve_thread_virtual_path
 from deerflow.agents.lead_agent.prompt import refresh_skills_system_prompt_cache_async
 from deerflow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
@@ -94,13 +95,22 @@ def _skill_to_response(skill: Skill) -> SkillResponse:
     )
 
 
+def _load_custom_skill_response(skill_name: str) -> CustomSkillContentResponse:
+    skills = load_skills(enabled_only=False)
+    skill = next((s for s in skills if s.name == skill_name and s.category == "custom"), None)
+    if skill is None:
+        raise HTTPException(status_code=404, detail=f"Custom skill '{skill_name}' not found")
+    return CustomSkillContentResponse(**_skill_to_response(skill).model_dump(), content=read_custom_skill_content(skill_name))
+
+
 @router.get(
     "/skills",
     response_model=SkillsListResponse,
     summary="List All Skills",
     description="Retrieve a list of all available skills from both public and custom directories.",
 )
-async def list_skills() -> SkillsListResponse:
+async def list_skills(request: Request) -> SkillsListResponse:
+    require_user(request)
     try:
         skills = load_skills(enabled_only=False)
         return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])
@@ -115,7 +125,8 @@ async def list_skills() -> SkillsListResponse:
     summary="Install Skill",
     description="Install a skill from a .skill file (ZIP archive) located in the thread's user-data directory.",
 )
-async def install_skill(request: SkillInstallRequest) -> SkillInstallResponse:
+async def install_skill(request: SkillInstallRequest, http_request: Request) -> SkillInstallResponse:
+    require_owner_user(http_request)
     try:
         skill_file_path = resolve_thread_virtual_path(request.thread_id, request.path)
         result = install_skill_from_archive(skill_file_path)
@@ -135,7 +146,8 @@ async def install_skill(request: SkillInstallRequest) -> SkillInstallResponse:
 
 
 @router.get("/skills/custom", response_model=SkillsListResponse, summary="List Custom Skills")
-async def list_custom_skills() -> SkillsListResponse:
+async def list_custom_skills(request: Request) -> SkillsListResponse:
+    require_user(request)
     try:
         skills = [skill for skill in load_skills(enabled_only=False) if skill.category == "custom"]
         return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])
@@ -145,13 +157,10 @@ async def list_custom_skills() -> SkillsListResponse:
 
 
 @router.get("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Get Custom Skill Content")
-async def get_custom_skill(skill_name: str) -> CustomSkillContentResponse:
+async def get_custom_skill(skill_name: str, request: Request) -> CustomSkillContentResponse:
+    require_user(request)
     try:
-        skills = load_skills(enabled_only=False)
-        skill = next((s for s in skills if s.name == skill_name and s.category == "custom"), None)
-        if skill is None:
-            raise HTTPException(status_code=404, detail=f"Custom skill '{skill_name}' not found")
-        return CustomSkillContentResponse(**_skill_to_response(skill).model_dump(), content=read_custom_skill_content(skill_name))
+        return _load_custom_skill_response(skill_name)
     except HTTPException:
         raise
     except Exception as e:
@@ -160,7 +169,8 @@ async def get_custom_skill(skill_name: str) -> CustomSkillContentResponse:
 
 
 @router.put("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Edit Custom Skill")
-async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest) -> CustomSkillContentResponse:
+async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest, http_request: Request) -> CustomSkillContentResponse:
+    require_owner_user(http_request)
     try:
         ensure_custom_skill_is_editable(skill_name)
         validate_skill_markdown_content(skill_name, request.content)
@@ -183,7 +193,7 @@ async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest
             },
         )
         await refresh_skills_system_prompt_cache_async()
-        return await get_custom_skill(skill_name)
+        return _load_custom_skill_response(skill_name)
     except HTTPException:
         raise
     except FileNotFoundError as e:
@@ -196,7 +206,8 @@ async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest
 
 
 @router.delete("/skills/custom/{skill_name}", summary="Delete Custom Skill")
-async def delete_custom_skill(skill_name: str) -> dict[str, bool]:
+async def delete_custom_skill(skill_name: str, request: Request) -> dict[str, bool]:
+    require_owner_user(request)
     try:
         ensure_custom_skill_is_editable(skill_name)
         skill_dir = get_custom_skill_dir(skill_name)
@@ -226,7 +237,8 @@ async def delete_custom_skill(skill_name: str) -> dict[str, bool]:
 
 
 @router.get("/skills/custom/{skill_name}/history", response_model=CustomSkillHistoryResponse, summary="Get Custom Skill History")
-async def get_custom_skill_history(skill_name: str) -> CustomSkillHistoryResponse:
+async def get_custom_skill_history(skill_name: str, request: Request) -> CustomSkillHistoryResponse:
+    require_user(request)
     try:
         if not custom_skill_exists(skill_name) and not get_skill_history_file(skill_name).exists():
             raise HTTPException(status_code=404, detail=f"Custom skill '{skill_name}' not found")
@@ -239,7 +251,8 @@ async def get_custom_skill_history(skill_name: str) -> CustomSkillHistoryRespons
 
 
 @router.post("/skills/custom/{skill_name}/rollback", response_model=CustomSkillContentResponse, summary="Rollback Custom Skill")
-async def rollback_custom_skill(skill_name: str, request: SkillRollbackRequest) -> CustomSkillContentResponse:
+async def rollback_custom_skill(skill_name: str, request: SkillRollbackRequest, http_request: Request) -> CustomSkillContentResponse:
+    require_owner_user(http_request)
     try:
         if not custom_skill_exists(skill_name) and not get_skill_history_file(skill_name).exists():
             raise HTTPException(status_code=404, detail=f"Custom skill '{skill_name}' not found")
@@ -270,7 +283,7 @@ async def rollback_custom_skill(skill_name: str, request: SkillRollbackRequest) 
         atomic_write(skill_file, target_content)
         append_history(skill_name, history_entry)
         await refresh_skills_system_prompt_cache_async()
-        return await get_custom_skill(skill_name)
+        return _load_custom_skill_response(skill_name)
     except HTTPException:
         raise
     except IndexError:
@@ -290,7 +303,8 @@ async def rollback_custom_skill(skill_name: str, request: SkillRollbackRequest) 
     summary="Get Skill Details",
     description="Retrieve detailed information about a specific skill by its name.",
 )
-async def get_skill(skill_name: str) -> SkillResponse:
+async def get_skill(skill_name: str, request: Request) -> SkillResponse:
+    require_user(request)
     try:
         skills = load_skills(enabled_only=False)
         skill = next((s for s in skills if s.name == skill_name), None)
@@ -312,7 +326,8 @@ async def get_skill(skill_name: str) -> SkillResponse:
     summary="Update Skill",
     description="Update a skill's enabled status by modifying the extensions_config.json file.",
 )
-async def update_skill(skill_name: str, request: SkillUpdateRequest) -> SkillResponse:
+async def update_skill(skill_name: str, request: SkillUpdateRequest, http_request: Request) -> SkillResponse:
+    require_owner_user(http_request)
     try:
         skills = load_skills(enabled_only=False)
         skill = next((s for s in skills if s.name == skill_name), None)

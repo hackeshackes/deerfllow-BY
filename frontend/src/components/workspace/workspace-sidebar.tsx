@@ -15,8 +15,15 @@ import { WorkspaceNavChatList } from "./workspace-nav-chat-list";
 import { WorkspaceNavMenu } from "./workspace-nav-menu";
 
 export function WorkspaceSidebar({
+  sessionEmail,
+  sessionRole,
+  activeWorkspaceName,
   ...props
-}: React.ComponentProps<typeof Sidebar>) {
+}: React.ComponentProps<typeof Sidebar> & {
+  sessionEmail: string;
+  sessionRole: "owner" | "member";
+  activeWorkspaceName: string;
+}) {
   const { open: isSidebarOpen } = useSidebar();
   return (
     <>
@@ -29,7 +36,11 @@ export function WorkspaceSidebar({
           {isSidebarOpen && <RecentChatList />}
         </SidebarContent>
         <SidebarFooter>
-          <WorkspaceNavMenu />
+          <WorkspaceNavMenu
+            sessionEmail={sessionEmail}
+            sessionRole={sessionRole}
+            activeWorkspaceName={activeWorkspaceName}
+          />
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>

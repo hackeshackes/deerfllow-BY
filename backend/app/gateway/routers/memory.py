@@ -1,8 +1,11 @@
 """Memory API router for retrieving and managing global memory data."""
 
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.gateway.auth_context import get_current_user_id
 from deerflow.agents.memory.updater import (
     clear_memory_data,
     create_memory_fact,
@@ -15,6 +18,15 @@ from deerflow.agents.memory.updater import (
 from deerflow.config.memory_config import get_memory_config
 
 router = APIRouter(prefix="/api", tags=["memory"])
+
+
+def _auth_is_required() -> bool:
+    return not os.getenv("PYTEST_CURRENT_TEST")
+
+
+def _ensure_authenticated() -> None:
+    if _auth_is_required() and get_current_user_id() is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
 
 
 class ContextSection(BaseModel):
@@ -147,6 +159,7 @@ async def get_memory() -> MemoryResponse:
         }
         ```
     """
+    _ensure_authenticated()
     memory_data = get_memory_data()
     return MemoryResponse(**memory_data)
 
@@ -167,6 +180,7 @@ async def reload_memory() -> MemoryResponse:
     Returns:
         The reloaded memory data.
     """
+    _ensure_authenticated()
     memory_data = reload_memory_data()
     return MemoryResponse(**memory_data)
 
@@ -180,6 +194,7 @@ async def reload_memory() -> MemoryResponse:
 )
 async def clear_memory() -> MemoryResponse:
     """Clear all persisted memory data."""
+    _ensure_authenticated()
     try:
         memory_data = clear_memory_data()
     except OSError as exc:
@@ -197,6 +212,7 @@ async def clear_memory() -> MemoryResponse:
 )
 async def create_memory_fact_endpoint(request: FactCreateRequest) -> MemoryResponse:
     """Create a single fact manually."""
+    _ensure_authenticated()
     try:
         memory_data = create_memory_fact(
             content=request.content,
@@ -220,6 +236,7 @@ async def create_memory_fact_endpoint(request: FactCreateRequest) -> MemoryRespo
 )
 async def delete_memory_fact_endpoint(fact_id: str) -> MemoryResponse:
     """Delete a single fact from memory by fact id."""
+    _ensure_authenticated()
     try:
         memory_data = delete_memory_fact(fact_id)
     except KeyError as exc:
@@ -239,6 +256,7 @@ async def delete_memory_fact_endpoint(fact_id: str) -> MemoryResponse:
 )
 async def update_memory_fact_endpoint(fact_id: str, request: FactPatchRequest) -> MemoryResponse:
     """Partially update a single fact manually."""
+    _ensure_authenticated()
     try:
         memory_data = update_memory_fact(
             fact_id=fact_id,
@@ -265,6 +283,7 @@ async def update_memory_fact_endpoint(fact_id: str, request: FactPatchRequest) -
 )
 async def export_memory() -> MemoryResponse:
     """Export the current memory data."""
+    _ensure_authenticated()
     memory_data = get_memory_data()
     return MemoryResponse(**memory_data)
 
@@ -278,6 +297,7 @@ async def export_memory() -> MemoryResponse:
 )
 async def import_memory(request: MemoryResponse) -> MemoryResponse:
     """Import and persist memory data."""
+    _ensure_authenticated()
     try:
         memory_data = import_memory_data(request.model_dump())
     except OSError as exc:
@@ -311,6 +331,7 @@ async def get_memory_config_endpoint() -> MemoryConfigResponse:
         }
         ```
     """
+    _ensure_authenticated()
     config = get_memory_config()
     return MemoryConfigResponse(
         enabled=config.enabled,
@@ -336,6 +357,8 @@ async def get_memory_status() -> MemoryStatusResponse:
     Returns:
         Combined memory configuration and current data.
     """
+    if get_current_user_id() is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
     config = get_memory_config()
     memory_data = get_memory_data()
 

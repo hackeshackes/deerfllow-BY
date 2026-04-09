@@ -13,6 +13,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 
+from app.gateway.auth import AuthUser
 from deerflow.runtime import RunManager, StreamBridge
 
 
@@ -68,3 +69,7 @@ def get_checkpointer(request: Request):
 def get_store(request: Request):
     """Return the global store (may be ``None`` if not configured)."""
     return getattr(request.app.state, "store", None)
+
+
+def get_current_user(request: Request) -> AuthUser | None:
+    return getattr(request.state, "current_user", None)

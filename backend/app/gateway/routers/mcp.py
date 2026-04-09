@@ -3,9 +3,10 @@ import logging
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_owner_user, require_user
 from deerflow.config.extensions_config import ExtensionsConfig, get_extensions_config, reload_extensions_config
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class McpConfigUpdateRequest(BaseModel):
     summary="Get MCP Configuration",
     description="Retrieve the current Model Context Protocol (MCP) server configurations.",
 )
-async def get_mcp_configuration() -> McpConfigResponse:
+async def get_mcp_configuration(request: Request) -> McpConfigResponse:
     """Get the current MCP configuration.
 
     Returns:
@@ -90,6 +91,7 @@ async def get_mcp_configuration() -> McpConfigResponse:
         }
         ```
     """
+    require_user(request)
     config = get_extensions_config()
 
     return McpConfigResponse(mcp_servers={name: McpServerConfigResponse(**server.model_dump()) for name, server in config.mcp_servers.items()})
@@ -101,7 +103,7 @@ async def get_mcp_configuration() -> McpConfigResponse:
     summary="Update MCP Configuration",
     description="Update Model Context Protocol (MCP) server configurations and save to file.",
 )
-async def update_mcp_configuration(request: McpConfigUpdateRequest) -> McpConfigResponse:
+async def update_mcp_configuration(request: McpConfigUpdateRequest, http_request: Request) -> McpConfigResponse:
     """Update the MCP configuration.
 
     This will:
@@ -133,6 +135,7 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest) -> McpConfig
         }
         ```
     """
+    require_owner_user(http_request)
     try:
         # Get the current config path (or determine where to save it)
         config_path = ExtensionsConfig.resolve_config_path()
