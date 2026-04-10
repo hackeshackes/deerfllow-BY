@@ -33,7 +33,7 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
           {t.home.docs}
         </Link>
         <a href={supportMailto("BY support")} className="transition-colors hover:text-white">
-          Contact
+          联系我们
         </a>
       </nav>
 
@@ -42,7 +42,7 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
         asChild
         className="rounded-full bg-white text-slate-950 hover:bg-cyan-50"
       >
-        <Link href="/sign-in">Open workspace</Link>
+        <Link href="/sign-in">进入工作台</Link>
       </Button>
     </header>
   );

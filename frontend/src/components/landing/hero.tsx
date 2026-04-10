@@ -42,22 +42,22 @@ export function Hero({ className }: { className?: string }) {
         <h1 className="flex max-w-5xl flex-wrap items-center justify-center gap-3 text-center text-4xl font-bold md:text-6xl">
           <WordRotate
             words={[
-              "Deep Research",
-              "Collect Data",
-              "Analyze Data",
-              "Generate Webpages",
-              "Vibe Coding",
-              "Generate Slides",
-              "Generate Images",
-              "Generate Podcasts",
-              "Generate Videos",
-              "Generate Songs",
-              "Organize Emails",
-              "Do Anything",
-              "Learn Anything",
+              "深度研究",
+              "收集资料",
+              "分析数据",
+              "生成网页",
+              "辅助开发",
+              "生成演示稿",
+              "生成图片",
+              "生成播客",
+              "生成视频",
+              "生成内容",
+              "整理邮件",
+              "处理复杂任务",
+              "快速学习新主题",
             ]}
           />{" "}
-          <div>with {brand.name}</div>
+          <div>尽在 {brand.name}</div>
         </h1>
         <p className="mt-8 max-w-4xl text-center text-xl leading-9 text-slate-300 text-shadow-sm md:text-2xl">
           {brand.description}
@@ -68,29 +68,29 @@ export function Hero({ className }: { className?: string }) {
               className="size-lg scale-108 rounded-full bg-white px-6 text-slate-950 hover:bg-cyan-50"
               size="lg"
             >
-              <span className="text-md">Open private workspace</span>
+              <span className="text-md">进入中文工作台</span>
               <ChevronRightIcon className="size-4" />
             </Button>
           </Link>
-          <Link href="/en/docs">
+          <Link href={brand.docsPath}>
             <Button
               className="rounded-full border-white/20 bg-white/5 px-6 text-white hover:bg-white/10"
               size="lg"
               variant="outline"
             >
-              Read docs
+              查看文档
             </Button>
           </Link>
         </div>
         <div className="mt-10 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            Streamed agent runs with structured progress
+            面向团队协作的流式执行与任务进度
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            Uploads, artifacts, and export-friendly outputs
+            支持上传、产物沉淀与结果导出
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            Protected single-user workspace with owner access
+            支持个人空间与共享空间协作
           </div>
         </div>
       </div>
