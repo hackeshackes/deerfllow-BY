@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CircleUserIcon,
   ChevronsUpDown,
   GlobeIcon,
   InfoIcon,
@@ -179,6 +180,12 @@ export function WorkspaceNavMenu({
                   >
                     <Settings2Icon />
                     {t.common.settings}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/workspace/account">
+                      <CircleUserIcon />
+                      Account
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <a

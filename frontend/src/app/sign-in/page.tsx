@@ -39,9 +39,9 @@ export default function SignInPage() {
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as
-          | { message?: string }
+          | { message?: string; detail?: string }
           | null;
-        setError(body?.message ?? "Unable to sign in.");
+        setError(body?.detail ?? body?.message ?? "Unable to sign in.");
         return;
       }
 
@@ -144,7 +144,7 @@ export default function SignInPage() {
               >
                 {brand.supportEmail}
               </a>
-              .
+              . If you were invited, activate your account from the invite link first.
             </div>
           </CardContent>
         </Card>
