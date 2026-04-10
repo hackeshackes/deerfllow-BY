@@ -61,7 +61,7 @@ export const zhCN: Translations = {
   welcome: {
     greeting: "你好，欢迎回来！",
     description:
-      "欢迎使用 BY，你的私人 AI 工作台。你可以在这里做研究、分析文件、撰写内容，并把过程和产物集中保存在一个受保护的空间里。",
+      "欢迎使用 BY 中文团队版。你可以在个人空间保存自己的思路和记忆，也可以在共享空间中与团队成员协作研究、写作、分析文件并沉淀产物。",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:

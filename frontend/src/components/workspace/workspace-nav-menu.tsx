@@ -152,7 +152,7 @@ export function WorkspaceNavMenu({
                     </div>
                     <div className="mt-1 text-sm font-medium">{sessionEmail}</div>
                     <div className="mt-1 text-xs text-slate-500">
-                      Workspace: {activeWorkspaceName}
+                      当前空间：{activeWorkspaceName}
                     </div>
                   </div>
                   <DropdownMenuSeparator />
@@ -164,7 +164,7 @@ export function WorkspaceNavMenu({
                             key={workspace.id}
                             onClick={() => void handleWorkspaceSwitch(workspace.id)}
                           >
-                            {workspace.name}
+                            {workspace.default_personal ? `个人空间 · ${workspace.name}` : `共享空间 · ${workspace.name}`}
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuGroup>
@@ -184,7 +184,7 @@ export function WorkspaceNavMenu({
                   <DropdownMenuItem asChild>
                     <Link href="/workspace/account">
                       <CircleUserIcon />
-                      Account
+                      我的账号
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -207,13 +207,13 @@ export function WorkspaceNavMenu({
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/users">
                           <ShieldCheckIcon />
-                          User management
+                          用户管理
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/workspaces">
                           <ShieldCheckIcon />
-                          Workspace management
+                          空间管理
                         </Link>
                       </DropdownMenuItem>
                     </>
@@ -232,7 +232,7 @@ export function WorkspaceNavMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => void handleLogout()}>
                   <LogOutIcon />
-                  {loggingOut ? "Signing out..." : "Sign out"}
+                  {loggingOut ? "退出中..." : "退出登录"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
