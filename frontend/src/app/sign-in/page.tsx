@@ -41,14 +41,14 @@ export default function SignInPage() {
         const body = (await response.json().catch(() => null)) as
           | { message?: string; detail?: string }
           | null;
-        setError(body?.detail ?? body?.message ?? "Unable to sign in.");
+        setError(body?.detail ?? body?.message ?? "登录失败，请稍后重试。");
         return;
       }
 
       router.replace("/workspace");
       router.refresh();
     } catch {
-      setError("Unable to reach the sign-in service.");
+      setError("无法连接登录服务，请稍后重试。");
     } finally {
       setLoading(false);
     }
@@ -63,28 +63,26 @@ export default function SignInPage() {
           <div className="space-y-4">
             <div className="text-primary-foreground/80 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm backdrop-blur-sm">
               <LockKeyholeIcon className="size-4" />
-              Single-user secure workspace
+              中文优先 · 邀请制团队工作台
             </div>
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
-              Sign in to the BY workspace.
+              登录 BY 工作台
             </h1>
             <p className="max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              BY is a private AI control room for research, writing, file
-              analysis, and long-running agent work. Access is limited to invited
-              accounts.
+              BY 是一个面向个人与团队协作的中文 AI 工作台，适合研究、写作、文件分析和长任务执行。目前仅支持受邀账号登录使用。
             </p>
           </div>
           <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-              <div className="font-medium text-white">Focused execution</div>
+              <div className="font-medium text-white">专注执行</div>
               <p className="mt-1 text-sm text-slate-300">
-                Run complex tasks, track progress, and keep outputs in one place.
+                在一个空间里完成复杂任务、查看进度并沉淀结果。
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-              <div className="font-medium text-white">Private by default</div>
+              <div className="font-medium text-white">协作有边界</div>
               <p className="mt-1 text-sm text-slate-300">
-                Built for a protected, multi-user private deployment.
+                支持个人空间与共享空间，适合私有部署和团队协作。
               </p>
             </div>
           </div>
@@ -92,15 +90,15 @@ export default function SignInPage() {
 
         <Card className="border-white/10 bg-white/95 py-0 text-slate-900 shadow-2xl shadow-black/20 backdrop-blur-xl">
           <CardHeader className="gap-3 border-b border-slate-200/80 py-8">
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
+            <CardTitle className="text-2xl">欢迎回来</CardTitle>
             <CardDescription>
-              Use your BY account credentials to enter the workspace.
+              使用你的 BY 账号进入工作台。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 py-8">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
+                <label className="text-sm font-medium">邮箱</label>
                 <Input
                   autoComplete="email"
                   inputMode="email"
@@ -112,13 +110,13 @@ export default function SignInPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
+                <label className="text-sm font-medium">密码</label>
                 <Input
                   autoComplete="current-password"
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Enter your owner password"
+                  placeholder="请输入账号密码"
                   required
                 />
               </div>
@@ -131,20 +129,20 @@ export default function SignInPage() {
               )}
 
               <Button className="h-11 w-full rounded-xl" disabled={loading}>
-                {loading ? "Signing in..." : "Sign in"}
+                {loading ? "登录中..." : "登录"}
                 {!loading && <ArrowRightIcon className="size-4" />}
               </Button>
             </form>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Need help? Contact{" "}
+              如需帮助，请联系{" "}
               <a
                 className="font-medium text-slate-900 underline"
                 href={supportMailto("BY access request")}
               >
                 {brand.supportEmail}
               </a>
-              . If you were invited, activate your account from the invite link first.
+              。如果你已经收到邀请，请先通过激活链接完成账号设置。
             </div>
           </CardContent>
         </Card>

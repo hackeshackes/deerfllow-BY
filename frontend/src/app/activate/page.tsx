@@ -21,11 +21,11 @@ export default function ActivatePage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) {
-      setError("Invite token is missing.");
+      setError("缺少邀请凭证，请确认链接是否完整。");
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError("两次输入的密码不一致。");
       return;
     }
 
@@ -39,13 +39,13 @@ export default function ActivatePage() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-        setError(body?.detail ?? "Unable to activate account.");
+        setError(body?.detail ?? "激活账号失败，请稍后重试。");
         return;
       }
       router.replace("/workspace");
       router.refresh();
     } catch {
-      setError("Unable to reach the activation service.");
+      setError("无法连接激活服务，请稍后重试。");
     } finally {
       setLoading(false);
     }
@@ -60,34 +60,34 @@ export default function ActivatePage() {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200 backdrop-blur-sm">
               <MailCheckIcon className="size-4" />
-              Invite-only access
+              邀请制账号激活
             </div>
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
-              Activate your BY account.
+              激活你的 BY 账号
             </h1>
             <p className="max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              Set your password once to unlock your personal workspace and any shared workspaces you were invited to.
+              完成一次密码设置后，你就可以进入个人空间，并访问已被邀请加入的共享空间。
             </p>
           </div>
         </section>
 
         <Card className="border-white/10 bg-white/95 py-0 text-slate-900 shadow-2xl shadow-black/20 backdrop-blur-xl">
           <CardHeader className="gap-3 border-b border-slate-200/80 py-8">
-            <CardTitle className="text-2xl">Complete account setup</CardTitle>
-            <CardDescription>Choose a password for your invited BY account.</CardDescription>
+            <CardTitle className="text-2xl">完成账号设置</CardTitle>
+            <CardDescription>为你的受邀账号设置一个登录密码。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 py-8">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Invite token</label>
+                <label className="text-sm font-medium">邀请凭证</label>
                 <Input value={token} readOnly className="bg-slate-50" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">New password</label>
+                <label className="text-sm font-medium">新密码</label>
                 <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Confirm password</label>
+                <label className="text-sm font-medium">确认密码</label>
                 <Input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={8} />
               </div>
               {error && (
@@ -97,7 +97,7 @@ export default function ActivatePage() {
                 </div>
               )}
               <Button className="h-11 w-full rounded-xl" disabled={loading}>
-                {loading ? "Activating..." : "Activate account"}
+                {loading ? "激活中..." : "激活账号"}
                 {!loading && <ArrowRightIcon className="size-4" />}
               </Button>
             </form>
