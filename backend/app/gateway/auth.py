@@ -8,6 +8,7 @@ import os
 import secrets
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -27,6 +28,9 @@ class AuthUser:
     status: str
     password_hash: str
     salt: str
+    invited_at: str | None = None
+    activated_at: str | None = None
+    last_login_at: str | None = None
 
     @property
     def is_owner(self) -> bool:
@@ -49,6 +53,16 @@ class WorkspaceMembership:
     role: str
 
 
+@dataclass(slots=True)
+class InviteToken:
+    id: str
+    user_id: str
+    token: str
+    expires_at: str
+    used_at: str | None
+    created_at: str
+
+
 def _auth_secret() -> str:
     return os.getenv("BETTER_AUTH_SECRET") or "by-local-dev-secret"
 
@@ -59,6 +73,24 @@ def _users_file():
 
 def _workspaces_file():
     return get_paths().workspaces_file
+
+
+def _invites_file():
+    return get_paths().invites_file
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _utc_now_iso() -> str:
+    return _utc_now().isoformat()
+
+
+def _parse_datetime(raw: str | None) -> datetime | None:
+    if not raw:
+        return None
+    return datetime.fromisoformat(raw)
 
 
 def _hash_password(password: str, salt: str) -> str:
@@ -114,6 +146,7 @@ def _seed_owner_user() -> dict[str, Any]:
     owner_password = os.getenv("BY_ADMIN_PASSWORD", "change-me-123")
     owner_name = os.getenv("BY_ADMIN_NAME", "BY Owner")
     salt = secrets.token_hex(16)
+    now = _utc_now_iso()
     return {
         "id": "owner",
         "email": owner_email,
@@ -122,6 +155,9 @@ def _seed_owner_user() -> dict[str, Any]:
         "status": "active",
         "salt": salt,
         "password_hash": _hash_password(owner_password, salt),
+        "invited_at": now,
+        "activated_at": now,
+        "last_login_at": None,
     }
 
 
@@ -171,24 +207,6 @@ def _write_users_payload(payload: dict[str, Any]) -> None:
     temp_path.replace(file_path)
 
 
-def _to_workspace(record: dict[str, Any]) -> Workspace:
-    return Workspace(
-        id=str(record["id"]),
-        name=str(record["name"]),
-        slug=str(record["slug"]),
-        created_by_user_id=str(record["created_by_user_id"]),
-        default_personal=bool(record.get("default_personal", False)),
-    )
-
-
-def _to_membership(record: dict[str, Any]) -> WorkspaceMembership:
-    return WorkspaceMembership(
-        workspace_id=str(record["workspace_id"]),
-        user_id=str(record["user_id"]),
-        role=str(record.get("role", "member")),
-    )
-
-
 def _read_workspaces_payload() -> dict[str, Any]:
     file_path = _workspaces_file()
     if not file_path.exists():
@@ -211,6 +229,58 @@ def _write_workspaces_payload(payload: dict[str, Any]) -> None:
     temp_path = file_path.with_suffix(".tmp")
     temp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     temp_path.replace(file_path)
+
+
+def _read_invites_payload() -> dict[str, Any]:
+    file_path = _invites_file()
+    if not file_path.exists():
+        payload = {"invites": []}
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return payload
+    try:
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Invalid invites store JSON") from exc
+    payload.setdefault("invites", [])
+    return payload
+
+
+def _write_invites_payload(payload: dict[str, Any]) -> None:
+    file_path = _invites_file()
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = file_path.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    temp_path.replace(file_path)
+
+
+def _to_workspace(record: dict[str, Any]) -> Workspace:
+    return Workspace(
+        id=str(record["id"]),
+        name=str(record["name"]),
+        slug=str(record["slug"]),
+        created_by_user_id=str(record["created_by_user_id"]),
+        default_personal=bool(record.get("default_personal", False)),
+    )
+
+
+def _to_membership(record: dict[str, Any]) -> WorkspaceMembership:
+    return WorkspaceMembership(
+        workspace_id=str(record["workspace_id"]),
+        user_id=str(record["user_id"]),
+        role=str(record.get("role", "member")),
+    )
+
+
+def _to_invite(record: dict[str, Any]) -> InviteToken:
+    return InviteToken(
+        id=str(record["id"]),
+        user_id=str(record["user_id"]),
+        token=str(record["token"]),
+        expires_at=str(record["expires_at"]),
+        used_at=record.get("used_at"),
+        created_at=str(record["created_at"]),
+    )
 
 
 def _ensure_workspace_defaults(payload: dict[str, Any]) -> dict[str, Any]:
@@ -242,6 +312,9 @@ def _to_auth_user(record: dict[str, Any]) -> AuthUser:
         status=str(record.get("status", "active")),
         password_hash=str(record["password_hash"]),
         salt=str(record["salt"]),
+        invited_at=record.get("invited_at"),
+        activated_at=record.get("activated_at"),
+        last_login_at=record.get("last_login_at"),
     )
 
 
@@ -260,6 +333,11 @@ def list_workspace_memberships() -> list[WorkspaceMembership]:
     return [_to_membership(membership) for membership in payload.get("memberships", [])]
 
 
+def list_invites() -> list[InviteToken]:
+    payload = _read_invites_payload()
+    return [_to_invite(invite) for invite in payload.get("invites", [])]
+
+
 def get_workspace_by_id(workspace_id: str) -> Workspace | None:
     for workspace in list_workspaces():
         if workspace.id == workspace_id:
@@ -267,7 +345,9 @@ def get_workspace_by_id(workspace_id: str) -> Workspace | None:
     return None
 
 
-def get_workspace_membership(user_id: str, workspace_id: str) -> WorkspaceMembership | None:
+def get_workspace_membership(user_id: str, workspace_id: str | None) -> WorkspaceMembership | None:
+    if workspace_id is None:
+        return None
     for membership in list_workspace_memberships():
         if membership.user_id == user_id and membership.workspace_id == workspace_id:
             return membership
@@ -282,7 +362,10 @@ def get_default_workspace_id_for_user(user_id: str) -> str | None:
     memberships = list_workspaces_for_user(user_id)
     if not memberships:
         return None
-    personal = next((m for m in memberships if get_workspace_by_id(m.workspace_id) and get_workspace_by_id(m.workspace_id).default_personal), None)
+    personal = next(
+        (membership for membership in memberships if (workspace := get_workspace_by_id(membership.workspace_id)) and workspace.default_personal),
+        None,
+    )
     return personal.workspace_id if personal else memberships[0].workspace_id
 
 
@@ -301,6 +384,25 @@ def get_user_by_email(email: str) -> AuthUser | None:
     return None
 
 
+def get_active_invite_for_user(user_id: str) -> InviteToken | None:
+    now = _utc_now()
+    invites = [invite for invite in list_invites() if invite.user_id == user_id and invite.used_at is None and (_parse_datetime(invite.expires_at) or now) > now]
+    invites.sort(key=lambda invite: invite.created_at, reverse=True)
+    return invites[0] if invites else None
+
+
+def get_invite_by_token(token: str) -> InviteToken | None:
+    now = _utc_now()
+    for invite in list_invites():
+        if invite.token != token:
+            continue
+        expires_at = _parse_datetime(invite.expires_at)
+        if invite.used_at is not None or expires_at is None or expires_at <= now:
+            return None
+        return invite
+    return None
+
+
 def verify_password(user: AuthUser, password: str) -> bool:
     return hmac.compare_digest(user.password_hash, _hash_password(password, user.salt))
 
@@ -312,7 +414,16 @@ def authenticate_user(email: str, password: str) -> AuthUser | None:
     return user if verify_password(user, password) else None
 
 
-def create_user(email: str, password: str, role: str = "member", name: str | None = None) -> AuthUser:
+def touch_last_login(user_id: str) -> None:
+    payload = _read_users_payload()
+    for record in payload["users"]:
+        if record.get("id") == user_id:
+            record["last_login_at"] = _utc_now_iso()
+            _write_users_payload(payload)
+            return
+
+
+def create_user(email: str, password: str | None = None, role: str = "member", name: str | None = None, *, status: str = "invited") -> AuthUser:
     normalized_email = email.strip().lower()
     if not normalized_email:
         raise HTTPException(status_code=422, detail="Email is required")
@@ -320,18 +431,25 @@ def create_user(email: str, password: str, role: str = "member", name: str | Non
         raise HTTPException(status_code=409, detail="User already exists")
     if role not in {"owner", "member"}:
         raise HTTPException(status_code=422, detail="Invalid role")
-    if len(password) < 8:
+    if status not in {"invited", "active", "disabled"}:
+        raise HTTPException(status_code=422, detail="Invalid status")
+    if status == "active" and (password is None or len(password) < 8):
         raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
 
     salt = secrets.token_hex(16)
+    now = _utc_now_iso()
+    seeded_password = password or secrets.token_urlsafe(24)
     record = {
         "id": uuid.uuid4().hex,
         "email": normalized_email,
         "name": name or normalized_email,
         "role": role,
-        "status": "active",
+        "status": status,
         "salt": salt,
-        "password_hash": _hash_password(password, salt),
+        "password_hash": _hash_password(seeded_password, salt),
+        "invited_at": now,
+        "activated_at": now if status == "active" else None,
+        "last_login_at": None,
     }
     payload = _read_users_payload()
     payload["users"].append(record)
@@ -350,9 +468,11 @@ def update_user(user_id: str, *, role: str | None = None, status: str | None = N
                 raise HTTPException(status_code=422, detail="Invalid role")
             record["role"] = role
         if status is not None:
-            if status not in {"active", "disabled"}:
+            if status not in {"invited", "active", "disabled"}:
                 raise HTTPException(status_code=422, detail="Invalid status")
             record["status"] = status
+            if status == "active" and not record.get("activated_at"):
+                record["activated_at"] = _utc_now_iso()
         if name is not None:
             record["name"] = name.strip() or record.get("name") or record.get("email")
         if password is not None:
@@ -361,9 +481,66 @@ def update_user(user_id: str, *, role: str | None = None, status: str | None = N
             salt = secrets.token_hex(16)
             record["salt"] = salt
             record["password_hash"] = _hash_password(password, salt)
+            if record.get("status") == "invited":
+                record["status"] = "active"
+            if not record.get("activated_at"):
+                record["activated_at"] = _utc_now_iso()
         _write_users_payload(payload)
         return _to_auth_user(record)
     raise HTTPException(status_code=404, detail="User not found")
+
+
+def change_user_password(user_id: str, current_password: str, new_password: str) -> AuthUser:
+    user = get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.status != "active":
+        raise HTTPException(status_code=403, detail="Only active users can change password")
+    if not verify_password(user, current_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    return update_user(user_id, password=new_password)
+
+
+def issue_invite_token(user_id: str, *, expires_in_hours: int = 72) -> InviteToken:
+    user = get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = get_active_invite_for_user(user_id)
+    if existing is not None:
+        return existing
+    payload = _read_invites_payload()
+    now = _utc_now()
+    record = {
+        "id": uuid.uuid4().hex,
+        "user_id": user_id,
+        "token": secrets.token_urlsafe(32),
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(hours=expires_in_hours)).isoformat(),
+        "used_at": None,
+    }
+    payload["invites"].append(record)
+    _write_invites_payload(payload)
+    return _to_invite(record)
+
+
+def activate_user_from_token(token: str, password: str) -> AuthUser:
+    invite = get_invite_by_token(token)
+    if invite is None:
+        raise HTTPException(status_code=404, detail="Invite link is invalid or expired")
+    user = get_user_by_id(invite.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.status == "disabled":
+        raise HTTPException(status_code=403, detail="Account is disabled")
+    activated_user = update_user(user.id, password=password, status="active")
+
+    payload = _read_invites_payload()
+    for record in payload["invites"]:
+        if record.get("id") == invite.id:
+            record["used_at"] = _utc_now_iso()
+            break
+    _write_invites_payload(payload)
+    return activated_user
 
 
 def create_workspace(name: str, created_by_user_id: str) -> Workspace:
