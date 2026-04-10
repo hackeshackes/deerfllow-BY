@@ -57,6 +57,12 @@ Then open:
 
 ## 5. Launch validation checklist
 
+### Chinese UX
+
+- `/sign-in` and `/activate` render Chinese-first copy
+- `/workspace/account` explains personal vs shared workspace boundaries in Chinese
+- `/workspace/admin/users` and `/workspace/admin/workspaces` render Chinese management UX
+
 ### Authentication
 
 - Owner can sign in
