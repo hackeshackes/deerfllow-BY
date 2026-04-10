@@ -426,15 +426,15 @@ def touch_last_login(user_id: str) -> None:
 def create_user(email: str, password: str | None = None, role: str = "member", name: str | None = None, *, status: str = "invited") -> AuthUser:
     normalized_email = email.strip().lower()
     if not normalized_email:
-        raise HTTPException(status_code=422, detail="Email is required")
+        raise HTTPException(status_code=422, detail="邮箱不能为空")
     if get_user_by_email(normalized_email) is not None:
-        raise HTTPException(status_code=409, detail="User already exists")
+        raise HTTPException(status_code=409, detail="该用户已存在")
     if role not in {"owner", "member"}:
-        raise HTTPException(status_code=422, detail="Invalid role")
+        raise HTTPException(status_code=422, detail="无效的角色")
     if status not in {"invited", "active", "disabled"}:
-        raise HTTPException(status_code=422, detail="Invalid status")
+        raise HTTPException(status_code=422, detail="无效的用户状态")
     if status == "active" and (password is None or len(password) < 8):
-        raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
+        raise HTTPException(status_code=422, detail="密码长度至少需要 8 位")
 
     salt = secrets.token_hex(16)
     now = _utc_now_iso()
@@ -465,11 +465,11 @@ def update_user(user_id: str, *, role: str | None = None, status: str | None = N
             continue
         if role is not None:
             if role not in {"owner", "member"}:
-                raise HTTPException(status_code=422, detail="Invalid role")
+                raise HTTPException(status_code=422, detail="无效的角色")
             record["role"] = role
         if status is not None:
             if status not in {"invited", "active", "disabled"}:
-                raise HTTPException(status_code=422, detail="Invalid status")
+                raise HTTPException(status_code=422, detail="无效的用户状态")
             record["status"] = status
             if status == "active" and not record.get("activated_at"):
                 record["activated_at"] = _utc_now_iso()
@@ -477,7 +477,7 @@ def update_user(user_id: str, *, role: str | None = None, status: str | None = N
             record["name"] = name.strip() or record.get("name") or record.get("email")
         if password is not None:
             if len(password) < 8:
-                raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
+                raise HTTPException(status_code=422, detail="密码长度至少需要 8 位")
             salt = secrets.token_hex(16)
             record["salt"] = salt
             record["password_hash"] = _hash_password(password, salt)
@@ -487,24 +487,24 @@ def update_user(user_id: str, *, role: str | None = None, status: str | None = N
                 record["activated_at"] = _utc_now_iso()
         _write_users_payload(payload)
         return _to_auth_user(record)
-    raise HTTPException(status_code=404, detail="User not found")
+    raise HTTPException(status_code=404, detail="未找到该用户")
 
 
 def change_user_password(user_id: str, current_password: str, new_password: str) -> AuthUser:
     user = get_user_by_id(user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="未找到该用户")
     if user.status != "active":
-        raise HTTPException(status_code=403, detail="Only active users can change password")
+        raise HTTPException(status_code=403, detail="只有已激活用户可以修改密码")
     if not verify_password(user, current_password):
-        raise HTTPException(status_code=401, detail="Current password is incorrect")
+        raise HTTPException(status_code=401, detail="当前密码不正确")
     return update_user(user_id, password=new_password)
 
 
 def issue_invite_token(user_id: str, *, expires_in_hours: int = 72) -> InviteToken:
     user = get_user_by_id(user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="未找到该用户")
     existing = get_active_invite_for_user(user_id)
     if existing is not None:
         return existing
@@ -526,12 +526,12 @@ def issue_invite_token(user_id: str, *, expires_in_hours: int = 72) -> InviteTok
 def activate_user_from_token(token: str, password: str) -> AuthUser:
     invite = get_invite_by_token(token)
     if invite is None:
-        raise HTTPException(status_code=404, detail="Invite link is invalid or expired")
+        raise HTTPException(status_code=404, detail="邀请链接无效或已过期")
     user = get_user_by_id(invite.user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="未找到该用户")
     if user.status == "disabled":
-        raise HTTPException(status_code=403, detail="Account is disabled")
+        raise HTTPException(status_code=403, detail="账号已被禁用")
     activated_user = update_user(user.id, password=password, status="active")
 
     payload = _read_invites_payload()
@@ -546,7 +546,7 @@ def activate_user_from_token(token: str, password: str) -> AuthUser:
 def create_workspace(name: str, created_by_user_id: str) -> Workspace:
     normalized_name = name.strip()
     if not normalized_name:
-        raise HTTPException(status_code=422, detail="Workspace name is required")
+        raise HTTPException(status_code=422, detail="空间名称不能为空")
     payload = _read_workspaces_payload()
     workspace = {
         "id": f"ws-{uuid.uuid4().hex}",
@@ -563,12 +563,12 @@ def create_workspace(name: str, created_by_user_id: str) -> Workspace:
 
 def add_workspace_member(workspace_id: str, user_id: str, role: str = "member") -> WorkspaceMembership:
     if role not in {"owner", "admin", "member"}:
-        raise HTTPException(status_code=422, detail="Invalid workspace role")
+        raise HTTPException(status_code=422, detail="无效的空间角色")
     payload = _read_workspaces_payload()
     if not any(workspace.get("id") == workspace_id for workspace in payload["workspaces"]):
-        raise HTTPException(status_code=404, detail="Workspace not found")
+        raise HTTPException(status_code=404, detail="未找到该空间")
     if not any(user.get("id") == user_id for user in _read_users_payload().get("users", [])):
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="未找到该用户")
     for membership in payload["memberships"]:
         if membership.get("workspace_id") == workspace_id and membership.get("user_id") == user_id:
             membership["role"] = role
@@ -583,10 +583,10 @@ def add_workspace_member(workspace_id: str, user_id: str, role: str = "member") 
 def set_active_workspace(user: AuthUser, workspace_id: str) -> tuple[Workspace, WorkspaceMembership]:
     workspace = get_workspace_by_id(workspace_id)
     if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+        raise HTTPException(status_code=404, detail="未找到该空间")
     membership = get_workspace_membership(user.id, workspace_id)
     if membership is None:
-        raise HTTPException(status_code=403, detail="Workspace membership required")
+        raise HTTPException(status_code=403, detail="当前账号不属于该空间")
     return workspace, membership
 
 
@@ -625,12 +625,12 @@ def session_payload_from_request(request: Request) -> dict[str, Any] | None:
 def require_user(request: Request) -> AuthUser:
     user = session_user_from_request(request)
     if user is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
+        raise HTTPException(status_code=401, detail="需要先登录")
     return user
 
 
 def require_owner_user(request: Request) -> AuthUser:
     user = require_user(request)
     if not user.is_owner:
-        raise HTTPException(status_code=403, detail="Owner access required")
+        raise HTTPException(status_code=403, detail="仅拥有者可执行此操作")
     return user

@@ -23,6 +23,7 @@ from app.gateway.auth import (
     get_workspace_membership,
     issue_invite_token,
     list_users,
+    list_workspace_memberships,
     list_workspaces_for_user,
     require_owner_user,
     require_user,
@@ -101,6 +102,7 @@ class WorkspaceResponse(BaseModel):
     created_by_user_id: str
     default_personal: bool
     role: str
+    member_count: int
 
 
 class WorkspacesListResponse(BaseModel):
@@ -131,6 +133,7 @@ def _invite_to_response(invite: InviteToken | None) -> InviteResponse | None:
 
 
 def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership) -> WorkspaceResponse:
+    member_count = len([item for item in list_workspace_memberships() if item.workspace_id == workspace.id])
     return WorkspaceResponse(
         id=workspace.id,
         name=workspace.name,
@@ -138,6 +141,7 @@ def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership
         created_by_user_id=workspace.created_by_user_id,
         default_personal=workspace.default_personal,
         role=membership.role,
+        member_count=member_count,
     )
 
 
@@ -190,15 +194,15 @@ def _set_session_cookie(response: Response, user: AuthUser, request: Request, *,
 async def login(body: SessionLoginRequest, response: Response, request: Request) -> SessionUserResponse:
     user = get_user_by_email(body.email)
     if user is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="邮箱或密码错误")
     if user.status == "invited":
-        raise HTTPException(status_code=403, detail="Account has not been activated yet")
+        raise HTTPException(status_code=403, detail="账号尚未激活，请先完成邀请激活")
     if user.status == "disabled":
-        raise HTTPException(status_code=403, detail="Account is disabled")
+        raise HTTPException(status_code=403, detail="账号已被禁用")
 
     authenticated = authenticate_user(body.email, body.password)
     if authenticated is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="邮箱或密码错误")
 
     touch_last_login(authenticated.id)
     refreshed = get_user_by_email(authenticated.email) or authenticated
