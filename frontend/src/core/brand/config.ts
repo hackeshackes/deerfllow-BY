@@ -1,12 +1,12 @@
 export const brand = {
   name: "BY",
   shortName: "BY",
-  tagline: "Private AI workspace for focused research, writing, and execution.",
+  tagline: "面向个人与团队协作的中文 AI 工作台。",
   description:
-    "BY is a private AI workspace that researches, writes, analyzes files, and ships polished outputs from one place.",
+    "BY 是一个面向个人与团队协作的 AI 工作台，可以在一个空间里完成研究、写作、文件分析与结果沉淀。",
   supportEmail: "sabar.bao@me.com",
   websitePath: "/",
-  docsPath: "/en/docs",
+  docsPath: "/zh/docs",
 };
 
 export function supportMailto(subject?: string) {
