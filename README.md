@@ -226,6 +226,15 @@ That prompt is intended for coding agents. It tells the agent to clone the repo 
 
 ### Running the Application
 
+#### Invite-Only Account Flow (BY deployments)
+
+The current BY account model is invite-only:
+
+- owners create invited users in `/workspace/admin/users`
+- invited users activate their account from `/activate?token=...`
+- only `active` users can sign in
+- `disabled` users cannot access the workspace
+
 #### Deployment Sizing
 
 Use the table below as a practical starting point when choosing how to run DeerFlow:

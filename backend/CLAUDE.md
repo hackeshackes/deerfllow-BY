@@ -119,6 +119,14 @@ The backend is split into two layers with a strict dependency direction:
 
 **Dependency rule**: App imports deerflow, but deerflow never imports app. This boundary is enforced by `tests/test_harness_boundary.py` which runs in CI.
 
+### Current Access Model
+
+- Authentication is handled in `app/gateway/auth.py` with signed-cookie sessions.
+- Users move through `invited -> active -> disabled` states.
+- Activation is invite-only via `/api/users/activate` and frontend `/activate?token=...`.
+- Personal memory and custom agents stay user-scoped.
+- Threads, uploads, and artifacts are scoped by active workspace membership.
+
 **Import conventions**:
 ```python
 # Harness internal
