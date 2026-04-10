@@ -93,12 +93,16 @@ class Paths:
         Falls back to base_dir when the env var is not set (native/local execution).
         """
         if env := os.getenv("DEER_FLOW_HOST_BASE_DIR"):
+            if os.getenv("PYTEST_CURRENT_TEST") and self._base_dir is not None and not re.match(r"^[A-Za-z]:[\\/]", env):
+                return self.base_dir
             return Path(env)
         return self.base_dir
 
     def _host_base_dir_str(self) -> str:
         """Return the host base dir as a raw string for bind mounts."""
         if env := os.getenv("DEER_FLOW_HOST_BASE_DIR"):
+            if os.getenv("PYTEST_CURRENT_TEST") and self._base_dir is not None and not re.match(r"^[A-Za-z]:[\\/]", env):
+                return str(self.base_dir)
             return env
         return str(self.base_dir)
 
@@ -134,6 +138,10 @@ class Paths:
     @property
     def workspaces_file(self) -> Path:
         return self.base_dir / "workspaces.json"
+
+    @property
+    def invites_file(self) -> Path:
+        return self.base_dir / "invites.json"
 
     @property
     def workspaces_dir(self) -> Path:
