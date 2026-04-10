@@ -66,7 +66,9 @@ Then open:
 ### User management
 
 - Owner can open `/workspace/admin/users`
-- Owner can create a member
+- Owner can create an invited member
+- Owner can copy an activation link for the invited member
+- Invited users can activate via `/activate?token=...`
 - Owner can disable/enable a member
 
 ### Isolation
