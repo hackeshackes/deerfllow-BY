@@ -6,21 +6,28 @@ from pydantic import BaseModel, Field
 from app.gateway.auth import (
     SESSION_COOKIE_NAME,
     AuthUser,
+    InviteToken,
     Workspace,
     WorkspaceMembership,
+    activate_user_from_token,
     add_workspace_member,
     authenticate_user,
+    change_user_password,
     create_session_token,
     create_user,
     create_workspace,
+    get_active_invite_for_user,
     get_default_workspace_id_for_user,
+    get_user_by_email,
     get_workspace_by_id,
     get_workspace_membership,
+    issue_invite_token,
     list_users,
     list_workspaces_for_user,
     require_owner_user,
     require_user,
     set_active_workspace,
+    touch_last_login,
     update_user,
 )
 
@@ -38,18 +45,30 @@ class SessionUserResponse(BaseModel):
     role: str
     name: str
     status: str
+    invited_at: str | None = None
+    activated_at: str | None = None
+    last_login_at: str | None = None
     active_workspace_id: str | None = None
     active_workspace_name: str | None = None
     active_workspace_role: str | None = None
 
 
+class InviteResponse(BaseModel):
+    token: str
+    expires_at: str
+    activation_path: str
+
+
+class UserResponse(SessionUserResponse):
+    invite: InviteResponse | None = None
+
+
 class UsersListResponse(BaseModel):
-    users: list[SessionUserResponse]
+    users: list[UserResponse]
 
 
 class UserCreateRequest(BaseModel):
     email: str
-    password: str
     role: str = "member"
     name: str | None = None
 
@@ -59,6 +78,20 @@ class UserUpdateRequest(BaseModel):
     status: str | None = None
     name: str | None = None
     password: str | None = Field(default=None, min_length=8)
+
+
+class UserInviteRequest(BaseModel):
+    expires_in_hours: int = Field(default=72, ge=1, le=24 * 30)
+
+
+class AccountPasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
+class ActivationRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8)
 
 
 class WorkspaceResponse(BaseModel):
@@ -87,6 +120,16 @@ class WorkspaceSwitchRequest(BaseModel):
     workspace_id: str
 
 
+def _invite_to_response(invite: InviteToken | None) -> InviteResponse | None:
+    if invite is None:
+        return None
+    return InviteResponse(
+        token=invite.token,
+        expires_at=invite.expires_at,
+        activation_path=f"/activate?token={invite.token}",
+    )
+
+
 def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership) -> WorkspaceResponse:
     return WorkspaceResponse(
         id=workspace.id,
@@ -108,10 +151,19 @@ def _to_response(user: AuthUser, active_workspace_id: str | None = None) -> Sess
         role=user.role,
         name=user.name,
         status=user.status,
+        invited_at=user.invited_at,
+        activated_at=user.activated_at,
+        last_login_at=user.last_login_at,
         active_workspace_id=workspace_id,
         active_workspace_name=workspace.name if workspace else None,
         active_workspace_role=membership.role if membership else None,
     )
+
+
+def _to_user_response(user: AuthUser, active_workspace_id: str | None = None) -> UserResponse:
+    base = _to_response(user, active_workspace_id=active_workspace_id)
+    invite = _invite_to_response(get_active_invite_for_user(user.id)) if user.status == "invited" else None
+    return UserResponse(**base.model_dump(), invite=invite)
 
 
 def _use_secure_cookie(request: Request | None = None) -> bool:
@@ -122,13 +174,7 @@ def _use_secure_cookie(request: Request | None = None) -> bool:
     return False
 
 
-@router.post("/session/login", response_model=SessionUserResponse)
-async def login(body: SessionLoginRequest, response: Response, request: Request) -> SessionUserResponse:
-    user = authenticate_user(body.email, body.password)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    active_workspace_id = get_default_workspace_id_for_user(user.id)
+def _set_session_cookie(response: Response, user: AuthUser, request: Request, *, active_workspace_id: str | None = None) -> None:
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=create_session_token(user, active_workspace_id=active_workspace_id),
@@ -138,7 +184,27 @@ async def login(body: SessionLoginRequest, response: Response, request: Request)
         path="/",
         max_age=60 * 60 * 24 * 14,
     )
-    return _to_response(user, active_workspace_id=active_workspace_id)
+
+
+@router.post("/session/login", response_model=SessionUserResponse)
+async def login(body: SessionLoginRequest, response: Response, request: Request) -> SessionUserResponse:
+    user = get_user_by_email(body.email)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user.status == "invited":
+        raise HTTPException(status_code=403, detail="Account has not been activated yet")
+    if user.status == "disabled":
+        raise HTTPException(status_code=403, detail="Account is disabled")
+
+    authenticated = authenticate_user(body.email, body.password)
+    if authenticated is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    touch_last_login(authenticated.id)
+    refreshed = get_user_by_email(authenticated.email) or authenticated
+    active_workspace_id = get_default_workspace_id_for_user(refreshed.id)
+    _set_session_cookie(response, refreshed, request, active_workspace_id=active_workspace_id)
+    return _to_response(refreshed, active_workspace_id=active_workspace_id)
 
 
 @router.post("/session/logout")
@@ -161,23 +227,52 @@ async def get_me(request: Request) -> SessionUserResponse:
     return _to_response(user, active_workspace_id=active_workspace_id)
 
 
+@router.post("/users/activate", response_model=SessionUserResponse)
+async def activate_user_endpoint(body: ActivationRequest, response: Response, request: Request) -> SessionUserResponse:
+    user = activate_user_from_token(body.token, body.password)
+    touch_last_login(user.id)
+    refreshed = get_user_by_email(user.email) or user
+    active_workspace_id = get_default_workspace_id_for_user(refreshed.id)
+    _set_session_cookie(response, refreshed, request, active_workspace_id=active_workspace_id)
+    return _to_response(refreshed, active_workspace_id=active_workspace_id)
+
+
+@router.post("/account/change-password", response_model=SessionUserResponse)
+async def change_password_endpoint(body: AccountPasswordChangeRequest, request: Request) -> SessionUserResponse:
+    user = require_user(request)
+    updated = change_user_password(user.id, body.current_password, body.new_password)
+    active_workspace_id = getattr(request.state, "active_workspace_id", None)
+    return _to_response(updated, active_workspace_id=active_workspace_id)
+
+
 @router.get("/users", response_model=UsersListResponse)
 async def get_users(request: Request) -> UsersListResponse:
     require_owner_user(request)
-    return UsersListResponse(users=[_to_response(user) for user in list_users()])
+    return UsersListResponse(users=[_to_user_response(user) for user in list_users()])
 
 
-@router.post("/users", response_model=SessionUserResponse, status_code=201)
-async def create_user_endpoint(body: UserCreateRequest, request: Request) -> SessionUserResponse:
+@router.post("/users", response_model=UserResponse, status_code=201)
+async def create_user_endpoint(body: UserCreateRequest, request: Request) -> UserResponse:
     require_owner_user(request)
-    return _to_response(create_user(body.email, body.password, role=body.role, name=body.name))
+    user = create_user(body.email, role=body.role, name=body.name, status="invited")
+    issue_invite_token(user.id)
+    return _to_user_response(user)
 
 
-@router.patch("/users/{user_id}", response_model=SessionUserResponse)
-async def update_user_endpoint(user_id: str, body: UserUpdateRequest, request: Request) -> SessionUserResponse:
+@router.post("/users/{user_id}/invite", response_model=UserResponse)
+async def resend_invite_endpoint(user_id: str, body: UserInviteRequest, request: Request) -> UserResponse:
+    require_owner_user(request)
+    user = update_user(user_id, status="invited")
+    issue_invite_token(user.id, expires_in_hours=body.expires_in_hours)
+    refreshed = get_user_by_email(user.email) or user
+    return _to_user_response(refreshed)
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+async def update_user_endpoint(user_id: str, body: UserUpdateRequest, request: Request) -> UserResponse:
     require_owner_user(request)
     updated = update_user(user_id, role=body.role, status=body.status, name=body.name, password=body.password)
-    return _to_response(updated)
+    return _to_user_response(updated)
 
 
 @router.get("/workspaces", response_model=WorkspacesListResponse)
@@ -212,13 +307,5 @@ async def add_workspace_member_endpoint(workspace_id: str, body: WorkspaceMember
 async def switch_workspace(body: WorkspaceSwitchRequest, response: Response, request: Request) -> SessionUserResponse:
     user = require_user(request)
     workspace, _membership = set_active_workspace(user, body.workspace_id)
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=create_session_token(user, active_workspace_id=workspace.id),
-        httponly=True,
-        samesite="lax",
-        secure=_use_secure_cookie(request),
-        path="/",
-        max_age=60 * 60 * 24 * 14,
-    )
+    _set_session_cookie(response, user, request, active_workspace_id=workspace.id)
     return _to_response(user, active_workspace_id=workspace.id)
