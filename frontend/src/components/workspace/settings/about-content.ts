@@ -1,32 +1,32 @@
-export const aboutMarkdown = `# About BY
+export const aboutMarkdown = `# 关于 Mic Service Agent
 
-> A private AI workspace tuned for focused, owner-operated use.
+> 面向个人与团队协作的中文智能服务工作台。
 
-BY is a single-user deployment of this agent workspace, rebuilt around a simpler brand, a cleaner UI, and a private operating model.
+Mic Service Agent（MSA）是一个支持多用户、共享空间、文件处理、模型调用与结果沉淀的智能服务工作台。
 
 ---
 
-## What BY is for
+## 核心能力
 
-- Long-form research and synthesis
-- Writing, rewriting, and report generation
-- Working with uploads, generated artifacts, and exports
-- Running multi-step agent tasks from one protected workspace
+- 多用户与邀请制账号体系
+- 个人空间与共享空间协作
+- 文件上传、分析、生成产物与导出
+- 智能体执行、技能调用与长期任务推进
 
-## What stays powerful
+## 典型场景
 
-- Streaming agent runs
-- Skills, tools, and file handling
-- Todos, artifacts, and exports
-- Workspace memory and conversation history
+- 行业研究与资料整理
+- 报告、方案、文档写作
+- 团队共享空间中的协作分析
+- 面向产物的 PPT、文件与结果输出
 
-## Contact
+## 联系方式
 
-For access, support, or private deployment questions, contact [sabar.bao@me.com](mailto:sabar.bao@me.com).
+如需支持或部署帮助，请联系 [sabar.bao@me.com](mailto:sabar.bao@me.com)。
 
 ---
 
 ## License
 
-This deployment remains based on software distributed under the **MIT License**.
+当前部署仍基于 **MIT License** 软件构建。
 `;
