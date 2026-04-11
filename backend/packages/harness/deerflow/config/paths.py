@@ -198,13 +198,18 @@ class Paths:
             ValueError: If `thread_id` contains unsafe characters (path separators
                         or `..`) that could cause directory traversal.
         """
+        validated_thread_id = _validate_thread_id(thread_id)
         current_workspace_id = get_current_workspace_id()
         if current_workspace_id and not os.getenv("PYTEST_CURRENT_TEST"):
-            return self.workspace_dir(current_workspace_id) / "threads" / _validate_thread_id(thread_id)
+            workspace_thread_dir = self.workspace_dir(current_workspace_id) / "threads" / validated_thread_id
+            legacy_thread_dir = self.base_dir / "threads" / validated_thread_id
+            if workspace_thread_dir.exists() or not legacy_thread_dir.exists():
+                return workspace_thread_dir
+            return legacy_thread_dir
         current_user_id = self._active_user_id()
         if current_user_id:
-            return self.user_dir(current_user_id) / "threads" / _validate_thread_id(thread_id)
-        return self.base_dir / "threads" / _validate_thread_id(thread_id)
+            return self.user_dir(current_user_id) / "threads" / validated_thread_id
+        return self.base_dir / "threads" / validated_thread_id
 
     def sandbox_work_dir(self, thread_id: str) -> Path:
         """
