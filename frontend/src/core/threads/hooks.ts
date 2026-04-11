@@ -212,6 +212,14 @@ export function useThreadStream({
     onCreated(meta) {
       handleStreamStart(meta.thread_id);
       setOnStreamThreadId(meta.thread_id);
+      void fetch(
+        `${getBackendBaseURL()}/api/threads/${encodeURIComponent(meta.thread_id)}/sync`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ metadata: {} }),
+        },
+      );
     },
     onLangChainEvent(event) {
       if (event.event === "on_tool_end") {
