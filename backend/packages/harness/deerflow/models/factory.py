@@ -53,6 +53,8 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             "name",
             "display_name",
             "description",
+            "enabled",
+            "is_default",
             "supports_thinking",
             "supports_reasoning_effort",
             "when_thinking_enabled",
@@ -60,6 +62,11 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             "supports_vision",
         },
     )
+    # Pydantic extra fields such as admin-only flags may still be preserved in
+    # some model_dump paths. Strip them defensively before instantiating the
+    # provider model so they never leak into model_kwargs.
+    for admin_only_key in ("enabled", "is_default"):
+        model_settings_from_config.pop(admin_only_key, None)
     # Compute effective when_thinking_enabled by merging in the `thinking` shortcut field.
     # The `thinking` shortcut is equivalent to setting when_thinking_enabled["thinking"].
     has_thinking_settings = (model_config.when_thinking_enabled is not None) or (model_config.thinking is not None)
