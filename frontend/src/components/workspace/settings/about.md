@@ -1,24 +1,24 @@
-# About BY
+# 关于 Mic Service Agent
 
-> A private AI workspace for focused, owner-operated use.
+> 面向个人与团队协作的中文智能服务工作台。
 
-BY is a single-user deployment of this agent workspace, rebuilt around a simpler brand, a cleaner interface, and a private operating model.
+Mic Service Agent（MSA）支持多用户、共享空间、文件分析、模型调用和产物沉淀，适合个人使用与团队协作场景。
 
 ---
 
-## Core use cases
+## 适合做什么
 
-- Deep research and synthesis
-- Writing and report generation
-- Working with uploads, outputs, and exported artifacts
-- Running long-form agent tasks from one protected workspace
+- 深度研究与资料整合
+- 报告、方案与文档写作
+- 文件处理与产物生成
+- 共享空间中的团队协作任务
 
-## Contact
+## 联系方式
 
-For support or deployment questions, contact [sabar.bao@me.com](mailto:sabar.bao@me.com).
+如需支持或部署帮助，请联系 [sabar.bao@me.com](mailto:sabar.bao@me.com)。
 
 ---
 
 ## License
 
-This deployment remains based on software distributed under the **MIT License**.
+当前部署仍基于 **MIT License** 软件构建。

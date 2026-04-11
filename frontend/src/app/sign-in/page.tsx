@@ -66,10 +66,10 @@ export default function SignInPage() {
               中文优先 · 邀请制团队工作台
             </div>
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
-              登录 BY 工作台
+              登录 Mic Service Agent
             </h1>
             <p className="max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              BY 是一个面向个人与团队协作的中文 AI 工作台，适合研究、写作、文件分析和长任务执行。目前仅支持受邀账号登录使用。
+              Mic Service Agent 是一个面向个人与团队协作的中文智能服务工作台，适合研究、写作、文件分析和长任务执行。目前仅支持受邀账号登录使用。
             </p>
           </div>
           <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
@@ -92,7 +92,7 @@ export default function SignInPage() {
           <CardHeader className="gap-3 border-b border-slate-200/80 py-8">
             <CardTitle className="text-2xl">欢迎回来</CardTitle>
             <CardDescription>
-              使用你的 BY 账号进入工作台。
+              使用你的 Mic Service Agent 账号进入工作台。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 py-8">
@@ -138,7 +138,7 @@ export default function SignInPage() {
               如需帮助，请联系{" "}
               <a
                 className="font-medium text-slate-900 underline"
-                href={supportMailto("BY access request")}
+                  href={supportMailto("Mic Service Agent access request")}
               >
                 {brand.supportEmail}
               </a>
