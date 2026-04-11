@@ -1,9 +1,9 @@
 export const brand = {
-  name: "BY",
-  shortName: "BY",
-  tagline: "面向个人与团队协作的中文 AI 工作台。",
+  name: "Mic Service Agent",
+  shortName: "MSA",
+  tagline: "面向个人与团队协作的中文智能服务工作台。",
   description:
-    "BY 是一个面向个人与团队协作的 AI 工作台，可以在一个空间里完成研究、写作、文件分析与结果沉淀。",
+    "Mic Service Agent 是一个面向个人与团队协作的中文智能服务工作台，可以在一个空间里完成研究、写作、文件分析与结果沉淀。",
   supportEmail: "sabar.bao@me.com",
   websitePath: "/",
   docsPath: "/zh/docs",

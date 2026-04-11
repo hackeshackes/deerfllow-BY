@@ -7,6 +7,7 @@ import {
   InfoIcon,
   LogOutIcon,
   MailIcon,
+  MonitorCogIcon,
   ShieldCheckIcon,
   Settings2Icon,
   SettingsIcon,
@@ -211,9 +212,15 @@ export function WorkspaceNavMenu({
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/workspace/admin/workspaces">
-                          <ShieldCheckIcon />
-                          空间管理
+                      <Link href="/workspace/admin/workspaces">
+                        <ShieldCheckIcon />
+                        空间管理
+                      </Link>
+                    </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/workspace/admin/models">
+                          <MonitorCogIcon />
+                          模型管理
                         </Link>
                       </DropdownMenuItem>
                     </>
