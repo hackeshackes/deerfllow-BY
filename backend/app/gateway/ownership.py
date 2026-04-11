@@ -7,6 +7,7 @@ from fastapi import HTTPException, Request
 from app.gateway.auth import AuthUser, get_workspace_membership, require_user
 from app.gateway.auth_context import get_current_workspace_id
 from app.gateway.deps import get_store
+from deerflow.config.paths import get_paths
 
 THREAD_OWNER_KEY = "owner_user_id"
 THREAD_WORKSPACE_KEY = "workspace_id"
@@ -51,7 +52,20 @@ async def require_thread_owner(request: Request, thread_id: str) -> tuple[AuthUs
         raise HTTPException(status_code=503, detail="Store not available")
     item = await store.aget(("threads",), thread_id)
     if item is None:
-        raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+        thread_dir = get_paths().thread_dir(thread_id)
+        if thread_dir.exists():
+            recovered = {
+                "thread_id": thread_id,
+                "status": "idle",
+                "created_at": 0,
+                "updated_at": 0,
+                "metadata": attach_owner_metadata({}, user),
+                "values": {},
+            }
+            await store.aput(("threads",), thread_id, recovered)
+            item = await store.aget(("threads",), thread_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     record = item.value
     if not is_owner(record, user):
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")

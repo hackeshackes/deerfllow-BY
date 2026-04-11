@@ -97,6 +97,12 @@ class ThreadPatchRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata to merge")
 
 
+class ThreadSyncRequest(BaseModel):
+    """Request body for synchronizing a LangGraph-created thread into the gateway store."""
+
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata to merge")
+
+
 class ThreadStateUpdateRequest(BaseModel):
     """Request body for updating thread state (human-in-the-loop resume)."""
 
@@ -466,6 +472,29 @@ async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Reques
         created_at=str(updated.get("created_at", "")),
         updated_at=str(now),
         metadata=updated.get("metadata", {}),
+    )
+
+
+@router.post("/{thread_id}/sync", response_model=ThreadResponse)
+async def sync_thread(thread_id: str, body: ThreadSyncRequest, request: Request) -> ThreadResponse:
+    """Mirror a LangGraph-created thread into the gateway store for artifact/access checks."""
+    user = require_user(request)
+    store = get_store(request)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Store not available")
+
+    metadata = attach_owner_metadata(body.metadata, user)
+    await _store_upsert(store, thread_id, metadata=metadata)
+    record = await _store_get(store, thread_id)
+    if record is None:
+        raise HTTPException(status_code=500, detail="Failed to sync thread")
+    return ThreadResponse(
+        thread_id=thread_id,
+        status=record.get("status", "idle"),
+        created_at=str(record.get("created_at", "")),
+        updated_at=str(record.get("updated_at", "")),
+        metadata=record.get("metadata", {}),
+        values=record.get("values", {}),
     )
 
 
