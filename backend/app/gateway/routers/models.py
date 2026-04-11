@@ -77,6 +77,17 @@ def _write_override_data(data: dict[str, Any]) -> None:
     path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
 
+def _persist_and_reload(data: dict[str, Any]):
+    previous = _read_override_data()
+    _write_override_data(data)
+    try:
+        return reload_app_config()
+    except Exception as exc:  # noqa: BLE001
+        _write_override_data(previous)
+        reload_app_config()
+        raise HTTPException(status_code=422, detail=f"模型配置无效：{exc}") from exc
+
+
 def _model_to_response(model: ModelConfig, *, is_default: bool = False) -> ModelResponse:
     return ModelResponse(
         name=model.name,
@@ -139,8 +150,7 @@ async def create_admin_model(payload: ModelMutationRequest, request: Request) ->
         for item in data["models"]:
             item["is_default"] = False
     data["models"].append(_normalize_model_record(payload))
-    _write_override_data(data)
-    config = reload_app_config()
+    config = _persist_and_reload(data)
     model = config.get_model_config(payload.name)
     return _model_to_response(model, is_default=payload.is_default)
 
@@ -162,8 +172,7 @@ async def update_admin_model(model_name: str, payload: ModelMutationRequest, req
         for item in data["models"]:
             if item.get("name") != payload.name:
                 item["is_default"] = False
-    _write_override_data(data)
-    config = reload_app_config()
+    config = _persist_and_reload(data)
     model = config.get_model_config(payload.name)
     return _model_to_response(model, is_default=payload.is_default)
 
