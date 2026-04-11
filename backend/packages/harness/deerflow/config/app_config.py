@@ -14,6 +14,7 @@ from deerflow.config.extensions_config import ExtensionsConfig
 from deerflow.config.guardrails_config import GuardrailsConfig, load_guardrails_config_from_dict
 from deerflow.config.memory_config import MemoryConfig, load_memory_config_from_dict
 from deerflow.config.model_config import ModelConfig
+from deerflow.config.paths import get_paths
 from deerflow.config.sandbox_config import SandboxConfig
 from deerflow.config.skill_evolution_config import SkillEvolutionConfig
 from deerflow.config.skills_config import SkillsConfig
@@ -28,6 +29,24 @@ from deerflow.config.tool_search_config import ToolSearchConfig, load_tool_searc
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _merge_model_overrides(base_models: list[dict], override_models: list[dict]) -> list[dict]:
+    merged = {model.get("name"): dict(model) for model in base_models if model.get("name")}
+    for override in override_models:
+        name = override.get("name")
+        if not name:
+            continue
+        if name in merged:
+            merged[name] = {**merged[name], **override}
+        else:
+            merged[name] = dict(override)
+    ordered_names = [model.get("name") for model in base_models if model.get("name")]
+    for override in override_models:
+        name = override.get("name")
+        if name and name not in ordered_names:
+            ordered_names.append(name)
+    return [merged[name] for name in ordered_names if name in merged]
 
 
 def _default_config_candidates() -> tuple[Path, ...]:
@@ -99,6 +118,13 @@ class AppConfig(BaseModel):
         resolved_path = cls.resolve_config_path(config_path)
         with open(resolved_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f) or {}
+
+        override_path = get_paths().models_override_file
+        if override_path.exists():
+            with open(override_path, encoding="utf-8") as f:
+                override_data = yaml.safe_load(f) or {}
+            if override_models := override_data.get("models"):
+                config_data["models"] = _merge_model_overrides(config_data.get("models", []), override_models)
 
         # Check config version before processing
         cls._check_config_version(config_data, resolved_path)
