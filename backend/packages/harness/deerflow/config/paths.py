@@ -144,6 +144,10 @@ class Paths:
         return self.base_dir / "invites.json"
 
     @property
+    def models_override_file(self) -> Path:
+        return self.base_dir / "models.override.yaml"
+
+    @property
     def workspaces_dir(self) -> Path:
         return self.base_dir / "workspaces"
 
