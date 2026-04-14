@@ -61,11 +61,11 @@ export const zhCN: Translations = {
   welcome: {
     greeting: "你好，欢迎回来！",
     description:
-      "欢迎使用 BY 中文团队版。你可以在个人空间保存自己的思路和记忆，也可以在共享空间中与团队成员协作研究、写作、分析文件并沉淀产物。",
+      "欢迎使用 MicX 中文团队版。你可以在个人空间保存自己的思路和记忆，也可以在共享空间中与团队成员协作研究、写作、分析文件并沉淀产物。",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:
-      "创建自己的技能来扩展 BY，让工作台更贴合你的研究、写作和执行流程。",
+      "创建自己的技能来扩展 MicX，让工作台更贴合你的研究、写作和执行流程。",
   },
 
   // Clipboard
@@ -196,13 +196,13 @@ export const zhCN: Translations = {
     save: "保存智能体",
     saving: "正在保存智能体...",
     saveRequested:
-      "已提交保存请求，BY 正在根据当前对话生成并保存初版智能体。",
+      "已提交保存请求，MicX 正在根据当前对话生成并保存初版智能体。",
     saveHint:
       "你可以在右上角的菜单里随时保存这个智能体，就算目前还只是初稿也可以。",
     saveCommandMessage:
       "请现在根据我们目前已经讨论的全部内容保存这个自定义智能体。这就是我明确的保存确认。如果仍有少量细节缺失，请根据上下文做出合理假设，生成一份简洁的英文初始 SOUL.md，并直接调用 setup_agent，不要再向我索要额外确认。",
     agentCreatedPendingRefresh:
-      "智能体已创建，但 BY 暂时还无法读取到它。请稍后刷新当前页面。",
+      "智能体已创建，但 MicX 暂时还无法读取到它。请稍后刷新当前页面。",
     more: "更多操作",
     agentCreated: "智能体已创建！",
     startChatting: "开始对话",
@@ -217,13 +217,13 @@ export const zhCN: Translations = {
 
   // Workspace
   workspace: {
-    officialWebsite: "访问 BY 首页",
-    githubTooltip: "BY",
+    officialWebsite: "访问 MicX 首页",
+    githubTooltip: "MicX",
     settingsAndMore: "设置和更多",
     visitGithub: "产品链接",
     reportIssue: "报告问题",
     contactUs: "联系我们",
-    about: "关于 BY",
+    about: "关于 MicX",
   },
 
   // Conversation
@@ -239,7 +239,7 @@ export const zhCN: Translations = {
 
   // Page titles (document title)
   pages: {
-    appName: "BY",
+    appName: "MicX",
     chats: "对话",
     newChat: "新对话",
     untitled: "未命名",
@@ -264,7 +264,7 @@ export const zhCN: Translations = {
     writeFile: "写入文件",
     clickToViewContent: "点击查看文件内容",
     writeTodos: "更新 To-do 列表",
-    skillInstallTooltip: "安装技能并使其可在 BY 中使用",
+    skillInstallTooltip: "安装技能并使其可在 MicX 中使用",
   },
 
   uploads: {
@@ -295,7 +295,7 @@ export const zhCN: Translations = {
     noResults: "未找到结果。",
     actions: "操作",
     keyboardShortcuts: "键盘快捷键",
-    keyboardShortcutsDescription: "使用键盘快捷键更快地操作 BY。",
+    keyboardShortcutsDescription: "使用键盘快捷键更快地操作 MicX。",
     openCommandPalette: "打开命令面板",
     toggleSidebar: "切换侧边栏",
   },
@@ -303,7 +303,7 @@ export const zhCN: Translations = {
   // Settings
   settings: {
     title: "设置",
-    description: "根据你的偏好调整 BY 的界面和行为。",
+    description: "根据你的偏好调整 MicX 的界面和行为。",
     sections: {
       appearance: "外观",
       memory: "记忆",
@@ -315,7 +315,7 @@ export const zhCN: Translations = {
     memory: {
       title: "记忆",
       description:
-        "BY 会在后台不断从你的对话中自动学习。这些记忆能帮助 BY 更好地理解你，并提供更个性化的体验。",
+        "MicX 会在后台不断从你的对话中自动学习。这些记忆能帮助 MicX 更好地理解你，并提供更个性化的体验。",
       empty: "暂无可展示的记忆数据。",
       rawJson: "原始 JSON",
       exportButton: "导出记忆",
@@ -411,18 +411,18 @@ export const zhCN: Translations = {
       createSkill: "新建技能",
       emptyTitle: "还没有技能",
       emptyDescription:
-        "将你的 Agent Skill 文件夹放在 BY 根目录下的 `/skills/custom` 文件夹中。",
+        "将你的 Agent Skill 文件夹放在 MicX 根目录下的 `/skills/custom` 文件夹中。",
       emptyButton: "创建你的第一个技能",
     },
     notification: {
       title: "通知",
       description:
-        "BY 只会在窗口不活跃时发送完成通知，特别适合长时间任务：你可以先去做别的事，完成后会收到提醒。",
+        "MicX 只会在窗口不活跃时发送完成通知，特别适合长时间任务：你可以先去做别的事，完成后会收到提醒。",
       requestPermission: "请求通知权限",
       deniedHint:
         "通知权限已被拒绝。可在浏览器的网站设置中重新开启，以接收完成提醒。",
       testButton: "发送测试通知",
-      testTitle: "BY",
+      testTitle: "MicX",
       testBody: "这是一条测试通知。",
       notSupported: "当前浏览器不支持通知功能。",
       disableNotification: "关闭通知",

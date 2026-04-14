@@ -134,6 +134,12 @@ function getStreamErrorMessage(error: unknown): string {
   return "Request failed.";
 }
 
+
+function isThreadMissingError(error: unknown): boolean {
+  const message = getStreamErrorMessage(error);
+  return /thread( with id)? .+ not found/i.test(message);
+}
+
 export function useThreadStream({
   threadId,
   context,
@@ -289,6 +295,17 @@ export function useThreadStream({
     },
     onError(error) {
       setOptimisticMessages([]);
+      if (typeof window !== "undefined" && isThreadMissingError(error)) {
+        const currentThreadId = threadIdRef.current;
+        if (runMetadataStorageRef.current && currentThreadId) {
+          runMetadataStorageRef.current.removeItem(`lg:stream:${currentThreadId}`);
+        }
+        toast.error("当前对话已不可访问，已为你切换到新对话。", {
+          duration: 2500,
+        });
+        window.location.replace("/workspace/chats/new");
+        return;
+      }
       toast.error(getStreamErrorMessage(error));
     },
     onFinish(state) {
@@ -539,72 +556,35 @@ export function useThreads(
     select: ["thread_id", "updated_at", "values"],
   },
 ) {
-  const apiClient = getAPIClient();
   return useQuery<AgentThread[]>({
     queryKey: ["threads", "search", params],
     queryFn: async () => {
-      const maxResults = params.limit;
-      const initialOffset = params.offset ?? 0;
-      const DEFAULT_PAGE_SIZE = 50;
+      const response = await fetch(`${getBackendBaseURL()}/api/threads/search`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(params),
+      });
 
-      // Preserve prior semantics: if a non-positive limit is explicitly provided,
-      // delegate to a single search call with the original parameters.
-      if (maxResults !== undefined && maxResults <= 0) {
-        const response =
-          await apiClient.threads.search<AgentThreadState>(params);
-        return response as AgentThread[];
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ detail: "Failed to load threads." }));
+        throw new Error(error.detail ?? "Failed to load threads.");
       }
 
-      const pageSize =
-        typeof maxResults === "number" && maxResults > 0
-          ? Math.min(DEFAULT_PAGE_SIZE, maxResults)
-          : DEFAULT_PAGE_SIZE;
-
-      const threads: AgentThread[] = [];
-      let offset = initialOffset;
-
-      while (true) {
-        if (typeof maxResults === "number" && threads.length >= maxResults) {
-          break;
-        }
-
-        const currentLimit =
-          typeof maxResults === "number"
-            ? Math.min(pageSize, maxResults - threads.length)
-            : pageSize;
-
-        if (typeof maxResults === "number" && currentLimit <= 0) {
-          break;
-        }
-
-        const response = (await apiClient.threads.search<AgentThreadState>({
-          ...params,
-          limit: currentLimit,
-          offset,
-        })) as AgentThread[];
-
-        threads.push(...response);
-
-        if (response.length < currentLimit) {
-          break;
-        }
-
-        offset += response.length;
-      }
-
-      return threads;
+      return (await response.json()) as AgentThread[];
     },
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000,
   });
 }
 
 export function useDeleteThread() {
   const queryClient = useQueryClient();
-  const apiClient = getAPIClient();
   return useMutation({
     mutationFn: async ({ threadId }: { threadId: string }) => {
-      await apiClient.threads.delete(threadId);
-
       const response = await fetch(
         `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}`,
         {
@@ -617,6 +597,10 @@ export function useDeleteThread() {
           .json()
           .catch(() => ({ detail: "Failed to delete local thread data." }));
         throw new Error(error.detail ?? "Failed to delete local thread data.");
+      }
+
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(`lg:stream:${threadId}`);
       }
     },
     onSuccess(_, { threadId }) {
@@ -641,7 +625,6 @@ export function useDeleteThread() {
 
 export function useRenameThread() {
   const queryClient = useQueryClient();
-  const apiClient = getAPIClient();
   return useMutation({
     mutationFn: async ({
       threadId,
@@ -650,11 +633,34 @@ export function useRenameThread() {
       threadId: string;
       title: string;
     }) => {
-      await apiClient.threads.updateState(threadId, {
-        values: { title },
-      });
+      const response = await fetch(
+        `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}/title`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ title }),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ detail: "Failed to rename thread." }));
+        throw new Error(error.detail ?? "Failed to rename thread.");
+      }
+
+      return response.json();
     },
     onSuccess(_, { threadId, title }) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("micx-thread-title-updated", {
+            detail: { threadId, title },
+          }),
+        );
+      }
       queryClient.setQueriesData(
         {
           queryKey: ["threads", "search"],
@@ -675,6 +681,45 @@ export function useRenameThread() {
           });
         },
       );
+    },
+    onSettled() {
+      void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
+    },
+  });
+}
+
+export function useUpdateThreadVisibility() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      threadId,
+      visibility,
+    }: {
+      threadId: string;
+      visibility: "private" | "workspace";
+    }) => {
+      const response = await fetch(
+        `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}/visibility`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ visibility }),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ detail: "Failed to update thread visibility." }));
+        throw new Error(error.detail ?? "Failed to update thread visibility.");
+      }
+
+      return response.json();
+    },
+    onSettled() {
+      void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
     },
   });
 }

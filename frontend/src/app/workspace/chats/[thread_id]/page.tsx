@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
@@ -31,6 +32,7 @@ import { cn } from "@/lib/utils";
 
 export default function ChatPage() {
   const { t } = useI18n();
+  const router = useRouter();
   const [showFollowups, setShowFollowups] = useState(false);
   const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
     useThreadChat();
@@ -41,6 +43,35 @@ export default function ChatPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isNewThread) {
+      return;
+    }
+
+    let cancelled = false;
+    async function ensureThreadAccessible() {
+      try {
+        const response = await fetch(`/api/threads/${encodeURIComponent(threadId)}`);
+        if (!response.ok) {
+          if (!cancelled) {
+            window.sessionStorage.removeItem(`lg:stream:${threadId}`);
+            router.replace("/workspace/chats/new");
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          window.sessionStorage.removeItem(`lg:stream:${threadId}`);
+          router.replace("/workspace/chats/new");
+        }
+      }
+    }
+
+    void ensureThreadAccessible();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNewThread, router, threadId]);
 
   const { showNotification } = useNotification();
 

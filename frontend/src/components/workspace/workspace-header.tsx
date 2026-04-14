@@ -12,6 +12,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { brand } from "@/core/brand/config";
 import { useI18n } from "@/core/i18n/hooks";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
@@ -29,10 +30,10 @@ export function WorkspaceHeader({ className }: { className?: string }) {
         )}
       >
         {state === "collapsed" ? (
-          <div className="group-has-data-[collapsible=icon]/sidebar-wrapper:-translate-y flex w-full cursor-pointer items-center justify-center">
-            <div className="text-primary block pt-1 font-serif group-hover/workspace-header:hidden">
-              MSA
-            </div>
+            <div className="group-has-data-[collapsible=icon]/sidebar-wrapper:-translate-y flex w-full cursor-pointer items-center justify-center">
+              <div className="text-primary block pt-1 font-serif group-hover/workspace-header:hidden">
+                {brand.shortName}
+              </div>
             <SidebarTrigger className="hidden pl-2 group-hover/workspace-header:block" />
           </div>
         ) : (

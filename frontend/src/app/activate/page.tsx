@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/brand/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { brand } from "@/core/brand/config";
 
 export default function ActivatePage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function ActivatePage() {
         setError(body?.detail ?? "激活账号失败，请稍后重试。");
         return;
       }
-      router.replace("/workspace");
+      router.replace("/workspace/chats/new");
       router.refresh();
     } catch {
       setError("无法连接激活服务，请稍后重试。");
@@ -63,7 +64,7 @@ export default function ActivatePage() {
               邀请制账号激活
             </div>
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
-              激活你的 Mic Service Agent 账号
+              激活你的 {brand.name} 账号
             </h1>
             <p className="max-w-xl text-base leading-7 text-slate-300 md:text-lg">
               完成一次密码设置后，你就可以进入个人空间，并访问已被邀请加入的共享空间。
@@ -74,7 +75,7 @@ export default function ActivatePage() {
         <Card className="border-white/10 bg-white/95 py-0 text-slate-900 shadow-2xl shadow-black/20 backdrop-blur-xl">
           <CardHeader className="gap-3 border-b border-slate-200/80 py-8">
             <CardTitle className="text-2xl">完成账号设置</CardTitle>
-            <CardDescription>为你的受邀 Mic Service Agent 账号设置一个登录密码。</CardDescription>
+            <CardDescription>为你的受邀 {brand.name} 账号设置一个登录密码。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 py-8">
             <form className="space-y-4" onSubmit={handleSubmit}>

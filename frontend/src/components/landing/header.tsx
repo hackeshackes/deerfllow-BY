@@ -32,7 +32,7 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
         <Link href={`/${lang}/docs`} className="transition-colors hover:text-white">
           {t.home.docs}
         </Link>
-        <a href={supportMailto("BY support")} className="transition-colors hover:text-white">
+        <a href={supportMailto("MicX support")} className="transition-colors hover:text-white">
           联系我们
         </a>
       </nav>
