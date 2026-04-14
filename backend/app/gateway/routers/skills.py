@@ -1,13 +1,17 @@
 import json
 import logging
 import shutil
+import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_owner_user, require_user
 from app.gateway.path_utils import resolve_thread_virtual_path
+from deerflow.admin import append_admin_audit_record, upsert_skill_metadata
 from deerflow.agents.lead_agent.prompt import refresh_skills_system_prompt_cache_async
 from deerflow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
 from deerflow.skills import Skill, load_skills
@@ -37,8 +41,15 @@ class SkillResponse(BaseModel):
     name: str = Field(..., description="Name of the skill")
     description: str = Field(..., description="Description of what the skill does")
     license: str | None = Field(None, description="License information")
+    author: str | None = Field(None, description="Author information")
+    version: str | None = Field(None, description="Version information")
+    compatibility: str | None = Field(None, description="Compatibility information")
     category: str = Field(..., description="Category of the skill (public or custom)")
     enabled: bool = Field(default=True, description="Whether this skill is enabled")
+    source: str | None = Field(None, description="Installation source")
+    installed_at: str | None = Field(None, description="Install timestamp")
+    display_name_zh: str | None = Field(None, description="Chinese display name")
+    description_zh: str | None = Field(None, description="Chinese description")
 
 
 class SkillsListResponse(BaseModel):
@@ -66,6 +77,18 @@ class SkillInstallResponse(BaseModel):
     success: bool = Field(..., description="Whether the installation was successful")
     skill_name: str = Field(..., description="Name of the installed skill")
     message: str = Field(..., description="Installation result message")
+    source: str | None = Field(None, description="Installation source")
+
+
+class SkillRemoteInstallRequest(BaseModel):
+    url: str = Field(..., description="Remote URL to a .skill archive")
+    conflict_strategy: str = Field(default="error", description="error, replace, or rename")
+    rename_to: str | None = Field(default=None, description="New skill name when conflict_strategy is rename")
+
+
+class SkillMetadataUpdateRequest(BaseModel):
+    display_name_zh: str | None = Field(default=None, description="Chinese display name")
+    description_zh: str | None = Field(default=None, description="Chinese description")
 
 
 class CustomSkillContentResponse(SkillResponse):
@@ -90,9 +113,43 @@ def _skill_to_response(skill: Skill) -> SkillResponse:
         name=skill.name,
         description=skill.description,
         license=skill.license,
+        author=skill.author,
+        version=skill.version,
+        compatibility=skill.compatibility,
         category=skill.category,
         enabled=skill.enabled,
+        source=skill.source,
+        installed_at=skill.installed_at,
+        display_name_zh=skill.display_name_zh,
+        description_zh=skill.description_zh,
     )
+
+
+def _extensions_config_path() -> Path:
+    config_path = ExtensionsConfig.resolve_config_path()
+    if config_path is None:
+        return Path.cwd().parent / "extensions_config.json"
+    return config_path
+
+
+def _set_skill_enabled_state(skill_name: str, enabled: bool) -> None:
+    config_path = _extensions_config_path()
+    current_config = get_extensions_config()
+    config_data = {
+        "mcpServers": {name: server.model_dump() for name, server in current_config.mcp_servers.items()},
+        "skills": {name: {"enabled": skill.enabled} for name, skill in current_config.skills.items()},
+    }
+    config_data["skills"][skill_name] = {"enabled": enabled}
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False), encoding="utf-8")
+    reload_extensions_config()
+
+
+def _current_skill(skill_name: str) -> Skill:
+    skill = next((item for item in load_skills(enabled_only=False) if item.name == skill_name), None)
+    if skill is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found after installation")
+    return skill
 
 
 def _load_custom_skill_response(skill_name: str) -> CustomSkillContentResponse:
@@ -126,11 +183,14 @@ async def list_skills(request: Request) -> SkillsListResponse:
     description="Install a skill from a .skill file (ZIP archive) located in the thread's user-data directory.",
 )
 async def install_skill(request: SkillInstallRequest, http_request: Request) -> SkillInstallResponse:
-    require_owner_user(http_request)
+    user = require_owner_user(http_request)
     try:
         skill_file_path = resolve_thread_virtual_path(request.thread_id, request.path)
         result = install_skill_from_archive(skill_file_path)
+        _set_skill_enabled_state(result["skill_name"], True)
+        upsert_skill_metadata(result["skill_name"], source=f"thread:{request.thread_id}:{request.path}", installed_at=datetime.now(UTC).isoformat())
         await refresh_skills_system_prompt_cache_async()
+        append_admin_audit_record("skill.installed", actor_id=user.id, target=result["skill_name"], details={"source": f"thread:{request.thread_id}:{request.path}"})
         return SkillInstallResponse(**result)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -143,6 +203,87 @@ async def install_skill(request: SkillInstallRequest, http_request: Request) -> 
     except Exception as e:
         logger.error(f"Failed to install skill: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to install skill: {str(e)}")
+
+
+@router.post(
+    "/skills/install/remote",
+    response_model=SkillInstallResponse,
+    summary="Install Skill From Remote URL",
+)
+async def install_skill_from_remote(request: SkillRemoteInstallRequest, http_request: Request) -> SkillInstallResponse:
+    user = require_owner_user(http_request)
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            archive_path = Path(temp_dir) / "remote.skill"
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+                response = await client.get(request.url)
+                response.raise_for_status()
+            archive_path.write_bytes(response.content)
+            result = install_skill_from_archive(
+                archive_path,
+                conflict_strategy=request.conflict_strategy,
+                rename_to=request.rename_to,
+            )
+
+        _set_skill_enabled_state(result["skill_name"], False)
+        skill = _current_skill(result["skill_name"])
+        upsert_skill_metadata(
+            result["skill_name"],
+            source=request.url,
+            installed_at=datetime.now(UTC).isoformat(),
+            version=skill.version,
+            author=skill.author,
+            compatibility=skill.compatibility,
+        )
+        await refresh_skills_system_prompt_cache_async()
+        append_admin_audit_record(
+            "skill.installed_remote",
+            actor_id=user.id,
+            target=result["skill_name"],
+            details={
+                "source": request.url,
+                "enabled": False,
+                "conflict_strategy": request.conflict_strategy,
+            },
+        )
+        return SkillInstallResponse(**result, source=request.url)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to download remote skill: {exc}") from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SkillAlreadyExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to install remote skill: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to install remote skill: {exc}") from exc
+
+
+@router.put("/admin/skills/{skill_name}/metadata", response_model=SkillResponse)
+async def update_skill_metadata(skill_name: str, body: SkillMetadataUpdateRequest, request: Request) -> SkillResponse:
+    user = require_owner_user(request)
+    skill = next((item for item in load_skills(enabled_only=False) if item.name == skill_name), None)
+    if skill is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
+
+    upsert_skill_metadata(
+        skill_name,
+        display_name_zh=body.display_name_zh,
+        description_zh=body.description_zh,
+    )
+    append_admin_audit_record(
+        "skill.metadata_updated",
+        actor_id=user.id,
+        target=skill_name,
+        details={"display_name_zh": bool(body.display_name_zh), "description_zh": bool(body.description_zh)},
+    )
+    updated_skill = next((item for item in load_skills(enabled_only=False) if item.name == skill_name), None)
+    if updated_skill is None:
+        raise HTTPException(status_code=500, detail=f"Failed to reload skill '{skill_name}' after metadata update")
+    return _skill_to_response(updated_skill)
 
 
 @router.get("/skills/custom", response_model=SkillsListResponse, summary="List Custom Skills")

@@ -14,6 +14,13 @@ class Skill:
     relative_path: Path  # Relative path from category root to skill directory
     category: str  # 'public' or 'custom'
     enabled: bool = False  # Whether this skill is enabled
+    author: str | None = None
+    version: str | None = None
+    compatibility: str | None = None
+    source: str | None = None
+    installed_at: str | None = None
+    display_name_zh: str | None = None
+    description_zh: str | None = None
 
     @property
     def skill_path(self) -> str:
