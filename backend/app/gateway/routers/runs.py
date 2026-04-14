@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from app.gateway.auth import require_user
 from app.gateway.deps import get_checkpointer, get_run_manager, get_store, get_stream_bridge
-from app.gateway.ownership import is_owner
+from app.gateway.ownership import can_manage_thread
 from app.gateway.routers.thread_runs import RunCreateRequest
 from app.gateway.services import sse_consumer, start_run
 from deerflow.runtime import serialize_channel_values
@@ -46,7 +46,7 @@ async def stateless_stream(body: RunCreateRequest, request: Request) -> Streamin
     store = get_store(request)
     if store is not None:
         existing = await store.aget(("threads",), thread_id)
-        if existing is not None and not is_owner(existing.value, user):
+        if existing is not None and not can_manage_thread(existing.value, user):
             raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
@@ -77,7 +77,7 @@ async def stateless_wait(body: RunCreateRequest, request: Request) -> dict:
     store = get_store(request)
     if store is not None:
         existing = await store.aget(("threads",), thread_id)
-        if existing is not None and not is_owner(existing.value, user):
+        if existing is not None and not can_manage_thread(existing.value, user):
             raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     record = await start_run(body, thread_id, request)
 
