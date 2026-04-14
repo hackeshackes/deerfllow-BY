@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from app.gateway.auth import (
@@ -16,6 +18,7 @@ from app.gateway.auth import (
     create_session_token,
     create_user,
     create_workspace,
+    delete_user,
     get_active_invite_for_user,
     get_default_workspace_id_for_user,
     get_user_by_email,
@@ -23,6 +26,7 @@ from app.gateway.auth import (
     get_workspace_membership,
     issue_invite_token,
     list_users,
+    list_workspaces,
     list_workspace_memberships,
     list_workspaces_for_user,
     require_owner_user,
@@ -31,6 +35,8 @@ from app.gateway.auth import (
     touch_last_login,
     update_user,
 )
+from deerflow.admin import append_admin_audit_record
+from deerflow.config.paths import get_paths
 
 router = APIRouter(prefix="/api", tags=["users"])
 
@@ -85,6 +91,11 @@ class UserInviteRequest(BaseModel):
     expires_in_hours: int = Field(default=72, ge=1, le=24 * 30)
 
 
+class UserDeleteResponse(BaseModel):
+    success: bool
+    message: str
+
+
 class AccountPasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8)
@@ -103,6 +114,10 @@ class WorkspaceResponse(BaseModel):
     default_personal: bool
     role: str
     member_count: int
+    thread_count: int = 0
+    upload_file_count: int = 0
+    artifact_file_count: int = 0
+    agent_count: int = 0
 
 
 class WorkspacesListResponse(BaseModel):
@@ -133,6 +148,12 @@ def _invite_to_response(invite: InviteToken | None) -> InviteResponse | None:
 
 
 def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership) -> WorkspaceResponse:
+    workspace_dir = get_paths().workspace_dir(workspace.id)
+    threads_dir = workspace_dir / "threads"
+    agents_dir = workspace_dir / "agents"
+    thread_count = sum(1 for item in threads_dir.iterdir() if item.is_dir()) if threads_dir.exists() else 0
+    upload_file_count = _count_files_under_many(thread_dir / "user-data" / "uploads" for thread_dir in threads_dir.iterdir() if thread_dir.is_dir()) if threads_dir.exists() else 0
+    artifact_file_count = _count_files_under_many(thread_dir / "user-data" / "outputs" for thread_dir in threads_dir.iterdir() if thread_dir.is_dir()) if threads_dir.exists() else 0
     member_count = len([item for item in list_workspace_memberships() if item.workspace_id == workspace.id])
     return WorkspaceResponse(
         id=workspace.id,
@@ -142,7 +163,20 @@ def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership
         default_personal=workspace.default_personal,
         role=membership.role,
         member_count=member_count,
+        thread_count=thread_count,
+        upload_file_count=upload_file_count,
+        artifact_file_count=artifact_file_count,
+        agent_count=sum(1 for item in agents_dir.iterdir() if item.is_dir()) if agents_dir.exists() else 0,
     )
+
+
+def _count_files_under_many(paths: list[Path] | tuple[Path, ...] | object) -> int:
+    total = 0
+    for path in paths:
+        if not isinstance(path, Path) or not path.exists():
+            continue
+        total += sum(1 for item in path.rglob("*") if item.is_file())
+    return total
 
 
 def _to_response(user: AuthUser, active_workspace_id: str | None = None) -> SessionUserResponse:
@@ -250,38 +284,75 @@ async def change_password_endpoint(body: AccountPasswordChangeRequest, request: 
 
 
 @router.get("/users", response_model=UsersListResponse)
-async def get_users(request: Request) -> UsersListResponse:
+async def get_users(
+    request: Request,
+    role: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+) -> UsersListResponse:
     require_owner_user(request)
-    return UsersListResponse(users=[_to_user_response(user) for user in list_users()])
+    users = list_users()
+    if role is not None:
+        users = [user for user in users if user.role == role]
+    if status is not None:
+        users = [user for user in users if user.status == status]
+    return UsersListResponse(users=[_to_user_response(user) for user in users])
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
 async def create_user_endpoint(body: UserCreateRequest, request: Request) -> UserResponse:
-    require_owner_user(request)
+    actor = require_owner_user(request)
     user = create_user(body.email, role=body.role, name=body.name, status="invited")
     issue_invite_token(user.id)
+    append_admin_audit_record("user.created", actor_id=actor.id, target=user.id, details={"email": user.email, "role": user.role})
     return _to_user_response(user)
 
 
 @router.post("/users/{user_id}/invite", response_model=UserResponse)
 async def resend_invite_endpoint(user_id: str, body: UserInviteRequest, request: Request) -> UserResponse:
-    require_owner_user(request)
+    actor = require_owner_user(request)
     user = update_user(user_id, status="invited")
     issue_invite_token(user.id, expires_in_hours=body.expires_in_hours)
     refreshed = get_user_by_email(user.email) or user
+    append_admin_audit_record("user.reinvited", actor_id=actor.id, target=user.id, details={"expires_in_hours": body.expires_in_hours})
     return _to_user_response(refreshed)
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
 async def update_user_endpoint(user_id: str, body: UserUpdateRequest, request: Request) -> UserResponse:
-    require_owner_user(request)
+    actor = require_owner_user(request)
     updated = update_user(user_id, role=body.role, status=body.status, name=body.name, password=body.password)
+    append_admin_audit_record(
+        "user.updated",
+        actor_id=actor.id,
+        target=updated.id,
+        details={"role": body.role, "status": body.status, "name": body.name, "password_updated": body.password is not None},
+    )
     return _to_user_response(updated)
+
+
+@router.delete("/users/{user_id}", response_model=UserDeleteResponse)
+async def delete_user_endpoint(user_id: str, request: Request) -> UserDeleteResponse:
+    actor = require_owner_user(request)
+    deleted = delete_user(user_id, actor_user_id=actor.id)
+    append_admin_audit_record(
+        "user.deleted",
+        actor_id=actor.id,
+        target=deleted.id,
+        details={"email": deleted.email, "role": deleted.role},
+    )
+    return UserDeleteResponse(success=True, message=f"用户 {deleted.email} 已删除")
 
 
 @router.get("/workspaces", response_model=WorkspacesListResponse)
 async def get_workspaces(request: Request) -> WorkspacesListResponse:
     user = require_user(request)
+    if user.role == "owner":
+        workspaces = []
+        for workspace in list_workspaces():
+            membership = get_workspace_membership(user.id, workspace.id) or WorkspaceMembership(workspace_id=workspace.id, user_id=user.id, role="owner")
+            workspaces.append(_to_workspace_response(workspace, membership))
+        return WorkspacesListResponse(workspaces=workspaces)
+
     memberships = list_workspaces_for_user(user.id)
     workspaces = []
     for membership in memberships:
@@ -293,17 +364,19 @@ async def get_workspaces(request: Request) -> WorkspacesListResponse:
 
 @router.post("/workspaces", response_model=WorkspaceResponse, status_code=201)
 async def create_workspace_endpoint(body: WorkspaceCreateRequest, request: Request) -> WorkspaceResponse:
-    user = require_owner_user(request)
-    workspace = create_workspace(body.name, user.id)
-    membership = get_workspace_membership(user.id, workspace.id)
+    actor = require_owner_user(request)
+    workspace = create_workspace(body.name, actor.id)
+    membership = get_workspace_membership(actor.id, workspace.id)
+    append_admin_audit_record("workspace.created", actor_id=actor.id, target=workspace.id, details={"name": workspace.name})
     return _to_workspace_response(workspace, membership)
 
 
 @router.post("/workspaces/{workspace_id}/members", response_model=WorkspaceResponse)
 async def add_workspace_member_endpoint(workspace_id: str, body: WorkspaceMemberRequest, request: Request) -> WorkspaceResponse:
-    require_owner_user(request)
+    actor = require_owner_user(request)
     membership = add_workspace_member(workspace_id, body.user_id, role=body.role)
     workspace = get_workspace_by_id(workspace_id)
+    append_admin_audit_record("workspace.member_added", actor_id=actor.id, target=workspace_id, details={"user_id": body.user_id, "role": body.role})
     return _to_workspace_response(workspace, membership)
 
 

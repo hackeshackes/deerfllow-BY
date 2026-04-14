@@ -580,6 +580,48 @@ def add_workspace_member(workspace_id: str, user_id: str, role: str = "member") 
     return _to_membership(record)
 
 
+def delete_user(user_id: str, *, actor_user_id: str | None = None) -> AuthUser:
+    users_payload = _read_users_payload()
+    user_record = next((user for user in users_payload["users"] if user.get("id") == user_id), None)
+    if user_record is None:
+        raise HTTPException(status_code=404, detail="未找到该用户")
+
+    user = _to_auth_user(user_record)
+    if user.role == "owner":
+        raise HTTPException(status_code=403, detail="不能删除拥有者账号")
+    if actor_user_id is not None and actor_user_id == user_id:
+        raise HTTPException(status_code=403, detail="不能删除当前登录账号")
+
+    workspaces_payload = _read_workspaces_payload()
+    blocking_workspaces = [
+        workspace for workspace in workspaces_payload["workspaces"] if workspace.get("created_by_user_id") == user_id and not workspace.get("default_personal", False)
+    ]
+    if blocking_workspaces:
+        raise HTTPException(status_code=409, detail="该用户仍拥有共享空间，请先转移或删除其共享空间")
+
+    users_payload["users"] = [record for record in users_payload["users"] if record.get("id") != user_id]
+    _write_users_payload(users_payload)
+
+    personal_workspace_id = f"ws-{user_id}"
+    workspaces_payload["memberships"] = [
+        membership
+        for membership in workspaces_payload["memberships"]
+        if membership.get("user_id") != user_id and membership.get("workspace_id") != personal_workspace_id
+    ]
+    workspaces_payload["workspaces"] = [
+        workspace
+        for workspace in workspaces_payload["workspaces"]
+        if workspace.get("id") != personal_workspace_id
+    ]
+    _write_workspaces_payload(workspaces_payload)
+
+    invites_payload = _read_invites_payload()
+    invites_payload["invites"] = [invite for invite in invites_payload["invites"] if invite.get("user_id") != user_id]
+    _write_invites_payload(invites_payload)
+
+    return user
+
+
 def set_active_workspace(user: AuthUser, workspace_id: str) -> tuple[Workspace, WorkspaceMembership]:
     workspace = get_workspace_by_id(workspace_id)
     if workspace is None:
