@@ -51,7 +51,7 @@ export default function LandingPage() {
         <section className="container-md mx-auto grid w-full gap-10 px-6 py-8 md:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[2rem] border border-white/10 bg-slate-950/60 p-8 shadow-2xl shadow-black/15">
             <p className="text-sm font-medium tracking-[0.2em] text-cyan-300 uppercase">
-              为什么选择 BY
+              为什么选择 MicX
             </p>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
               一个适合个人与团队协作的中文 AI 工作台。
@@ -90,9 +90,9 @@ export default function LandingPage() {
             </div>
             <a
               className="mt-6 inline-flex rounded-full border border-white/15 bg-white px-5 py-3 text-sm font-medium text-slate-950 transition hover:bg-cyan-50 md:mt-0"
-              href={supportMailto("BY product inquiry")}
+              href={supportMailto("MicX product inquiry")}
             >
-              联系 BY
+              联系 MicX
             </a>
           </div>
         </section>

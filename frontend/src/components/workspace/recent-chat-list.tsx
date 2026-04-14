@@ -11,9 +11,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,7 +43,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { getAPIClient } from "@/core/api";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   exportThreadAsJSON,
@@ -51,6 +51,7 @@ import {
 import {
   useDeleteThread,
   useRenameThread,
+  useUpdateThreadVisibility,
   useThreads,
 } from "@/core/threads/hooks";
 import type { AgentThread, AgentThreadState } from "@/core/threads/types";
@@ -66,11 +67,27 @@ export function RecentChatList() {
   const { data: threads = [] } = useThreads();
   const { mutate: deleteThread } = useDeleteThread();
   const { mutate: renameThread } = useRenameThread();
+  const { mutateAsync: updateThreadVisibility } = useUpdateThreadVisibility();
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
 
   // Rename dialog state
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameThreadId, setRenameThreadId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  useEffect(() => {
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/session/me");
+        if (!response.ok) return;
+        const payload = (await response.json()) as { id: string };
+        setSessionUserId(payload.id);
+      } catch {
+        // ignore session lookup failures in sidebar
+      }
+    }
+    void loadSession();
+  }, []);
 
   const handleDelete = useCallback(
     (threadId: string) => {
@@ -111,6 +128,7 @@ export function RecentChatList() {
 
   const handleShare = useCallback(
     async (threadId: string) => {
+      await updateThreadVisibility({ threadId, visibility: "workspace" });
       // Always use Vercel URL for sharing so others can access
       const VERCEL_URL = "https://deer-flow-v2.vercel.app";
       const isLocalhost =
@@ -121,21 +139,36 @@ export function RecentChatList() {
       const shareUrl = `${baseUrl}/workspace/chats/${threadId}`;
       try {
         await navigator.clipboard.writeText(shareUrl);
-        toast.success(t.clipboard.linkCopied);
+        toast.success("已共享到工作区，并复制链接");
       } catch {
         toast.error(t.clipboard.failedToCopyToClipboard);
       }
     },
-    [t],
+    [t, updateThreadVisibility],
+  );
+
+  const handleMakePrivate = useCallback(
+    async (threadId: string) => {
+      try {
+        await updateThreadVisibility({ threadId, visibility: "private" });
+        toast.success("已切换为私有对话");
+      } catch {
+        toast.error("切换私有失败");
+      }
+    },
+    [updateThreadVisibility],
   );
 
   const handleExport = useCallback(
     async (thread: AgentThread, format: "markdown" | "json") => {
       try {
-        const apiClient = getAPIClient();
-        const state = await apiClient.threads.getState<AgentThreadState>(
-          thread.thread_id,
+        const response = await fetch(
+          `${window.location.origin}/api/threads/${encodeURIComponent(thread.thread_id)}/state`,
         );
+        if (!response.ok) {
+          throw new Error("Failed to load thread state");
+        }
+        const state = (await response.json()) as { values?: AgentThreadState };
         const messages = state.values?.messages ?? [];
         if (messages.length === 0) {
           toast.error(t.conversation.noMessages);
@@ -170,6 +203,11 @@ export function RecentChatList() {
             <div className="flex w-full flex-col gap-1">
               {threads.map((thread) => {
                 const isActive = pathOfThread(thread.thread_id) === pathname;
+                const visibility = (thread.metadata?.visibility as string | undefined) === "private" ? "private" : "workspace";
+                const isThreadOwner = thread.metadata?.owner_user_id === sessionUserId;
+                const ownerUserId = typeof thread.metadata?.owner_user_id === "string" ? thread.metadata.owner_user_id : "";
+                const workspaceId = typeof thread.metadata?.workspace_id === "string" ? thread.metadata.workspace_id : "";
+                const isPersonalWorkspace = workspaceId === `ws-${ownerUserId}`;
                 return (
                   <SidebarMenuItem
                     key={thread.thread_id}
@@ -183,7 +221,12 @@ export function RecentChatList() {
                         >
                           {titleOfThread(thread)}
                         </Link>
-                        {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" && (
+                        <div className="mt-1 pl-0.5">
+                          <Badge variant={visibility === "private" ? "outline" : "default"} className="text-[10px]">
+                            {visibility === "private" ? "私有" : "已共享"}
+                          </Badge>
+                        </div>
+                        {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" && isThreadOwner && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <SidebarMenuAction
@@ -212,9 +255,17 @@ export function RecentChatList() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => handleShare(thread.thread_id)}
+                                disabled={visibility === "workspace" || isPersonalWorkspace}
                               >
                                 <Share2 className="text-muted-foreground" />
-                                <span>{t.common.share}</span>
+                                <span>共享到工作区</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => handleMakePrivate(thread.thread_id)}
+                                disabled={visibility === "private"}
+                              >
+                                <Share2 className="text-muted-foreground" />
+                                <span>设为私有</span>
                               </DropdownMenuItem>
                               <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>

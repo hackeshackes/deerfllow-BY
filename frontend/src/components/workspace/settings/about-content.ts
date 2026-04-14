@@ -1,8 +1,8 @@
-export const aboutMarkdown = `# 关于 Mic Service Agent
+export const aboutMarkdown = `# 关于 MicX
 
 > 面向个人与团队协作的中文智能服务工作台。
 
-Mic Service Agent（MSA）是一个支持多用户、共享空间、文件处理、模型调用与结果沉淀的智能服务工作台。
+MicX 是一个支持多用户、共享空间、文件处理、模型调用与结果沉淀的智能服务工作台。
 
 ---
 

@@ -61,11 +61,11 @@ export const enUS: Translations = {
   welcome: {
     greeting: "Hello, again!",
     description:
-      "Welcome to BY, your private AI workspace. Use it to research, analyze files, draft content, and keep outputs organized in one protected place.",
+      "Welcome to MicX, your private AI workspace. Use it to research, analyze files, draft content, and keep outputs organized in one protected place.",
 
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:
-      "Create your own skill to extend BY. Custom skills let your workspace match your research, writing, and execution flow.",
+      "Create your own skill to extend MicX. Custom skills let your workspace match your research, writing, and execution flow.",
   },
 
   // Clipboard
@@ -208,13 +208,13 @@ export const enUS: Translations = {
     save: "Save agent",
     saving: "Saving agent...",
     saveRequested:
-      "Save requested. BY is generating and saving an initial version now.",
+      "Save requested. MicX is generating and saving an initial version now.",
     saveHint:
       "You can save this agent at any time from the top-right menu, even if this is only a first draft.",
     saveCommandMessage:
       "Please save this custom agent now based on everything we have discussed so far. Treat this as my explicit confirmation to save. If some details are still missing, make reasonable assumptions, generate a concise first SOUL.md in English, and call setup_agent immediately without asking me for more confirmation.",
     agentCreatedPendingRefresh:
-      "The agent was created, but BY could not load it yet. Please refresh this page in a moment.",
+      "The agent was created, but MicX could not load it yet. Please refresh this page in a moment.",
     more: "More actions",
     agentCreated: "Agent created!",
     startChatting: "Start chatting",
@@ -229,13 +229,13 @@ export const enUS: Translations = {
 
   // Workspace
   workspace: {
-    officialWebsite: "BY home",
-    githubTooltip: "BY",
+    officialWebsite: "MicX home",
+    githubTooltip: "MicX",
     settingsAndMore: "Settings and more",
     visitGithub: "Product links",
     reportIssue: "Report a issue",
     contactUs: "Contact us",
-    about: "About BY",
+    about: "About MicX",
   },
 
   // Conversation
@@ -251,7 +251,7 @@ export const enUS: Translations = {
 
   // Page titles (document title)
   pages: {
-    appName: "BY",
+    appName: "MicX",
     chats: "Chats",
     newChat: "New chat",
     untitled: "Untitled",
@@ -277,7 +277,7 @@ export const enUS: Translations = {
     writeFile: "Write file",
     clickToViewContent: "Click to view file content",
     writeTodos: "Update to-do list",
-    skillInstallTooltip: "Install skill and make it available to BY",
+    skillInstallTooltip: "Install skill and make it available to MicX",
   },
 
   // Subtasks
@@ -310,7 +310,7 @@ export const enUS: Translations = {
     actions: "Actions",
     keyboardShortcuts: "Keyboard Shortcuts",
     keyboardShortcutsDescription:
-      "Navigate BY faster with keyboard shortcuts.",
+      "Navigate MicX faster with keyboard shortcuts.",
     openCommandPalette: "Open Command Palette",
     toggleSidebar: "Toggle Sidebar",
   },
@@ -318,7 +318,7 @@ export const enUS: Translations = {
   // Settings
   settings: {
     title: "Settings",
-    description: "Adjust how BY looks and behaves for you.",
+    description: "Adjust how MicX looks and behaves for you.",
     sections: {
       appearance: "Appearance",
       memory: "Memory",
@@ -330,7 +330,7 @@ export const enUS: Translations = {
     memory: {
       title: "Memory",
       description:
-        "BY automatically learns from your conversations in the background. These memories help BY understand you better and deliver a more personalized experience.",
+        "MicX automatically learns from your conversations in the background. These memories help MicX understand you better and deliver a more personalized experience.",
       empty: "No memory data to display.",
       rawJson: "Raw JSON",
       exportButton: "Export memory",
@@ -430,18 +430,18 @@ export const enUS: Translations = {
       createSkill: "Create skill",
       emptyTitle: "No agent skill yet",
       emptyDescription:
-        "Put your agent skill folders under the `/skills/custom` folder under the root folder of BY.",
+        "Put your agent skill folders under the `/skills/custom` folder under the root folder of MicX.",
       emptyButton: "Create Your First Skill",
     },
     notification: {
       title: "Notification",
       description:
-        "BY only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
+        "MicX only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
       requestPermission: "Request notification permission",
       deniedHint:
         "Notification permission was denied. You can enable it in your browser's site settings to receive completion alerts.",
       testButton: "Send test notification",
-      testTitle: "BY",
+      testTitle: "MicX",
       testBody: "This is a test notification.",
       notSupported: "Your browser does not support notifications.",
       disableNotification: "Disable notification",
