@@ -148,6 +148,26 @@ class Paths:
         return self.base_dir / "models.override.yaml"
 
     @property
+    def admin_dir(self) -> Path:
+        return self.base_dir / "admin"
+
+    @property
+    def admin_config_file(self) -> Path:
+        return self.admin_dir / "config.json"
+
+    @property
+    def admin_secrets_file(self) -> Path:
+        return self.admin_dir / "secrets.enc"
+
+    @property
+    def admin_audit_file(self) -> Path:
+        return self.admin_dir / "audit.jsonl"
+
+    @property
+    def admin_skill_metadata_file(self) -> Path:
+        return self.admin_dir / "skill-metadata.json"
+
+    @property
     def workspaces_dir(self) -> Path:
         return self.base_dir / "workspaces"
 
