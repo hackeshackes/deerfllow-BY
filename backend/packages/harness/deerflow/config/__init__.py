@@ -9,6 +9,7 @@ from .tracing_config import (
     get_explicitly_enabled_tracing_providers,
     get_tracing_config,
     is_tracing_enabled,
+    reset_tracing_config,
     validate_enabled_tracing_providers,
 )
 
@@ -26,5 +27,6 @@ __all__ = [
     "get_explicitly_enabled_tracing_providers",
     "get_enabled_tracing_providers",
     "is_tracing_enabled",
+    "reset_tracing_config",
     "validate_enabled_tracing_providers",
 ]

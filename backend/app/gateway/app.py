@@ -9,6 +9,8 @@ from app.gateway.auth_context import current_user_email, current_user_id, curren
 from app.gateway.config import get_gateway_config
 from app.gateway.deps import langgraph_runtime
 from app.gateway.routers import (
+    admin_config,
+    admin_monitoring,
     agents,
     artifacts,
     assistants_compat,
@@ -200,6 +202,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
             current_workspace_role.reset(token_workspace_role)
 
     # Include routers
+    app.include_router(admin_config.router)
+    app.include_router(admin_monitoring.router)
+
     # Models API is mounted at /api/models
     app.include_router(models.router)
 
