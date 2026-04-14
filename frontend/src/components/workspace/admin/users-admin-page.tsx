@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+import { AdminPageShell } from "./admin-page-shell";
+
 type UserRecord = {
   id: string;
   email: string;
@@ -30,6 +32,7 @@ export function UsersAdminPage() {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   function formatTime(value?: string | null) {
     return value ? new Date(value).toLocaleString() : "—";
@@ -66,6 +69,7 @@ export function UsersAdminPage() {
     event.preventDefault();
     setCreating(true);
     setError(null);
+    setStatusMessage(null);
     try {
       const response = await fetch("/api/users", {
         method: "POST",
@@ -78,6 +82,7 @@ export function UsersAdminPage() {
       }
       setEmail("");
       setName("");
+      setStatusMessage("成员已创建");
       await loadUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建成员失败");
@@ -87,6 +92,8 @@ export function UsersAdminPage() {
   }
 
   async function toggleStatus(user: UserRecord) {
+    setError(null);
+    setStatusMessage(null);
     const nextStatus = user.status === "disabled" ? (user.activated_at ? "active" : "invited") : "disabled";
     const response = await fetch(`/api/users/${user.id}`, {
       method: "PATCH",
@@ -97,10 +104,13 @@ export function UsersAdminPage() {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
       throw new Error(body?.detail ?? "更新成员状态失败");
     }
+    setStatusMessage(nextStatus === "disabled" ? "账号已禁用" : "账号已恢复");
     await loadUsers();
   }
 
   async function resendInvite(user: UserRecord) {
+    setError(null);
+    setStatusMessage(null);
     const response = await fetch(`/api/users/${user.id}/invite`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -110,6 +120,24 @@ export function UsersAdminPage() {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
       throw new Error(body?.detail ?? "重新邀请失败");
     }
+    setStatusMessage("已重新发送邀请");
+    await loadUsers();
+  }
+
+  async function deleteUser(user: UserRecord) {
+    setError(null);
+    setStatusMessage(null);
+    const confirmed = window.confirm(`确认删除用户 ${user.email} 吗？该操作不可撤销。`);
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { detail?: string } | null;
+      throw new Error(body?.detail ?? "删除用户失败");
+    }
+    setStatusMessage(`用户 ${user.email} 已删除`);
     await loadUsers();
   }
 
@@ -122,11 +150,11 @@ export function UsersAdminPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
+    <AdminPageShell title="用户管理" description="创建受邀成员、发出激活链接，并管理当前 MicX 部署的访问权限。">
       <Card>
         <CardHeader>
           <CardTitle>用户管理</CardTitle>
-          <CardDescription>创建受邀成员、发出激活链接，并管理当前 BY 部署的访问权限。</CardDescription>
+          <CardDescription>创建受邀成员、发出激活链接，并管理当前 MicX 部署的访问权限。</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-[1.4fr_1fr_auto]" onSubmit={handleCreateUser}>
@@ -135,6 +163,7 @@ export function UsersAdminPage() {
             <Button disabled={creating}>{creating ? "创建中..." : "创建受邀成员"}</Button>
           </form>
           {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+          {statusMessage && <p className="mt-4 text-sm text-emerald-700">{statusMessage}</p>}
         </CardContent>
       </Card>
 
@@ -195,6 +224,9 @@ export function UsersAdminPage() {
                             <Button variant="outline" size="sm" onClick={() => void toggleStatus(user)}>
                               {user.status === "disabled" ? "恢复使用" : "禁用账号"}
                             </Button>
+                            <Button variant="destructive" size="sm" onClick={() => void deleteUser(user).catch((err) => setError(err instanceof Error ? err.message : "删除用户失败"))}>
+                              删除用户
+                            </Button>
                           </div>
                         )}
                       </td>
@@ -206,6 +238,6 @@ export function UsersAdminPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminPageShell>
   );
 }

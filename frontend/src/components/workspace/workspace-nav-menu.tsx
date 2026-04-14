@@ -66,7 +66,7 @@ export function WorkspaceNavMenu({
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultSection, setSettingsDefaultSection] = useState<
-    "appearance" | "memory" | "tools" | "skills" | "notification" | "about"
+    "appearance" | "memory" | "notification" | "about"
   >("appearance");
   const [mounted, setMounted] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -197,7 +197,7 @@ export function WorkspaceNavMenu({
                       {t.workspace.officialWebsite}
                     </DropdownMenuItem>
                   </a>
-                  <a href={supportMailto("BY support request")}>
+                  <a href={supportMailto("MicX support request")}>
                     <DropdownMenuItem>
                       <MailIcon />
                       {t.workspace.contactUs}
@@ -205,6 +205,30 @@ export function WorkspaceNavMenu({
                   </a>
                   {sessionRole === "owner" && (
                     <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/workspace/admin">
+                          <ShieldCheckIcon />
+                          后台总览
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/workspace/admin/config">
+                          <Settings2Icon />
+                          配置中心
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/workspace/admin/monitoring">
+                          <MonitorCogIcon />
+                          监控中心
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/workspace/admin/skills">
+                          <ShieldCheckIcon />
+                          技能管理
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/users">
                           <ShieldCheckIcon />
