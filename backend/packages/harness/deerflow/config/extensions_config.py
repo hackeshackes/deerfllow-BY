@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from deerflow.admin.secrets import is_secret_ref, resolve_secret_ref
+
 
 class McpOAuthConfig(BaseModel):
     """OAuth configuration for an MCP server (HTTP/SSE transports)."""
@@ -164,6 +166,8 @@ class ExtensionsConfig(BaseModel):
                         config[key] = ""
                     else:
                         config[key] = env_value
+                elif is_secret_ref(value):
+                    config[key] = resolve_secret_ref(value) or ""
                 else:
                     config[key] = value
             elif isinstance(value, dict):

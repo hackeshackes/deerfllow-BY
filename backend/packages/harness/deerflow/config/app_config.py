@@ -8,6 +8,7 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 
+from deerflow.admin.secrets import is_secret_ref, resolve_secret_ref
 from deerflow.config.acp_config import load_acp_config_from_dict
 from deerflow.config.checkpointer_config import CheckpointerConfig, load_checkpointer_config_from_dict
 from deerflow.config.extensions_config import ExtensionsConfig
@@ -37,6 +38,9 @@ def _merge_model_overrides(base_models: list[dict], override_models: list[dict])
         name = override.get("name")
         if not name:
             continue
+        if override.get("deleted"):
+            merged.pop(name, None)
+            continue
         if name in merged:
             merged[name] = {**merged[name], **override}
         else:
@@ -44,7 +48,7 @@ def _merge_model_overrides(base_models: list[dict], override_models: list[dict])
     ordered_names = [model.get("name") for model in base_models if model.get("name")]
     for override in override_models:
         name = override.get("name")
-        if name and name not in ordered_names:
+        if name and name not in ordered_names and not override.get("deleted"):
             ordered_names.append(name)
     return [merged[name] for name in ordered_names if name in merged]
 
@@ -236,6 +240,11 @@ class AppConfig(BaseModel):
                 if env_value is None:
                     raise ValueError(f"Environment variable {config[1:]} not found for config value {config}")
                 return env_value
+            if is_secret_ref(config):
+                secret_value = resolve_secret_ref(config)
+                if secret_value is None:
+                    raise ValueError(f"Secret reference {config} could not be resolved")
+                return secret_value
             return config
         elif isinstance(config, dict):
             return {k: cls.resolve_env_variables(v) for k, v in config.items()}
@@ -253,6 +262,16 @@ class AppConfig(BaseModel):
             The model config if found, otherwise None.
         """
         return next((model for model in self.models if model.name == name), None)
+
+    def get_default_model_config(self) -> ModelConfig | None:
+        explicit_default = next((model for model in self.models if bool(getattr(model, "is_default", False))), None)
+        if explicit_default is not None:
+            return explicit_default
+        return self.models[0] if self.models else None
+
+    def get_default_model_name(self) -> str | None:
+        default_model = self.get_default_model_config()
+        return default_model.name if default_model is not None else None
 
     def get_tool_config(self, name: str) -> ToolConfig | None:
         """Get the tool config by name.

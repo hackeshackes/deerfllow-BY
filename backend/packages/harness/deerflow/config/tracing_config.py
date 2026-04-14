@@ -3,6 +3,9 @@ import threading
 
 from pydantic import BaseModel, Field
 
+from deerflow.admin.config_store import get_admin_config
+from deerflow.admin.secrets import resolve_secret_ref
+
 _config_lock = threading.Lock()
 
 
@@ -112,18 +115,21 @@ def get_tracing_config() -> TracingConfig:
     with _config_lock:
         if _tracing_config is not None:
             return _tracing_config
+        admin_config = get_admin_config()
+        langsmith = admin_config.tracing.langsmith
+        langfuse = admin_config.tracing.langfuse
         _tracing_config = TracingConfig(
             langsmith=LangSmithTracingConfig(
-                enabled=_env_flag_preferred("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2", "LANGCHAIN_TRACING"),
-                api_key=_first_env_value("LANGSMITH_API_KEY", "LANGCHAIN_API_KEY"),
-                project=_first_env_value("LANGSMITH_PROJECT", "LANGCHAIN_PROJECT") or "deer-flow",
-                endpoint=_first_env_value("LANGSMITH_ENDPOINT", "LANGCHAIN_ENDPOINT") or "https://api.smith.langchain.com",
+                enabled=langsmith.enabled or _env_flag_preferred("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2", "LANGCHAIN_TRACING"),
+                api_key=resolve_secret_ref(langsmith.api_key) if langsmith.api_key else (_first_env_value("LANGSMITH_API_KEY", "LANGCHAIN_API_KEY")),
+                project=langsmith.project or _first_env_value("LANGSMITH_PROJECT", "LANGCHAIN_PROJECT") or "deer-flow",
+                endpoint=langsmith.endpoint or _first_env_value("LANGSMITH_ENDPOINT", "LANGCHAIN_ENDPOINT") or "https://api.smith.langchain.com",
             ),
             langfuse=LangfuseTracingConfig(
-                enabled=_env_flag_preferred("LANGFUSE_TRACING"),
-                public_key=_first_env_value("LANGFUSE_PUBLIC_KEY"),
-                secret_key=_first_env_value("LANGFUSE_SECRET_KEY"),
-                host=_first_env_value("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com",
+                enabled=langfuse.enabled or _env_flag_preferred("LANGFUSE_TRACING"),
+                public_key=resolve_secret_ref(langfuse.public_key) if langfuse.public_key else _first_env_value("LANGFUSE_PUBLIC_KEY"),
+                secret_key=resolve_secret_ref(langfuse.secret_key) if langfuse.secret_key else _first_env_value("LANGFUSE_SECRET_KEY"),
+                host=langfuse.host or _first_env_value("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com",
             ),
         )
         return _tracing_config
@@ -147,3 +153,9 @@ def validate_enabled_tracing_providers() -> None:
 def is_tracing_enabled() -> bool:
     """Check if any tracing provider is enabled and fully configured."""
     return get_tracing_config().is_configured
+
+
+def reset_tracing_config() -> None:
+    global _tracing_config
+    with _config_lock:
+        _tracing_config = None
