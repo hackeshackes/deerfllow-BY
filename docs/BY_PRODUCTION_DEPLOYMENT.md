@@ -1,4 +1,4 @@
-# BY Production Deployment
+# MicX Production Deployment
 
 ## 1. Required environment variables
 
@@ -9,7 +9,7 @@ BETTER_AUTH_SECRET=<32+ char random secret>
 BETTER_AUTH_BASE_URL=https://by.example.com
 BY_ADMIN_EMAIL=sabar.bao@me.com
 BY_ADMIN_PASSWORD=<strong password>
-BY_ADMIN_NAME=BY Owner
+BY_ADMIN_NAME=MicX Owner
 
 DEER_FLOW_HOME=/data/deer-flow
 DEER_FLOW_HOST_BASE_DIR=/data/deer-flow
@@ -20,7 +20,7 @@ Also set your normal model/runtime secrets in `.env` as required by the backend.
 
 ## 2. Persistent storage
 
-Create and persist the BY runtime directory on the host:
+Create and persist the MicX runtime directory on the host:
 
 ```bash
 sudo mkdir -p /data/deer-flow
