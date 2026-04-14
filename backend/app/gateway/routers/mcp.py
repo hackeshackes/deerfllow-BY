@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_owner_user, require_user
+from deerflow.admin import append_admin_audit_record, is_secret_ref, mask_secret_value, upsert_secret
 from deerflow.config.extensions_config import ExtensionsConfig, get_extensions_config, reload_extensions_config
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,43 @@ class McpConfigUpdateRequest(BaseModel):
     )
 
 
+def _sanitize_oauth_for_read(oauth: McpOAuthConfigResponse | None) -> McpOAuthConfigResponse | None:
+    if oauth is None:
+        return None
+    data = oauth.model_dump()
+    data["client_secret"] = mask_secret_value(oauth.client_secret)
+    data["refresh_token"] = mask_secret_value(oauth.refresh_token)
+    return McpOAuthConfigResponse(**data)
+
+
+def _sanitize_server_for_read(config: McpServerConfigResponse) -> McpServerConfigResponse:
+    data = config.model_dump()
+    oauth = _sanitize_oauth_for_read(config.oauth)
+    data["env"] = {key: mask_secret_value(value) or "" for key, value in config.env.items()}
+    data["headers"] = {key: mask_secret_value(value) or "" for key, value in config.headers.items()}
+    data["oauth"] = oauth.model_dump() if oauth is not None else None
+    return McpServerConfigResponse(**data)
+
+
+def _persist_secret_map(server_name: str, payload: McpServerConfigResponse) -> McpServerConfigResponse:
+    data = payload.model_dump()
+    data["env"] = {
+        key: upsert_secret(f"mcp/{server_name}/env/{key}", value) if value and not value.startswith("$") and not is_secret_ref(value) else value
+        for key, value in data["env"].items()
+    }
+    data["headers"] = {
+        key: upsert_secret(f"mcp/{server_name}/headers/{key}", value) if value and not value.startswith("$") and not is_secret_ref(value) else value
+        for key, value in data["headers"].items()
+    }
+    oauth = data.get("oauth")
+    if oauth:
+        for field_name in ("client_secret", "refresh_token"):
+            field_value = oauth.get(field_name)
+            if field_value and not field_value.startswith("$") and not is_secret_ref(field_value):
+                oauth[field_name] = upsert_secret(f"mcp/{server_name}/oauth/{field_name}", field_value)
+    return McpServerConfigResponse(**data)
+
+
 @router.get(
     "/mcp/config",
     response_model=McpConfigResponse,
@@ -94,7 +132,7 @@ async def get_mcp_configuration(request: Request) -> McpConfigResponse:
     require_user(request)
     config = get_extensions_config()
 
-    return McpConfigResponse(mcp_servers={name: McpServerConfigResponse(**server.model_dump()) for name, server in config.mcp_servers.items()})
+    return McpConfigResponse(mcp_servers={name: _sanitize_server_for_read(McpServerConfigResponse(**server.model_dump())) for name, server in config.mcp_servers.items()})
 
 
 @router.put(
@@ -135,7 +173,7 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest, http_request
         }
         ```
     """
-    require_owner_user(http_request)
+    user = require_owner_user(http_request)
     try:
         # Get the current config path (or determine where to save it)
         config_path = ExtensionsConfig.resolve_config_path()
@@ -149,8 +187,9 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest, http_request
         current_config = get_extensions_config()
 
         # Convert request to dict format for JSON serialization
+        persisted_servers = {name: _persist_secret_map(name, server).model_dump() for name, server in request.mcp_servers.items()}
         config_data = {
-            "mcpServers": {name: server.model_dump() for name, server in request.mcp_servers.items()},
+            "mcpServers": persisted_servers,
             "skills": {name: {"enabled": skill.enabled} for name, skill in current_config.skills.items()},
         }
 
@@ -165,7 +204,8 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest, http_request
 
         # Reload the configuration and update the global cache
         reloaded_config = reload_extensions_config()
-        return McpConfigResponse(mcp_servers={name: McpServerConfigResponse(**server.model_dump()) for name, server in reloaded_config.mcp_servers.items()})
+        append_admin_audit_record("mcp.updated", actor_id=user.id, target="extensions_config.json", details={"server_count": len(request.mcp_servers)})
+        return McpConfigResponse(mcp_servers={name: _sanitize_server_for_read(McpServerConfigResponse(**server.model_dump())) for name, server in reloaded_config.mcp_servers.items()})
 
     except Exception as e:
         logger.error(f"Failed to update MCP configuration: {e}", exc_info=True)
