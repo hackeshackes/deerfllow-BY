@@ -8,6 +8,8 @@ dependencies = [
     "deerflow-harness",
     "fastapi>=0.115.0",
     "httpx>=0.28.0",
+    "Pillow>=11.2.0",
+    "python-pptx>=1.0.2",
     "python-multipart>=0.0.20",
     "sse-starlette>=2.1.0",
     "uvicorn[standard]>=0.34.0",

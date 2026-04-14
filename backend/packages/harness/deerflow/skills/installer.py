@@ -6,6 +6,7 @@ Both Gateway and Client delegate to these functions.
 
 import logging
 import posixpath
+import re
 import shutil
 import stat
 import tempfile
@@ -16,6 +17,23 @@ from deerflow.skills.loader import get_skills_root_path
 from deerflow.skills.validation import _validate_skill_frontmatter
 
 logger = logging.getLogger(__name__)
+
+_FRONTMATTER_NAME_RE = re.compile(r"(^---\s*\n(?:.*\n)*?name:\s*)([^\n]+)", re.MULTILINE)
+
+
+def _rewrite_skill_name(skill_file: Path, new_name: str) -> None:
+    content = skill_file.read_text(encoding="utf-8")
+    updated, count = _FRONTMATTER_NAME_RE.subn(rf"\1{new_name}", content, count=1)
+    if count != 1:
+        raise ValueError("Failed to rewrite skill name in SKILL.md")
+    skill_file.write_text(updated, encoding="utf-8")
+
+
+def _extract_plain_skill_file(skill_file: Path, dest_root: Path) -> None:
+    content = skill_file.read_text(encoding="utf-8")
+    temp_skill_dir = dest_root / "plain-skill"
+    temp_skill_dir.mkdir(parents=True, exist_ok=True)
+    (temp_skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
 
 class SkillAlreadyExistsError(ValueError):
@@ -118,6 +136,8 @@ def install_skill_from_archive(
     zip_path: str | Path,
     *,
     skills_root: Path | None = None,
+    conflict_strategy: str = "error",
+    rename_to: str | None = None,
 ) -> dict:
     """Install a skill from a .skill archive (ZIP).
 
@@ -156,10 +176,13 @@ def install_skill_from_archive(
         except FileNotFoundError:
             raise FileNotFoundError(f"Skill file not found: {zip_path}") from None
         except (zipfile.BadZipFile, IsADirectoryError):
-            raise ValueError("File is not a valid ZIP archive") from None
-
-        with zf:
-            safe_extract_skill_archive(zf, tmp_path)
+            try:
+                _extract_plain_skill_file(path, tmp_path)
+            except UnicodeDecodeError:
+                raise ValueError("File is not a valid ZIP archive") from None
+        else:
+            with zf:
+                safe_extract_skill_archive(zf, tmp_path)
 
         skill_dir = resolve_skill_dir_from_archive(tmp_path)
 
@@ -169,15 +192,26 @@ def install_skill_from_archive(
         if not skill_name or "/" in skill_name or "\\" in skill_name or ".." in skill_name:
             raise ValueError(f"Invalid skill name: {skill_name}")
 
-        target = custom_dir / skill_name
+        final_skill_name = rename_to or skill_name
+        if not final_skill_name or "/" in final_skill_name or "\\" in final_skill_name or ".." in final_skill_name:
+            raise ValueError(f"Invalid skill name: {final_skill_name}")
+
+        target = custom_dir / final_skill_name
         if target.exists():
-            raise SkillAlreadyExistsError(f"Skill '{skill_name}' already exists")
+            if conflict_strategy == "replace":
+                shutil.rmtree(target)
+            elif conflict_strategy == "rename" and rename_to:
+                pass
+            else:
+                raise SkillAlreadyExistsError(f"Skill '{final_skill_name}' already exists")
 
         shutil.copytree(skill_dir, target)
-        logger.info("Skill %r installed to %s", skill_name, target)
+        if rename_to and rename_to != skill_name:
+            _rewrite_skill_name(target / "SKILL.md", rename_to)
+        logger.info("Skill %r installed to %s", final_skill_name, target)
 
     return {
         "success": True,
-        "skill_name": skill_name,
-        "message": f"Skill '{skill_name}' installed successfully",
+        "skill_name": final_skill_name,
+        "message": f"Skill '{final_skill_name}' installed successfully",
     }

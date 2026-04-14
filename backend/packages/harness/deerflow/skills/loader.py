@@ -2,10 +2,16 @@ import logging
 import os
 from pathlib import Path
 
+from deerflow.admin import DEFAULT_SKILL_METADATA_ZH, read_skill_metadata
+
 from .parser import parse_skill_file
 from .types import Skill
 
 logger = logging.getLogger(__name__)
+
+
+def _is_meaningful_chinese(value: str | None) -> bool:
+    return bool(value and any("\u4e00" <= char <= "\u9fff" for char in value))
 
 
 def get_skills_root_path() -> Path:
@@ -77,6 +83,21 @@ def load_skills(skills_path: Path | None = None, use_config: bool = True, enable
                 skills_by_name[skill.name] = skill
 
     skills = list(skills_by_name.values())
+    skill_metadata = read_skill_metadata()
+
+    for skill in skills:
+        metadata = skill_metadata.get(skill.name, {})
+        default_metadata = DEFAULT_SKILL_METADATA_ZH.get(skill.name, {})
+        if metadata:
+            skill.source = metadata.get("source")
+            skill.installed_at = metadata.get("installed_at")
+            display_name_zh = metadata.get("display_name_zh")
+            description_zh = metadata.get("description_zh")
+            skill.display_name_zh = display_name_zh if _is_meaningful_chinese(display_name_zh) else default_metadata.get("display_name_zh")
+            skill.description_zh = description_zh if _is_meaningful_chinese(description_zh) else default_metadata.get("description_zh")
+        elif default_metadata:
+            skill.display_name_zh = default_metadata.get("display_name_zh")
+            skill.description_zh = default_metadata.get("description_zh")
 
     # Load skills state configuration and update enabled status
     # NOTE: We use ExtensionsConfig.from_file() instead of get_extensions_config()

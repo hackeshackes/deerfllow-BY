@@ -108,11 +108,17 @@ def parse_skill_file(skill_file: Path, category: str, relative_path: Path | None
             return None
 
         license_text = metadata.get("license")
+        author = metadata.get("author")
+        version = metadata.get("version")
+        compatibility = metadata.get("compatibility")
 
         return Skill(
             name=name,
             description=description,
             license=license_text,
+            author=author,
+            version=version,
+            compatibility=compatibility,
             skill_dir=skill_file.parent,
             skill_file=skill_file,
             relative_path=relative_path or Path(skill_file.parent.name),
