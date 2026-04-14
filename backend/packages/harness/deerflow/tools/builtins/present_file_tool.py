@@ -51,6 +51,11 @@ def _normalize_presented_filepath(
     else:
         actual_path = Path(filepath).expanduser().resolve()
 
+    if not actual_path.exists():
+        raise ValueError(f"File does not exist and cannot be presented: {filepath}")
+    if not actual_path.is_file():
+        raise ValueError(f"Only files can be presented: {filepath}")
+
     try:
         relative_path = actual_path.relative_to(outputs_dir)
     except ValueError as exc:

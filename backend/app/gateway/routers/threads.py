@@ -23,7 +23,20 @@ from pydantic import BaseModel, Field
 from app.gateway.auth import require_user
 from app.gateway.auth_context import get_current_workspace_id
 from app.gateway.deps import get_checkpointer, get_store
-from app.gateway.ownership import THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, attach_owner_metadata, require_thread_owner
+from app.gateway.ownership import (
+    THREAD_OWNER_KEY,
+    THREAD_SHARED_AT_KEY,
+    THREAD_SHARED_BY_KEY,
+    THREAD_VISIBILITY_KEY,
+    THREAD_VISIBILITY_PRIVATE,
+    THREAD_VISIBILITY_WORKSPACE,
+    THREAD_WORKSPACE_KEY,
+    attach_owner_metadata,
+    can_read_thread,
+    normalize_thread_visibility,
+    require_thread_manage_access,
+    require_thread_read_access,
+)
 from deerflow.config.paths import Paths, get_paths
 from deerflow.runtime import serialize_channel_values
 
@@ -95,6 +108,14 @@ class ThreadPatchRequest(BaseModel):
     """Request body for patching thread metadata."""
 
     metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata to merge")
+
+
+class ThreadTitleUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, description="Thread title")
+
+
+class ThreadVisibilityUpdateRequest(BaseModel):
+    visibility: str = Field(description="private or workspace")
 
 
 class ThreadSyncRequest(BaseModel):
@@ -178,6 +199,8 @@ async def _store_upsert(store, thread_id: str, *, metadata: dict | None = None, 
     now = time.time()
     existing = await _store_get(store, thread_id)
     if existing is None:
+        normalized_metadata = dict(metadata or {})
+        normalized_metadata[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(normalized_metadata.get(THREAD_VISIBILITY_KEY))
         await _store_put(
             store,
             {
@@ -185,7 +208,7 @@ async def _store_upsert(store, thread_id: str, *, metadata: dict | None = None, 
                 "status": "idle",
                 "created_at": now,
                 "updated_at": now,
-                "metadata": metadata or {},
+                "metadata": normalized_metadata,
                 "values": values or {},
             },
         )
@@ -193,10 +216,46 @@ async def _store_upsert(store, thread_id: str, *, metadata: dict | None = None, 
         val = dict(existing)
         val["updated_at"] = now
         if metadata:
-            val.setdefault("metadata", {}).update(metadata)
+            incoming = dict(metadata)
+            existing_metadata = val.setdefault("metadata", {})
+            for protected_key in (THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, "created_by_user_id"):
+                current_value = existing_metadata.get(protected_key)
+                incoming_value = incoming.get(protected_key)
+                if current_value is not None and incoming_value is not None and incoming_value != current_value:
+                    raise HTTPException(status_code=409, detail=f"Cannot mutate thread metadata field '{protected_key}'")
+                incoming.pop(protected_key, None)
+
+            if THREAD_VISIBILITY_KEY in incoming:
+                incoming_visibility = normalize_thread_visibility(incoming.get(THREAD_VISIBILITY_KEY))
+                current_visibility = normalize_thread_visibility(existing_metadata.get(THREAD_VISIBILITY_KEY))
+                if incoming_visibility != current_visibility:
+                    raise HTTPException(status_code=409, detail="Thread visibility can only be changed through the visibility API")
+                incoming[THREAD_VISIBILITY_KEY] = current_visibility
+
+            existing_metadata.update(incoming)
+            existing_metadata[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(existing_metadata.get(THREAD_VISIBILITY_KEY))
         if values:
             val.setdefault("values", {}).update(values)
         await _store_put(store, val)
+
+
+def _is_visible_to_user(metadata: dict[str, Any], user_id: str, active_workspace_id: str | None) -> bool:
+    owner_user_id = metadata.get(THREAD_OWNER_KEY)
+    if owner_user_id == user_id:
+        return True
+    visibility = normalize_thread_visibility(metadata.get(THREAD_VISIBILITY_KEY))
+    return visibility == THREAD_VISIBILITY_WORKSPACE and bool(active_workspace_id and metadata.get(THREAD_WORKSPACE_KEY) == active_workspace_id)
+
+
+async def _sync_checkpoint_metadata(checkpointer, thread_id: str, metadata_updates: dict[str, Any]) -> None:
+    checkpoint_tuple = await checkpointer.aget_tuple({"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}})
+    if checkpoint_tuple is None:
+        return
+    checkpoint = dict(getattr(checkpoint_tuple, "checkpoint", {}) or {})
+    metadata = dict(getattr(checkpoint_tuple, "metadata", {}) or {})
+    metadata.update(metadata_updates)
+    metadata[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(metadata.get(THREAD_VISIBILITY_KEY))
+    await checkpointer.aput({"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}, checkpoint, metadata, {})
 
 
 def _derive_thread_status(checkpoint_tuple) -> str:
@@ -230,7 +289,7 @@ async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteRe
     Cleans DeerFlow-managed thread directories, removes checkpoint data,
     and removes the thread record from the Store.
     """
-    await require_thread_owner(request, thread_id)
+    await require_thread_manage_access(request, thread_id)
     # Clean local filesystem
     response = _delete_thread_data(thread_id)
 
@@ -366,10 +425,11 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
             val = item.value
             metadata = val.get("metadata", {})
             if active_workspace_id:
-                if metadata.get(THREAD_WORKSPACE_KEY) != active_workspace_id:
+                if not _is_visible_to_user(metadata, user.id, active_workspace_id):
                     continue
             elif metadata.get(THREAD_OWNER_KEY) != user.id:
                 continue
+            metadata[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(metadata.get(THREAD_VISIBILITY_KEY))
             merged[val["thread_id"]] = ThreadResponse(
                 thread_id=val["thread_id"],
                 status=val.get("status", "idle"),
@@ -407,10 +467,11 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
                 ckpt_values["title"] = title
 
             if active_workspace_id:
-                if user_meta.get(THREAD_WORKSPACE_KEY) != active_workspace_id:
+                if not _is_visible_to_user(user_meta, user.id, active_workspace_id):
                     continue
             elif user_meta.get(THREAD_OWNER_KEY) != user.id:
                 continue
+            user_meta[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(user_meta.get(THREAD_VISIBILITY_KEY))
 
             thread_resp = ThreadResponse(
                 thread_id=thread_id,
@@ -450,18 +511,25 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
 @router.patch("/{thread_id}", response_model=ThreadResponse)
 async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Request) -> ThreadResponse:
     """Merge metadata into a thread record."""
-    _, record = await require_thread_owner(request, thread_id)
+    _, record = await require_thread_manage_access(request, thread_id)
     store = get_store(request)
+    checkpointer = get_checkpointer(request)
     if store is None:
         raise HTTPException(status_code=503, detail="Store not available")
 
     now = time.time()
     updated = dict(record)
-    updated.setdefault("metadata", {}).update(body.metadata)
+    allowed_metadata = {
+        key: value
+        for key, value in body.metadata.items()
+        if key not in {THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, "created_by_user_id", THREAD_VISIBILITY_KEY, THREAD_SHARED_BY_KEY, THREAD_SHARED_AT_KEY}
+    }
+    updated.setdefault("metadata", {}).update(allowed_metadata)
     updated["updated_at"] = now
 
     try:
         await _store_put(store, updated)
+        await _sync_checkpoint_metadata(checkpointer, thread_id, updated.get("metadata", {}))
     except Exception:
         logger.exception("Failed to patch thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to update thread")
@@ -472,6 +540,66 @@ async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Reques
         created_at=str(updated.get("created_at", "")),
         updated_at=str(now),
         metadata=updated.get("metadata", {}),
+    )
+
+
+@router.patch("/{thread_id}/title", response_model=ThreadResponse)
+async def update_thread_title(thread_id: str, body: ThreadTitleUpdateRequest, request: Request) -> ThreadResponse:
+    _, record = await require_thread_manage_access(request, thread_id)
+    checkpointer = get_checkpointer(request)
+    store = get_store(request)
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Thread title cannot be empty")
+
+    read_config: dict[str, Any] = {
+        "configurable": {
+            "thread_id": thread_id,
+            "checkpoint_ns": "",
+        }
+    }
+    try:
+        checkpoint_tuple = await checkpointer.aget_tuple(read_config)
+    except Exception:
+        logger.exception("Failed to load thread %s before title update", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to update thread title")
+
+    if checkpoint_tuple is None:
+        raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+
+    checkpoint: dict[str, Any] = dict(getattr(checkpoint_tuple, "checkpoint", {}) or {})
+    metadata: dict[str, Any] = dict(getattr(checkpoint_tuple, "metadata", {}) or {})
+    channel_values: dict[str, Any] = dict(checkpoint.get("channel_values", {}))
+    channel_values["title"] = title
+    checkpoint["channel_values"] = channel_values
+    metadata["updated_at"] = time.time()
+    metadata[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(metadata.get(THREAD_VISIBILITY_KEY))
+
+    write_config: dict[str, Any] = {
+        "configurable": {
+            "thread_id": thread_id,
+            "checkpoint_ns": "",
+        }
+    }
+    try:
+        await checkpointer.aput(write_config, checkpoint, metadata, {})
+        if store is not None:
+            await _store_upsert(store, thread_id, values={"title": title})
+        updated_record = await _store_get(store, thread_id) if store is not None else None
+    except Exception:
+        logger.exception("Failed to update title for thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to update thread title")
+
+    final_record = updated_record or record
+    final_record.setdefault("values", {})["title"] = title
+    final_record["updated_at"] = metadata.get("updated_at", time.time())
+    return ThreadResponse(
+        thread_id=thread_id,
+        status=final_record.get("status", "idle"),
+        created_at=str(final_record.get("created_at", "")),
+        updated_at=str(final_record.get("updated_at", "")),
+        metadata=final_record.get("metadata", {}),
+        values=final_record.get("values", {}),
     )
 
 
@@ -506,14 +634,14 @@ async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
     status from the checkpointer.  Falls back to the checkpointer alone
     for threads that pre-date Store adoption (backward compat).
     """
-    user = require_user(request)
+    user, access_record = await require_thread_read_access(request, thread_id)
     store = get_store(request)
     checkpointer = get_checkpointer(request)
 
     record: dict | None = None
     if store is not None:
         record = await _store_get(store, thread_id)
-        if record is not None and record.get("metadata", {}).get(THREAD_OWNER_KEY) != user.id:
+        if record is not None and not can_read_thread(record, user):
             record = None
 
     # Derive accurate status from the checkpointer
@@ -538,9 +666,14 @@ async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
             "updated_at": ckpt_meta.get("updated_at", ckpt_meta.get("created_at", "")),
             "metadata": {k: v for k, v in ckpt_meta.items() if k not in ("created_at", "updated_at", "step", "source", "writes", "parents")},
         }
+    if record is None:
+        record = access_record
 
     if record is None:
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+
+    record.setdefault("metadata", {})
+    record["metadata"][THREAD_VISIBILITY_KEY] = normalize_thread_visibility(record["metadata"].get(THREAD_VISIBILITY_KEY))
 
     status = _derive_thread_status(checkpoint_tuple) if checkpoint_tuple is not None else record.get("status", "idle")
     checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {} if checkpoint_tuple is not None else {}
@@ -563,7 +696,7 @@ async def get_thread_state(thread_id: str, request: Request) -> ThreadStateRespo
     Channel values are serialized to ensure LangChain message objects
     are converted to JSON-safe dicts.
     """
-    await require_thread_owner(request, thread_id)
+    await require_thread_read_access(request, thread_id)
     checkpointer = get_checkpointer(request)
 
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
@@ -614,7 +747,7 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
     channel values, then syncs any updated ``title`` field back to the Store
     so that ``/threads/search`` reflects the change immediately.
     """
-    await require_thread_owner(request, thread_id)
+    await require_thread_manage_access(request, thread_id)
     checkpointer = get_checkpointer(request)
     store = get_store(request)
 
@@ -693,7 +826,7 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
 @router.post("/{thread_id}/history", response_model=list[HistoryEntry])
 async def get_thread_history(thread_id: str, body: ThreadHistoryRequest, request: Request) -> list[HistoryEntry]:
     """Get checkpoint history for a thread."""
-    await require_thread_owner(request, thread_id)
+    await require_thread_read_access(request, thread_id)
     checkpointer = get_checkpointer(request)
 
     config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
@@ -734,3 +867,43 @@ async def get_thread_history(thread_id: str, body: ThreadHistoryRequest, request
         raise HTTPException(status_code=500, detail="Failed to get thread history")
 
     return entries
+
+
+@router.patch("/{thread_id}/visibility", response_model=ThreadResponse)
+async def update_thread_visibility(thread_id: str, body: ThreadVisibilityUpdateRequest, request: Request) -> ThreadResponse:
+    user, record = await require_thread_manage_access(request, thread_id)
+    store = get_store(request)
+    checkpointer = get_checkpointer(request)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Store not available")
+
+    visibility = normalize_thread_visibility(body.visibility)
+    updated = dict(record)
+    metadata = dict(updated.get("metadata", {}) or {})
+    if visibility == THREAD_VISIBILITY_WORKSPACE and metadata.get(THREAD_WORKSPACE_KEY) == f"ws-{metadata.get(THREAD_OWNER_KEY)}":
+        raise HTTPException(status_code=422, detail="Personal workspace threads cannot be shared")
+    metadata[THREAD_VISIBILITY_KEY] = visibility
+    if visibility == THREAD_VISIBILITY_WORKSPACE:
+        metadata[THREAD_SHARED_BY_KEY] = user.id
+        metadata[THREAD_SHARED_AT_KEY] = time.time()
+    else:
+        metadata.pop(THREAD_SHARED_BY_KEY, None)
+        metadata.pop(THREAD_SHARED_AT_KEY, None)
+    updated["metadata"] = metadata
+    updated["updated_at"] = time.time()
+
+    try:
+        await _store_put(store, updated)
+        await _sync_checkpoint_metadata(checkpointer, thread_id, metadata)
+    except Exception:
+        logger.exception("Failed to update visibility for thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to update thread visibility")
+
+    return ThreadResponse(
+        thread_id=thread_id,
+        status=updated.get("status", "idle"),
+        created_at=str(updated.get("created_at", "")),
+        updated_at=str(updated.get("updated_at", "")),
+        metadata=updated.get("metadata", {}),
+        values=updated.get("values", {}),
+    )

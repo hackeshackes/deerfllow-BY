@@ -19,7 +19,7 @@ from langchain_core.messages import HumanMessage
 
 from app.gateway.auth import require_user
 from app.gateway.deps import get_checkpointer, get_run_manager, get_store, get_stream_bridge
-from app.gateway.ownership import attach_owner_metadata
+from app.gateway.ownership import THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, attach_owner_metadata
 from deerflow.runtime import (
     END_SENTINEL,
     HEARTBEAT_SENTINEL,
@@ -263,7 +263,24 @@ async def start_run(
 
     if body.metadata is None:
         body.metadata = {}
-    body.metadata = attach_owner_metadata(body.metadata, user)
+    existing_thread = None
+    if store is not None:
+        existing = await store.aget(("threads",), thread_id)
+        existing_thread = existing.value if existing is not None else None
+
+    if existing_thread is None:
+        body.metadata = attach_owner_metadata(body.metadata, user)
+    else:
+        existing_metadata = dict(existing_thread.get("metadata", {}) or {})
+        if existing_metadata.get(THREAD_OWNER_KEY) != user.id:
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+        incoming_metadata = dict(body.metadata or {})
+        for protected_key in (THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, "created_by_user_id"):
+            incoming_value = incoming_metadata.get(protected_key)
+            current_value = existing_metadata.get(protected_key)
+            if incoming_value is not None and current_value is not None and incoming_value != current_value:
+                raise HTTPException(status_code=409, detail=f"Cannot mutate thread metadata field '{protected_key}'")
+        body.metadata = existing_metadata
 
     disconnect = DisconnectMode.cancel if body.on_disconnect == "cancel" else DisconnectMode.continue_
 

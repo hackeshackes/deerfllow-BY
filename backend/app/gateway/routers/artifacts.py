@@ -7,8 +7,9 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
-from app.gateway.ownership import require_thread_owner
+from app.gateway.ownership import THREAD_WORKSPACE_KEY, require_thread_read_access
 from app.gateway.path_utils import resolve_thread_virtual_path
+from deerflow.config.paths import get_paths
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,30 @@ def _build_attachment_headers(filename: str, extra_headers: dict[str, str] | Non
     if extra_headers:
         headers.update(extra_headers)
     return headers
+
+
+def _resolve_artifact_path(thread_id: str, path: str, record: dict | None) -> Path:
+    actual_path = resolve_thread_virtual_path(thread_id, path)
+    if actual_path.exists():
+        return actual_path
+
+    metadata = (record or {}).get("metadata", {}) or {}
+    workspace_id = metadata.get(THREAD_WORKSPACE_KEY)
+    if workspace_id:
+        candidate = get_paths().workspace_dir(workspace_id) / "threads" / thread_id / "user-data"
+        try:
+            stripped = path.lstrip("/")
+            prefix = "mnt/user-data"
+            if stripped == prefix or stripped.startswith(prefix + "/"):
+                relative = stripped[len(prefix) :].lstrip("/")
+                fallback_path = (candidate / relative).resolve()
+                fallback_path.relative_to(candidate.resolve())
+                if fallback_path.exists():
+                    return fallback_path
+        except ValueError:
+            pass
+
+    return actual_path
 
 
 def is_text_file_by_content(path: Path, sample_size: int = 8192) -> bool:
@@ -115,7 +140,7 @@ async def get_artifact(thread_id: str, path: str, request: Request, download: bo
         - Download file: `/api/threads/abc123/artifacts/mnt/user-data/outputs/data.csv?download=true`
         - Active web content such as `.html`, `.xhtml`, and `.svg` artifacts is always downloaded
     """
-    await require_thread_owner(request, thread_id)
+    _user, record = await require_thread_read_access(request, thread_id)
     # Check if this is a request for a file inside a .skill archive (e.g., xxx.skill/SKILL.md)
     if ".skill/" in path:
         # Split the path at ".skill/" to get the ZIP file path and internal path
@@ -124,7 +149,7 @@ async def get_artifact(thread_id: str, path: str, request: Request, download: bo
         skill_file_path = path[: marker_pos + len(".skill")]  # e.g., "mnt/user-data/outputs/my-skill.skill"
         internal_path = path[marker_pos + len(skill_marker) :]  # e.g., "SKILL.md"
 
-        actual_skill_path = resolve_thread_virtual_path(thread_id, skill_file_path)
+        actual_skill_path = _resolve_artifact_path(thread_id, skill_file_path, record)
 
         if not actual_skill_path.exists():
             raise HTTPException(status_code=404, detail=f"Skill file not found: {skill_file_path}")
@@ -154,7 +179,7 @@ async def get_artifact(thread_id: str, path: str, request: Request, download: bo
         except UnicodeDecodeError:
             return Response(content=content, media_type=mime_type or "application/octet-stream", headers=cache_headers)
 
-    actual_path = resolve_thread_virtual_path(thread_id, path)
+    actual_path = _resolve_artifact_path(thread_id, path, record)
 
     logger.info(f"Resolving artifact path: thread_id={thread_id}, requested_path={path}, actual_path={actual_path}")
 
