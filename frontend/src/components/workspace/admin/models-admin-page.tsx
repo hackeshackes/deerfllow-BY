@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { Model } from "@/core/models/types";
 
+import { AdminPageShell } from "./admin-page-shell";
+
 type FormState = {
   originalName?: string;
   name: string;
@@ -62,6 +64,7 @@ export function ModelsAdminPage() {
   const [models, setModels] = useState<Model[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
 
@@ -108,6 +111,8 @@ export function ModelsAdminPage() {
   }
 
   async function saveModel() {
+    setError(null);
+    setStatusMessage(null);
     const target = form.originalName ? `/api/admin/models/${form.originalName}` : "/api/admin/models";
     const method = form.originalName ? "PATCH" : "POST";
     const response = await fetch(target, {
@@ -124,10 +129,13 @@ export function ModelsAdminPage() {
       return;
     }
     setDialogOpen(false);
+    setStatusMessage(form.originalName ? "模型修改已保存" : "模型已创建");
     await loadData();
   }
 
   async function testModel(name: string) {
+    setError(null);
+    setStatusMessage(null);
     setTestResult(null);
     const response = await fetch(`/api/admin/models/${name}/test`, { method: "POST" });
     const payload = (await response.json()) as { ok: boolean; message: string };
@@ -135,7 +143,29 @@ export function ModelsAdminPage() {
   }
 
   async function reloadModels(name: string) {
+    setError(null);
+    setStatusMessage(null);
     await fetch(`/api/admin/models/${name}/reload`, { method: "POST" });
+    setStatusMessage(`已重载 ${name} 的模型配置`);
+    await loadData();
+  }
+
+  async function deleteModel(name: string) {
+    setError(null);
+    setStatusMessage(null);
+    const confirmed = window.confirm(`确认删除模型 ${name} 吗？删除后将从管理台列表中移除。`);
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(`/api/admin/models/${name}`, { method: "DELETE" });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { detail?: string } | null;
+      setError(body?.detail ?? "删除模型失败");
+      return;
+    }
+
+    setStatusMessage(`模型 ${name} 已删除`);
     await loadData();
   }
 
@@ -145,7 +175,7 @@ export function ModelsAdminPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
+    <AdminPageShell title="模型管理" description="通过图形界面管理系统模型配置、启停状态、默认模型与连接测试。">
       <Card>
         <CardHeader>
           <CardTitle>模型管理中心</CardTitle>
@@ -181,11 +211,13 @@ export function ModelsAdminPage() {
                   <Button variant="outline" size="sm" onClick={() => openEditDialog(model)}>编辑</Button>
                   <Button variant="outline" size="sm" onClick={() => void testModel(model.name)}>测试连接</Button>
                   <Button variant="outline" size="sm" onClick={() => void reloadModels(model.name)}>重载配置</Button>
+                  <Button variant="destructive" size="sm" onClick={() => void deleteModel(model.name)}>删除</Button>
                 </div>
               </div>
             </div>
           ))}
           {error && <p className="text-sm text-rose-600">{error}</p>}
+          {statusMessage && <p className="text-sm text-emerald-700">{statusMessage}</p>}
           {testResult && <p className="text-sm text-sky-700">{testResult}</p>}
         </CardContent>
       </Card>
@@ -271,6 +303,6 @@ export function ModelsAdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPageShell>
   );
 }

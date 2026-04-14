@@ -6,12 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+import { AdminPageShell } from "./admin-page-shell";
+
 type WorkspaceRecord = {
   id: string;
   name: string;
   role: string;
   default_personal: boolean;
   member_count: number;
+  thread_count?: number;
+  upload_file_count?: number;
+  artifact_file_count?: number;
+  agent_count?: number;
 };
 
 type UserRecord = {
@@ -96,7 +102,7 @@ export function WorkspacesAdminPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
+    <AdminPageShell title="空间管理" description="为团队创建共享空间，查看空间规模，并把成员加入对应的协作区域。">
       <Card>
         <CardHeader>
           <CardTitle>空间管理</CardTitle>
@@ -148,6 +154,8 @@ export function WorkspacesAdminPage() {
                 </div>
                 <div className="text-right text-sm text-slate-500">
                   <div>{workspace.member_count} 名成员</div>
+                  <div>{workspace.thread_count ?? 0} 个线程 · {workspace.agent_count ?? 0} 个智能体</div>
+                  <div>{workspace.upload_file_count ?? 0} 个上传 · {workspace.artifact_file_count ?? 0} 个产物</div>
                   <div>{workspace.default_personal ? "仅自己可见" : "空间成员可协作"}</div>
                 </div>
               </div>
@@ -155,6 +163,6 @@ export function WorkspacesAdminPage() {
           ))}
         </CardContent>
       </Card>
-    </div>
+    </AdminPageShell>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -125,6 +126,33 @@ export function AccountPage() {
           {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
         </CardContent>
       </Card>
+
+      {user?.role === "owner" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>管理员入口</CardTitle>
+            <CardDescription>系统级配置、监控、技能和模型管理已经迁移到后台控制台。</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <Link className="rounded-2xl border px-4 py-4 text-sm transition-colors hover:bg-slate-50" href="/workspace/admin/config">
+              <div className="font-medium">配置中心</div>
+              <div className="mt-1 text-slate-500">统一维护系统配置、Tracing 与品牌信息。</div>
+            </Link>
+            <Link className="rounded-2xl border px-4 py-4 text-sm transition-colors hover:bg-slate-50" href="/workspace/admin/monitoring">
+              <div className="font-medium">监控中心</div>
+              <div className="mt-1 text-slate-500">查看健康状态、关键指标和审计日志。</div>
+            </Link>
+            <Link className="rounded-2xl border px-4 py-4 text-sm transition-colors hover:bg-slate-50" href="/workspace/admin/skills">
+              <div className="font-medium">技能管理</div>
+              <div className="mt-1 text-slate-500">远程安装技能并维护启用状态。</div>
+            </Link>
+            <Link className="rounded-2xl border px-4 py-4 text-sm transition-colors hover:bg-slate-50" href="/workspace/admin/models">
+              <div className="font-medium">模型管理</div>
+              <div className="mt-1 text-slate-500">维护模型配置、默认模型和连通性测试。</div>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
