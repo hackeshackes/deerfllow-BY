@@ -225,3 +225,15 @@ class TestInstallSkillFromArchive:
         result = install_skill_from_archive(zip_path, skills_root=skills_root)
         assert result["success"] is True
         assert result["skill_name"] == "my-skill"
+
+    def test_plain_text_skill_file_supported(self, tmp_path):
+        skill_path = tmp_path / "plain.skill"
+        skill_path.write_text("---\nname: plain-skill\ndescription: plain text skill\n---\n\n# Plain Skill\n", encoding="utf-8")
+        skills_root = tmp_path / "skills"
+        skills_root.mkdir()
+
+        result = install_skill_from_archive(skill_path, skills_root=skills_root)
+
+        assert result["success"] is True
+        assert result["skill_name"] == "plain-skill"
+        assert (skills_root / "custom" / "plain-skill" / "SKILL.md").exists()
