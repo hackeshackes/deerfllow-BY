@@ -142,10 +142,62 @@ def decode_session_token(token: str) -> dict[str, Any] | None:
         return None
 
 
+# Weak passwords that are forbidden in production
+_FORBIDDEN_PASSWORDS = frozenset({
+    "change-me-123",
+    "admin",
+    "password",
+    "12345678",
+    "changeme",
+    "default",
+})
+
+
+def _is_strict_mode() -> bool:
+    """Check if strict password mode is disabled (for development only)."""
+    return os.getenv("BY_ADMIN_PASSWORD_STRICT_MODE", "true").lower() != "false"
+
+
+def _validate_admin_password(password: str | None) -> None:
+    """Validate admin password meets security requirements.
+
+    Raises:
+        ValueError: If password is missing, too weak, or is a known insecure default.
+    """
+    if not password:
+        raise ValueError(
+            "BY_ADMIN_PASSWORD environment variable is not set. "
+            "Please set a strong password before starting the server."
+        )
+
+    if password in _FORBIDDEN_PASSWORDS:
+        if _is_strict_mode():
+            raise ValueError(
+                f"Password '{password}' is insecure and not allowed. "
+                "Please set a strong password via BY_ADMIN_PASSWORD environment variable. "
+                "To disable this check for development, set BY_ADMIN_PASSWORD_STRICT_MODE=false."
+            )
+        else:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Using known insecure default password. "
+                "This is only allowed in development mode (BY_ADMIN_PASSWORD_STRICT_MODE=false)."
+            )
+
+    if len(password) < 8:
+        raise ValueError(
+            "BY_ADMIN_PASSWORD must be at least 8 characters long."
+        )
+
+
 def _seed_owner_user() -> dict[str, Any]:
     owner_email = os.getenv("BY_ADMIN_EMAIL", "sabar.bao@me.com")
-    owner_password = os.getenv("BY_ADMIN_PASSWORD", "change-me-123")
+    owner_password = os.getenv("BY_ADMIN_PASSWORD")
     owner_name = os.getenv("BY_ADMIN_NAME", "BY Owner")
+
+    # Validate password before use
+    _validate_admin_password(owner_password)
+
     salt = secrets.token_hex(16)
     now = _utc_now_iso()
     return {
