@@ -5,6 +5,7 @@ import {
   InfoIcon,
   BrainIcon,
   PaletteIcon,
+  BlocksIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -19,6 +20,7 @@ import { AboutSettingsPage } from "@/components/workspace/settings/about-setting
 import { AppearanceSettingsPage } from "@/components/workspace/settings/appearance-settings-page";
 import { MemorySettingsPage } from "@/components/workspace/settings/memory-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
+import { UserSkillsPage } from "@/components/workspace/settings/user-skills-page";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +28,7 @@ type SettingsSection =
   | "appearance"
   | "memory"
   | "notification"
+  | "skills"
   | "about";
 
 type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
@@ -63,12 +66,18 @@ export function SettingsDialog(props: SettingsDialogProps) {
         label: t.settings.sections.memory,
         icon: BrainIcon,
       },
+      {
+        id: "skills",
+        label: t.settings.sections.skills,
+        icon: BlocksIcon,
+      },
       { id: "about", label: t.settings.sections.about, icon: InfoIcon },
     ],
     [
       t.settings.sections.appearance,
       t.settings.sections.memory,
       t.settings.sections.notification,
+      t.settings.sections.skills,
       t.settings.sections.about,
     ],
   );
@@ -117,6 +126,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
               {activeSection === "appearance" && <AppearanceSettingsPage />}
               {activeSection === "memory" && <MemorySettingsPage />}
               {activeSection === "notification" && <NotificationSettingsPage />}
+              {activeSection === "skills" && <UserSkillsPage />}
               {activeSection === "about" && <AboutSettingsPage />}
             </div>
           </ScrollArea>

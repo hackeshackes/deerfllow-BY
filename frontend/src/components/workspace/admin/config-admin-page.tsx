@@ -29,6 +29,56 @@ function emitBrandUpdate(branding: AdminConfig["branding"]) {
   );
 }
 
+type AdminUploadConfig = {
+  max_size_mb: number;
+  allowed_extensions: string[];
+  convert_to_markdown: boolean;
+};
+
+type AdminSandboxConfig = {
+  use: string;
+  allow_host_bash: boolean;
+  bash_output_max_chars: number;
+  read_file_output_max_chars: number;
+  ls_output_max_chars: number;
+};
+
+type AdminModelConfig = {
+  name: string;
+  display_name: string;
+  use: string;
+  model: string;
+  api_key: string | null;
+  api_base: string | null;
+  request_timeout: number;
+  max_retries: number;
+  max_tokens: number;
+  temperature: number;
+  supports_vision: boolean;
+  supports_thinking: boolean;
+  is_default: boolean;
+};
+
+type AdminToolConfig = {
+  name: string;
+  group: string;
+  use: string;
+  enabled: boolean;
+};
+
+type AdminSkillConfig = {
+  auto_update: boolean;
+  security_scan: boolean;
+};
+
+type AdminMCPServerConfig = {
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  enabled: boolean;
+};
+
 type AdminConfig = {
   system: { log_level?: string | null; token_usage_enabled?: boolean | null };
   tracing: {
@@ -44,6 +94,12 @@ type AdminConfig = {
     website_path: string;
     docs_path: string;
   };
+  upload: AdminUploadConfig;
+  sandbox: AdminSandboxConfig;
+  models: AdminModelConfig[];
+  tools: AdminToolConfig[];
+  skills: AdminSkillConfig;
+  mcp: AdminMCPServerConfig[];
 };
 
 export function ConfigAdminPage() {
@@ -185,6 +241,447 @@ export function ConfigAdminPage() {
             <Input value={form.tracing.langfuse.public_key ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, public_key: event.target.value } } } : current)} placeholder="Public Key / $ENV_VAR" />
             <Input value={form.tracing.langfuse.secret_key ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, secret_key: event.target.value } } } : current)} placeholder="Secret Key / $ENV_VAR" />
           </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>上传配置</CardTitle>
+            <CardDescription>控制文件上传的大小限制和格式。</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">最大文件大小 (MB)</div>
+              <Input
+                type="number"
+                value={form.upload.max_size_mb}
+                onChange={(event) =>
+                  setForm((current) =>
+                    current ? { ...current, upload: { ...current.upload, max_size_mb: Number(event.target.value) } } : current,
+                  )
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">允许的文件扩展名 (逗号分隔)</div>
+              <Input
+                value={form.upload.allowed_extensions.join(", ")}
+                onChange={(event) =>
+                  setForm((current) =>
+                    current
+                      ? {
+                          ...current,
+                          upload: {
+                            ...current.upload,
+                            allowed_extensions: event.target.value.split(",").map((ext) => ext.trim()).filter(Boolean),
+                          },
+                        }
+                      : current,
+                  )
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
+              <div>
+                <div className="font-medium">自动转换为 Markdown</div>
+                <div className="text-sm text-slate-500">将 PDF、PPT、Word、Excel 文件自动转为 Markdown。</div>
+              </div>
+              <Switch
+                checked={form.upload.convert_to_markdown}
+                onCheckedChange={(checked) =>
+                  setForm((current) => (current ? { ...current, upload: { ...current.upload, convert_to_markdown: checked } } : current))
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>沙箱配置</CardTitle>
+            <CardDescription>控制代码执行沙箱的行为。</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">沙箱 Provider</div>
+              <Input
+                value={form.sandbox.use}
+                onChange={(event) =>
+                  setForm((current) => (current ? { ...current, sandbox: { ...current.sandbox, use: event.target.value } } : current))
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
+              <div>
+                <div className="font-medium">允许宿主 Bash</div>
+                <div className="text-sm text-slate-500">允许在宿主系统执行 Bash 命令。</div>
+              </div>
+              <Switch
+                checked={form.sandbox.allow_host_bash}
+                onCheckedChange={(checked) =>
+                  setForm((current) => (current ? { ...current, sandbox: { ...current.sandbox, allow_host_bash: checked } } : current))
+                }
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Bash 输出最大字符</div>
+                <Input
+                  type="number"
+                  value={form.sandbox.bash_output_max_chars}
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current ? { ...current, sandbox: { ...current.sandbox, bash_output_max_chars: Number(event.target.value) } } : current,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">读取文件最大字符</div>
+                <Input
+                  type="number"
+                  value={form.sandbox.read_file_output_max_chars}
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current
+                        ? { ...current, sandbox: { ...current.sandbox, read_file_output_max_chars: Number(event.target.value) } }
+                        : current,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">ls 输出最大字符</div>
+                <Input
+                  type="number"
+                  value={form.sandbox.ls_output_max_chars}
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current ? { ...current, sandbox: { ...current.sandbox, ls_output_max_chars: Number(event.target.value) } } : current,
+                    )
+                  }
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>技能配置</CardTitle>
+          <CardDescription>控制技能的安全扫描和自动更新。</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
+            <div>
+              <div className="font-medium">自动更新</div>
+              <div className="text-sm text-slate-500">自动更新已安装的技能到最新版本。</div>
+            </div>
+            <Switch
+              checked={form.skills.auto_update}
+              onCheckedChange={(checked) =>
+                setForm((current) => (current ? { ...current, skills: { ...current.skills, auto_update: checked } } : current))
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
+            <div>
+              <div className="font-medium">安全扫描</div>
+              <div className="text-sm text-slate-500">安装前扫描技能文件的安全性。</div>
+            </div>
+            <Switch
+              checked={form.skills.security_scan}
+              onCheckedChange={(checked) =>
+                setForm((current) => (current ? { ...current, skills: { ...current.skills, security_scan: checked } } : current))
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>模型配置</CardTitle>
+          <CardDescription>配置可用的 AI 模型及其参数。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {form.models.length === 0 ? (
+            <p className="text-sm text-slate-500">暂无模型配置。</p>
+          ) : (
+            form.models.map((model, index) => (
+              <div key={model.name || index} className="rounded-2xl border p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="font-medium">{model.display_name || model.name}</div>
+                  <Switch
+                    checked={model.is_default}
+                      onCheckedChange={(checked) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { is_default: checked });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">名称</div>
+                    <Input
+                      value={model.name}
+                      onChange={(event) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { name: event.target.value });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">显示名称</div>
+                    <Input
+                      value={model.display_name}
+                      onChange={(event) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { display_name: event.target.value });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">API 模型</div>
+                    <Input
+                      value={model.model}
+                      onChange={(event) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { model: event.target.value });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                    <div className="text-sm font-medium">API Key / $ENV_VAR</div>
+                    <Input
+                      value={model.api_key ?? ""}
+                      onChange={(event) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { api_key: event.target.value || null });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                      placeholder="sk-... 或 $OPENAI_API_KEY"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">最大 Tokens</div>
+                    <Input
+                      type="number"
+                      value={model.max_tokens}
+                      onChange={(event) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { max_tokens: Number(event.target.value) });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Temperature</div>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={model.temperature}
+                      onChange={(event) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { temperature: Number(event.target.value) });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">超时 (秒)</div>
+                    <Input
+                      type="number"
+                      value={model.request_timeout}
+                      onChange={(event) => {
+                        const updated = [...form.models];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { request_timeout: Number(event.target.value) });
+                          setForm((current) => (current ? { ...current, models: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={model.supports_vision}
+                        onCheckedChange={(checked) => {
+                          const updated = [...form.models];
+                          const item = updated[index];
+                          if (item) {
+                            updated[index] = Object.assign({}, item, { supports_vision: checked });
+                            setForm((current) => (current ? { ...current, models: updated } : current));
+                          }
+                        }}
+                      />
+                      <span className="text-sm">Vision</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={model.supports_thinking}
+                        onCheckedChange={(checked) => {
+                          const updated = [...form.models];
+                          const item = updated[index];
+                          if (item) {
+                            updated[index] = Object.assign({}, item, { supports_thinking: checked });
+                            setForm((current) => (current ? { ...current, models: updated } : current));
+                          }
+                        }}
+                      />
+                      <span className="text-sm">Thinking</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>工具配置</CardTitle>
+          <CardDescription>配置可用的工具及其启用状态。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {form.tools.length === 0 ? (
+            <p className="text-sm text-slate-500">暂无工具配置。</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {form.tools.map((tool, index) => (
+                <div key={tool.name || index} className="flex items-center justify-between rounded-2xl border p-4">
+                  <div>
+                    <div className="font-medium">{tool.name}</div>
+                    <div className="text-sm text-slate-500">{tool.group}</div>
+                  </div>
+                  <Switch
+                    checked={tool.enabled}
+                    onCheckedChange={(checked) => {
+                      const updated = [...form.tools];
+                      const item = updated[index];
+                      if (item) {
+                        updated[index] = Object.assign({}, item, { enabled: checked });
+                        setForm((current) => (current ? { ...current, tools: updated } : current));
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>MCP 服务器配置</CardTitle>
+          <CardDescription>配置 Model Context Protocol 服务器。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {form.mcp.length === 0 ? (
+            <p className="text-sm text-slate-500">暂无 MCP 服务器配置。</p>
+          ) : (
+            form.mcp.map((server, index) => (
+              <div key={server.name || index} className="rounded-2xl border p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="font-medium">{server.name}</div>
+                  <Switch
+                    checked={server.enabled}
+                    onCheckedChange={(checked) => {
+                      const updated = [...form.mcp];
+                      const item = updated[index];
+                      if (item) {
+                        updated[index] = Object.assign({}, item, { enabled: checked });
+                        setForm((current) => (current ? { ...current, mcp: updated } : current));
+                      }
+                    }}
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">命令</div>
+                    <Input
+                      value={server.command}
+                      onChange={(event) => {
+                        const updated = [...form.mcp];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { command: event.target.value });
+                          setForm((current) => (current ? { ...current, mcp: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">参数 (逗号分隔)</div>
+                    <Input
+                      value={server.args.join(", ")}
+                      onChange={(event) => {
+                        const updated = [...form.mcp];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, {
+                            args: event.target.value.split(",").map((arg) => arg.trim()).filter(Boolean),
+                          });
+                          setForm((current) => (current ? { ...current, mcp: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="text-sm font-medium">环境变量 (key=value, 逗号分隔)</div>
+                    <Input
+                      value={Object.entries(server.env).map(([k, v]) => `${k}=${v}`).join(", ")}
+                      onChange={(event) => {
+                        const updated = [...form.mcp];
+                        const item = updated[index];
+                        if (item) {
+                          const env: Record<string, string> = {};
+                          event.target.value.split(",").forEach((pair) => {
+                            const [key, ...valueParts] = pair.split("=");
+                            if (key?.trim()) {
+                              env[key.trim()] = valueParts.join("=").trim();
+                            }
+                          });
+                          updated[index] = Object.assign({}, item, { env });
+                          setForm((current) => (current ? { ...current, mcp: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 

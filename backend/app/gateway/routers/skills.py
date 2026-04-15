@@ -24,6 +24,7 @@ from deerflow.skills.manager import (
     get_custom_skill_dir,
     get_custom_skill_file,
     get_skill_history_file,
+    public_skill_exists,
     read_custom_skill_content,
     read_history,
     validate_skill_markdown_content,
@@ -91,6 +92,11 @@ class SkillMetadataUpdateRequest(BaseModel):
     description_zh: str | None = Field(default=None, description="Chinese description")
 
 
+class CustomSkillCreateRequest(BaseModel):
+    name: str = Field(..., description="Skill name (must be unique)")
+    content: str = Field(..., description="SKILL.md content")
+
+
 class CustomSkillContentResponse(SkillResponse):
     content: str = Field(..., description="Raw SKILL.md content")
 
@@ -105,6 +111,27 @@ class CustomSkillHistoryResponse(BaseModel):
 
 class SkillRollbackRequest(BaseModel):
     history_index: int = Field(default=-1, description="History entry index to restore from, defaulting to the latest change.")
+
+
+class SkillShareRequest(BaseModel):
+    visibility: str = Field(..., description="Visibility: 'public' or 'workspace'")
+    workspace_id: str | None = Field(None, description="Workspace ID when visibility is 'workspace'")
+
+
+class SkillRatingRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
+    comment: str | None = Field(None, description="Optional comment")
+
+
+class SkillShareResponse(BaseModel):
+    skill_name: str
+    visibility: str
+    workspace_id: str | None = None
+    owner_id: str | None = None
+
+
+class SharedSkillsResponse(BaseModel):
+    skills: list[SkillShareResponse]
 
 
 def _skill_to_response(skill: Skill) -> SkillResponse:
@@ -297,6 +324,51 @@ async def list_custom_skills(request: Request) -> SkillsListResponse:
         raise HTTPException(status_code=500, detail=f"Failed to list custom skills: {str(e)}")
 
 
+@router.post("/skills/custom", response_model=CustomSkillContentResponse, status_code=201, summary="Create Custom Skill")
+async def create_custom_skill(request: CustomSkillCreateRequest, http_request: Request) -> CustomSkillContentResponse:
+    require_owner_user(http_request)
+    try:
+        skill_name = request.name.strip()
+        if not skill_name:
+            raise HTTPException(status_code=400, detail="Skill name cannot be empty")
+        if custom_skill_exists(skill_name):
+            raise HTTPException(status_code=409, detail=f"Custom skill '{skill_name}' already exists")
+        if public_skill_exists(skill_name):
+            raise HTTPException(status_code=409, detail=f"Built-in skill '{skill_name}' exists. Choose a different name.")
+
+        validate_skill_markdown_content(skill_name, request.content)
+        scan = await scan_skill_content(request.content, executable=False, location=f"{skill_name}/SKILL.md")
+        if scan.decision == "block":
+            raise HTTPException(status_code=400, detail=f"Security scan blocked the creation: {scan.reason}")
+
+        skill_dir = get_custom_skill_dir(skill_name)
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        skill_file = skill_dir / "SKILL.md"
+        atomic_write(skill_file, request.content)
+
+        append_history(
+            skill_name,
+            {
+                "action": "human_create",
+                "author": "human",
+                "thread_id": None,
+                "file_path": "SKILL.md",
+                "prev_content": None,
+                "new_content": request.content,
+                "scanner": {"decision": scan.decision, "reason": scan.reason},
+            },
+        )
+        await refresh_skills_system_prompt_cache_async()
+        return _load_custom_skill_response(skill_name)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to create custom skill %s: %s", request.name, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create custom skill: {str(e)}")
+
+
 @router.get("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Get Custom Skill Content")
 async def get_custom_skill(skill_name: str, request: Request) -> CustomSkillContentResponse:
     require_user(request)
@@ -438,6 +510,27 @@ async def rollback_custom_skill(skill_name: str, request: SkillRollbackRequest, 
         raise HTTPException(status_code=500, detail=f"Failed to roll back custom skill: {str(e)}")
 
 
+@router.get("/skills/shared", response_model=SharedSkillsResponse, summary="List Shared Skills")
+async def list_shared_skills(request: Request) -> SharedSkillsResponse:
+    user = require_user(request)
+    from deerflow.admin import get_shared_skills
+
+    workspace_id = getattr(user, "active_workspace_id", None)
+    shares = get_shared_skills(workspace_id=workspace_id)
+
+    return SharedSkillsResponse(
+        skills=[
+            SkillShareResponse(
+                skill_name=s.skill_name,
+                visibility=s.visibility,
+                workspace_id=s.workspace_id,
+                owner_id=s.owner_id,
+            )
+            for s in shares
+        ]
+    )
+
+
 @router.get(
     "/skills/{skill_name}",
     response_model=SkillResponse,
@@ -510,3 +603,81 @@ async def update_skill(skill_name: str, request: SkillUpdateRequest, http_reques
     except Exception as e:
         logger.error(f"Failed to update skill {skill_name}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to update skill: {str(e)}")
+
+
+@router.post("/skills/{skill_name}/share", response_model=SkillShareResponse, summary="Share a Skill")
+async def share_skill(skill_name: str, body: SkillShareRequest, request: Request) -> SkillShareResponse:
+    user = require_user(request)
+    skills = load_skills(enabled_only=False)
+    skill = next((s for s in skills if s.name == skill_name), None)
+    if skill is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
+
+    from deerflow.admin import SkillShare, save_skill_share
+
+    share = SkillShare(
+        skill_name=skill_name,
+        owner_id=user.id,
+        workspace_id=body.workspace_id if body.visibility == "workspace" else None,
+        visibility=body.visibility,
+    )
+    save_skill_share(share)
+
+    append_admin_audit_record(
+        "skill.shared",
+        actor_id=user.id,
+        target=skill_name,
+        details={"visibility": body.visibility, "workspace_id": body.workspace_id},
+    )
+
+    return SkillShareResponse(
+        skill_name=skill_name,
+        visibility=share.visibility,
+        workspace_id=share.workspace_id,
+        owner_id=share.owner_id,
+    )
+
+
+@router.post("/skills/{skill_name}/unshare", response_model=dict)
+async def unshare_skill(skill_name: str, request: Request) -> dict:
+    user = require_user(request)
+    from deerflow.admin import delete_skill_share, get_skill_share
+
+    existing = get_skill_share(skill_name)
+    if existing is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' is not shared")
+
+    if existing.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the owner can unshare the skill")
+
+    delete_skill_share(skill_name)
+
+    append_admin_audit_record(
+        "skill.unshared",
+        actor_id=user.id,
+        target=skill_name,
+        details={},
+    )
+
+    return {"success": True}
+
+
+@router.post("/skills/{skill_name}/rate", response_model=dict)
+async def rate_skill(skill_name: str, body: SkillRatingRequest, request: Request) -> dict:
+    user = require_user(request)
+    skills = load_skills(enabled_only=False)
+    skill = next((s for s in skills if s.name == skill_name), None)
+    if skill is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
+
+    from deerflow.admin import SkillRating, add_skill_rating
+
+    rating = SkillRating(
+        skill_name=skill_name,
+        user_id=user.id,
+        rating=body.rating,
+        comment=body.comment,
+    )
+    add_skill_rating(rating)
+
+    return {"success": True, "message": "Rating submitted successfully"}
