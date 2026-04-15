@@ -5,12 +5,18 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PROVISIONER_MODULE_PATH = REPO_ROOT / "docker" / "provisioner" / "app.py"
+
+if not PROVISIONER_MODULE_PATH.exists():
+    pytestmark = pytest.mark.skip(reason="docker/provisioner/app.py not found (provisioner is optional)")
+
 
 def _load_provisioner_module():
     """Load docker/provisioner/app.py as an importable test module."""
-    repo_root = Path(__file__).resolve().parents[2]
-    module_path = repo_root / "docker" / "provisioner" / "app.py"
-    spec = importlib.util.spec_from_file_location("provisioner_app_test", module_path)
+    spec = importlib.util.spec_from_file_location("provisioner_app_test", PROVISIONER_MODULE_PATH)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)

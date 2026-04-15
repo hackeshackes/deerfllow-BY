@@ -10,6 +10,25 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { AdminPageShell } from "./admin-page-shell";
 
+function emitBrandUpdate(branding: AdminConfig["branding"]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent("micx-brand-updated", {
+      detail: {
+        name: branding.name,
+        shortName: branding.short_name,
+        tagline: branding.tagline,
+        description: branding.description,
+        supportEmail: branding.support_email,
+        websitePath: branding.website_path,
+        docsPath: branding.docs_path,
+      },
+    }),
+  );
+}
+
 type AdminConfig = {
   system: { log_level?: string | null; token_usage_enabled?: boolean | null };
   tracing: {
@@ -61,7 +80,9 @@ export function ConfigAdminPage() {
         const body = (await response.json().catch(() => null)) as { detail?: string } | null;
         throw new Error(body?.detail ?? "保存配置失败");
       }
-      setForm((await response.json()) as AdminConfig);
+      const nextForm = (await response.json()) as AdminConfig;
+      setForm(nextForm);
+      emitBrandUpdate(nextForm.branding);
       setMessage("系统配置已保存。");
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存配置失败");

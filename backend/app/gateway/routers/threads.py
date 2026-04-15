@@ -28,7 +28,6 @@ from app.gateway.ownership import (
     THREAD_SHARED_AT_KEY,
     THREAD_SHARED_BY_KEY,
     THREAD_VISIBILITY_KEY,
-    THREAD_VISIBILITY_PRIVATE,
     THREAD_VISIBILITY_WORKSPACE,
     THREAD_WORKSPACE_KEY,
     attach_owner_metadata,
@@ -564,8 +563,28 @@ async def update_thread_title(thread_id: str, body: ThreadTitleUpdateRequest, re
         logger.exception("Failed to load thread %s before title update", thread_id)
         raise HTTPException(status_code=500, detail="Failed to update thread title")
 
+    updated_record = None
     if checkpoint_tuple is None:
-        raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+        if store is None:
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+        try:
+            await _store_upsert(store, thread_id, values={"title": title})
+            updated_record = await _store_get(store, thread_id)
+        except Exception:
+            logger.exception("Failed to update store-only title for thread %s", thread_id)
+            raise HTTPException(status_code=500, detail="Failed to update thread title")
+
+        final_record = updated_record or record
+        final_record.setdefault("values", {})["title"] = title
+        final_record["updated_at"] = time.time()
+        return ThreadResponse(
+            thread_id=thread_id,
+            status=final_record.get("status", "idle"),
+            created_at=str(final_record.get("created_at", "")),
+            updated_at=str(final_record.get("updated_at", "")),
+            metadata=final_record.get("metadata", {}),
+            values=final_record.get("values", {}),
+        )
 
     checkpoint: dict[str, Any] = dict(getattr(checkpoint_tuple, "checkpoint", {}) or {})
     metadata: dict[str, Any] = dict(getattr(checkpoint_tuple, "metadata", {}) or {})

@@ -2061,7 +2061,7 @@ class TestInstallSkillSecurity:
             archive = Path(tmp) / "fake.skill"
             archive.write_text("this is not a zip file")
 
-            with pytest.raises(ValueError, match="not a valid ZIP"):
+            with pytest.raises(ValueError, match="Invalid skill"):
                 client.install_skill(archive)
 
     def test_directory_path_rejected(self, client):

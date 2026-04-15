@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/brand/brand-mark";
+import { useBrand } from "@/components/brand/brand-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,9 +15,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { brand, supportMailto } from "@/core/brand/config";
+import { buildSupportMailto } from "@/core/brand/config";
 
 export default function SignInPage() {
+  const brand = useBrand();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -61,7 +63,7 @@ export default function SignInPage() {
         <section className="flex flex-col justify-center gap-6">
           <BrandMark className="text-white" />
           <div className="space-y-4">
-            <div className="text-primary-foreground/80 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm backdrop-blur-sm">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white backdrop-blur-sm">
               <LockKeyholeIcon className="size-4" />
               中文优先 · 邀请制团队工作台
             </div>
@@ -138,7 +140,7 @@ export default function SignInPage() {
               如需帮助，请联系{" "}
               <a
                 className="font-medium text-slate-900 underline"
-                  href={supportMailto(`${brand.name} access request`)}
+                  href={buildSupportMailto(brand.supportEmail, `${brand.name} access request`)}
               >
                 {brand.supportEmail}
               </a>

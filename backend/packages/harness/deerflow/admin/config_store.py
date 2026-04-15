@@ -9,7 +9,7 @@ from deerflow.admin.secrets import is_secret_ref, mask_secret_value, upsert_secr
 from deerflow.config.paths import get_paths
 
 _config_lock = Lock()
-_cached_config: "AdminConfig | None" = None
+_cached_config: AdminConfig | None = None
 
 
 class AdminTracingProviderConfig(BaseModel):
@@ -47,7 +47,7 @@ class AdminConfig(BaseModel):
     tracing: AdminTracingConfig = Field(default_factory=AdminTracingConfig)
     branding: AdminBrandingConfig = Field(default_factory=AdminBrandingConfig)
 
-    def masked(self) -> "AdminConfig":
+    def masked(self) -> AdminConfig:
         data = self.model_copy(deep=True)
         data.tracing.langsmith.api_key = mask_secret_value(data.tracing.langsmith.api_key)
         data.tracing.langfuse.public_key = mask_secret_value(data.tracing.langfuse.public_key)

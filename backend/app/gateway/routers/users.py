@@ -19,21 +19,25 @@ from app.gateway.auth import (
     create_user,
     create_workspace,
     delete_user,
+    delete_workspace,
     get_active_invite_for_user,
     get_default_workspace_id_for_user,
     get_user_by_email,
+    get_user_by_id,
     get_workspace_by_id,
     get_workspace_membership,
     issue_invite_token,
     list_users,
-    list_workspaces,
     list_workspace_memberships,
+    list_workspaces,
     list_workspaces_for_user,
+    remove_workspace_member,
     require_owner_user,
     require_user,
     set_active_workspace,
     touch_last_login,
     update_user,
+    update_workspace,
 )
 from deerflow.admin import append_admin_audit_record
 from deerflow.config.paths import get_paths
@@ -118,6 +122,7 @@ class WorkspaceResponse(BaseModel):
     upload_file_count: int = 0
     artifact_file_count: int = 0
     agent_count: int = 0
+    members: list[dict[str, str]] = Field(default_factory=list)
 
 
 class WorkspacesListResponse(BaseModel):
@@ -131,6 +136,15 @@ class WorkspaceCreateRequest(BaseModel):
 class WorkspaceMemberRequest(BaseModel):
     user_id: str
     role: str = "member"
+
+
+class WorkspaceUpdateRequest(BaseModel):
+    name: str = Field(min_length=1)
+
+
+class WorkspaceDeleteResponse(BaseModel):
+    success: bool
+    message: str
 
 
 class WorkspaceSwitchRequest(BaseModel):
@@ -154,7 +168,19 @@ def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership
     thread_count = sum(1 for item in threads_dir.iterdir() if item.is_dir()) if threads_dir.exists() else 0
     upload_file_count = _count_files_under_many(thread_dir / "user-data" / "uploads" for thread_dir in threads_dir.iterdir() if thread_dir.is_dir()) if threads_dir.exists() else 0
     artifact_file_count = _count_files_under_many(thread_dir / "user-data" / "outputs" for thread_dir in threads_dir.iterdir() if thread_dir.is_dir()) if threads_dir.exists() else 0
-    member_count = len([item for item in list_workspace_memberships() if item.workspace_id == workspace.id])
+    workspace_memberships = [item for item in list_workspace_memberships() if item.workspace_id == workspace.id]
+    member_count = len(workspace_memberships)
+    members = []
+    for workspace_membership in workspace_memberships:
+        member_user = get_user_by_id(workspace_membership.user_id)
+        if member_user is None:
+            continue
+        members.append({
+            "id": member_user.id,
+            "name": member_user.name,
+            "email": member_user.email,
+            "role": workspace_membership.role,
+        })
     return WorkspaceResponse(
         id=workspace.id,
         name=workspace.name,
@@ -167,6 +193,7 @@ def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership
         upload_file_count=upload_file_count,
         artifact_file_count=artifact_file_count,
         agent_count=sum(1 for item in agents_dir.iterdir() if item.is_dir()) if agents_dir.exists() else 0,
+        members=members,
     )
 
 
@@ -377,6 +404,35 @@ async def add_workspace_member_endpoint(workspace_id: str, body: WorkspaceMember
     membership = add_workspace_member(workspace_id, body.user_id, role=body.role)
     workspace = get_workspace_by_id(workspace_id)
     append_admin_audit_record("workspace.member_added", actor_id=actor.id, target=workspace_id, details={"user_id": body.user_id, "role": body.role})
+    return _to_workspace_response(workspace, membership)
+
+
+@router.patch("/workspaces/{workspace_id}", response_model=WorkspaceResponse)
+async def update_workspace_endpoint(workspace_id: str, body: WorkspaceUpdateRequest, request: Request) -> WorkspaceResponse:
+    actor = require_owner_user(request)
+    workspace = update_workspace(workspace_id, name=body.name)
+    membership = get_workspace_membership(actor.id, workspace.id)
+    append_admin_audit_record("workspace.updated", actor_id=actor.id, target=workspace_id, details={"name": workspace.name})
+    return _to_workspace_response(workspace, membership)
+
+
+@router.delete("/workspaces/{workspace_id}", response_model=WorkspaceDeleteResponse)
+async def delete_workspace_endpoint(workspace_id: str, request: Request) -> WorkspaceDeleteResponse:
+    actor = require_owner_user(request)
+    deleted = delete_workspace(workspace_id)
+    append_admin_audit_record("workspace.deleted", actor_id=actor.id, target=workspace_id, details={"name": deleted.name})
+    return WorkspaceDeleteResponse(success=True, message=f"空间 {deleted.name} 已删除")
+
+
+@router.delete("/workspaces/{workspace_id}/members/{user_id}", response_model=WorkspaceResponse)
+async def remove_workspace_member_endpoint(workspace_id: str, user_id: str, request: Request) -> WorkspaceResponse:
+    actor = require_owner_user(request)
+    removed = remove_workspace_member(workspace_id, user_id)
+    workspace = get_workspace_by_id(workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="未找到该空间")
+    append_admin_audit_record("workspace.member_removed", actor_id=actor.id, target=workspace_id, details={"user_id": removed.user_id})
+    membership = get_workspace_membership(actor.id, workspace_id)
     return _to_workspace_response(workspace, membership)
 
 

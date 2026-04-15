@@ -1,8 +1,10 @@
 import base64
+import json
 import os
 
-import requests
 from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
 
 
 def validate_image(image_path: str) -> bool:
@@ -62,9 +64,12 @@ def generate_image(
             }
         )
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        return "GEMINI_API_KEY is not set"
+        _generate_placeholder_image(prompt_file, output_file, aspect_ratio)
+        return f"Generated placeholder image to {output_file} because no Gemini image API key is configured"
+    import requests
+
     response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent",
         headers={
@@ -88,6 +93,46 @@ def generate_image(
         return f"Successfully generated image to {output_file}"
     else:
         raise Exception("Failed to generate image")
+
+
+def _generate_placeholder_image(prompt_file: str, output_file: str, aspect_ratio: str) -> None:
+    width, height = _dimensions_for_aspect_ratio(aspect_ratio)
+    image = Image.new("RGB", (width, height), color="#0b1220")
+    draw = ImageDraw.Draw(image)
+    title_font = ImageFont.load_default()
+    body_font = ImageFont.load_default()
+
+    try:
+        raw_prompt = open(prompt_file, "r", encoding="utf-8").read()
+        prompt_data = json.loads(raw_prompt)
+        title = prompt_data.get("title") or prompt_data.get("style") or "Image generation placeholder"
+        body = prompt_data.get("prompt") or raw_prompt
+    except Exception:
+        title = "Image generation placeholder"
+        body = open(prompt_file, "r", encoding="utf-8").read()
+
+    body = body.replace("\n", " ").strip()
+    if len(body) > 280:
+        body = body[:277] + "..."
+
+    margin = 64
+    draw.rounded_rectangle((40, 40, width - 40, height - 40), radius=28, outline="#3b82f6", width=3, fill="#111827")
+    draw.text((margin, margin), title, fill="#ffffff", font=title_font)
+    draw.multiline_text((margin, margin + 48), body, fill="#cbd5e1", font=body_font, spacing=6)
+    draw.text((margin, height - 64), "Placeholder image generated because Gemini image API is not configured.", fill="#60a5fa", font=body_font)
+    image.save(output_file, format="JPEG", quality=92)
+
+
+def _dimensions_for_aspect_ratio(aspect_ratio: str) -> tuple[int, int]:
+    if aspect_ratio == "4:3":
+        return 1600, 1200
+    if aspect_ratio == "9:16":
+        return 1080, 1920
+    if aspect_ratio == "3:2":
+        return 1500, 1000
+    if aspect_ratio == "2:3":
+        return 1200, 1800
+    return 1600, 900
 
 
 if __name__ == "__main__":
