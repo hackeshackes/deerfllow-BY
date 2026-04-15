@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 DEFAULT_SKILL_METADATA_ZH: dict[str, dict[str, str]] = {
     "academic-paper-review": {
         "display_name_zh": "学术论文评审",

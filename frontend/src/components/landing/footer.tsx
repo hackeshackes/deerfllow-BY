@@ -1,8 +1,12 @@
+"use client";
+
 import { useMemo } from "react";
 
-import { brand, supportMailto } from "@/core/brand/config";
+import { useBrand } from "@/components/brand/brand-provider";
+import { buildSupportMailto } from "@/core/brand/config";
 
 export function Footer() {
+  const brand = useBrand();
   const year = useMemo(() => new Date().getFullYear(), []);
 
   return (
@@ -17,7 +21,7 @@ export function Footer() {
         </div>
         <div className="text-left md:text-right">
           <p>中文优先 · 私有部署 · 团队协作</p>
-          <a className="mt-2 inline-block text-white underline" href={supportMailto("MicX support")}>{brand.supportEmail}</a>
+          <a className="mt-2 inline-block text-white underline" href={buildSupportMailto(brand.supportEmail, "MicX support")}>{brand.supportEmail}</a>
         </div>
       </div>
       <div className="container mb-8 flex flex-col items-center justify-center text-xs text-slate-500">

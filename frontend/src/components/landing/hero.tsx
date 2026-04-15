@@ -4,14 +4,15 @@ import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 
 import { BrandMark } from "@/components/brand/brand-mark";
+import { useBrand } from "@/components/brand/brand-provider";
 import { Button } from "@/components/ui/button";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import Galaxy from "@/components/ui/galaxy";
 import { WordRotate } from "@/components/ui/word-rotate";
-import { brand } from "@/core/brand/config";
 import { cn } from "@/lib/utils";
 
 export function Hero({ className }: { className?: string }) {
+  const brand = useBrand();
   return (
     <div
       className={cn(

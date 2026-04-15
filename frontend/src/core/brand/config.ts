@@ -9,8 +9,11 @@ export const brand = {
   docsPath: "/zh/docs",
 };
 
-export function supportMailto(subject?: string) {
-  const email = brand.supportEmail;
+export function buildSupportMailto(email: string, subject?: string) {
   if (!subject) return `mailto:${email}`;
   return `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+}
+
+export function supportMailto(subject?: string) {
+  return buildSupportMailto(brand.supportEmail, subject);
 }

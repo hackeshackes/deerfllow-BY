@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { BrandMark } from "@/components/brand/brand-mark";
+import { useBrand } from "@/components/brand/brand-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { brand } from "@/core/brand/config";
 
 export default function ActivatePage() {
+  const brand = useBrand();
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = useMemo(() => searchParams.get("token") ?? "", [searchParams]);

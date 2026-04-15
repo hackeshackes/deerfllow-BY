@@ -16,7 +16,6 @@ from app.gateway.ownership import (
 )
 from app.gateway.routers import threads as threads_router
 
-
 OWNER = AuthUser(id="owner", email="owner@example.com", role="owner", name="Owner", status="active", password_hash="", salt="")
 MEMBER = AuthUser(id="member", email="member@example.com", role="member", name="Member", status="active", password_hash="", salt="")
 OUTSIDER = AuthUser(id="outsider", email="outsider@example.com", role="member", name="Outsider", status="active", password_hash="", salt="")

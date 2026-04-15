@@ -36,6 +36,7 @@ export function CommandPalette() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isMac, setIsMac] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const handleNewChat = useCallback(() => {
     router.push("/workspace/chats/new");
@@ -65,8 +66,13 @@ export function CommandPalette() {
   useGlobalShortcuts(shortcuts);
 
   useEffect(() => {
+    setMounted(true);
     setIsMac(navigator.userAgent.includes("Mac"));
   }, []);
+
+  if (!mounted) {
+    return null;
+  }
   const metaKey = isMac ? "⌘" : "Ctrl+";
   const shiftKey = isMac ? "⇧" : "Shift+";
 

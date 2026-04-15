@@ -22,6 +22,8 @@ BASH_EXECUTABLE = next(
 
 if BASH_EXECUTABLE is None:
     pytestmark = pytest.mark.skip(reason="bash is required for docker.sh detection tests")
+elif not SCRIPT_PATH.exists():
+    pytestmark = pytest.mark.skip(reason="docker.sh script not found (may not be mounted in container)")
 
 
 def _detect_mode_with_config(config_content: str) -> str:

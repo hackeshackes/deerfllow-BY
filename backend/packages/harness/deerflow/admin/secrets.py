@@ -6,8 +6,12 @@ import json
 import os
 from pathlib import Path
 from threading import Lock
+from typing import TYPE_CHECKING
 
 from deerflow.config.paths import get_paths
+
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
 
 SECRET_REF_PREFIX = "secret://"
 _secret_lock = Lock()

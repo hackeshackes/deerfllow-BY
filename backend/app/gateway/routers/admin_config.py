@@ -59,6 +59,11 @@ def _to_response() -> AdminConfigResponse:
     return AdminConfigResponse.model_validate(get_admin_config().masked().model_dump())
 
 
+@router.get("/public/branding", response_model=AdminBrandingResponse)
+async def get_public_branding() -> AdminBrandingResponse:
+    return AdminBrandingResponse.model_validate(get_admin_config().branding.model_dump())
+
+
 @router.get("/config", response_model=AdminConfigResponse)
 async def get_admin_configuration(request: Request) -> AdminConfigResponse:
     require_owner_user(request)

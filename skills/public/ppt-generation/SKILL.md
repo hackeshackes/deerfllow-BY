@@ -162,6 +162,24 @@ Parameters:
 [!NOTE]
 Do NOT read the python file, just call it with the parameters.
 
+### Step 4B: Fallback when image generation is unavailable
+
+If image generation is unavailable because the environment lacks a usable image provider/API key, you MUST still generate a PPT using the presentation plan only.
+
+- In that case, call the same PPT script with `--plan-file` and `--output-file`
+- Skip `--slide-images`
+- The script will generate a text-based fallback presentation from the slide titles, subtitles, key points, and visual descriptions
+
+Example:
+
+```bash
+python /mnt/skills/public/ppt-generation/scripts/generate.py \
+  --plan-file /mnt/user-data/workspace/presentation-plan.json \
+  --output-file /mnt/user-data/outputs/presentation.pptx
+```
+
+You must prefer an actual image-rich PPT when image generation works, but you must not stop with "cannot create PPT" if a text-only fallback PPT can still be produced.
+
 ## Complete Example: Glassmorphism Style (最现代前卫)
 
 User request: "Create a presentation about AI product launch"

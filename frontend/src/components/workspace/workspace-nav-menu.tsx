@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useBrand } from "@/components/brand/brand-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +31,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { brand, supportMailto } from "@/core/brand/config";
+import { buildSupportMailto } from "@/core/brand/config";
 import { useI18n } from "@/core/i18n/hooks";
 
 import { SettingsDialog } from "./settings";
@@ -64,6 +65,7 @@ export function WorkspaceNavMenu({
   sessionRole: "owner" | "member";
   activeWorkspaceName: string;
 }) {
+  const brand = useBrand();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultSection, setSettingsDefaultSection] = useState<
     "appearance" | "memory" | "notification" | "about"
@@ -197,7 +199,7 @@ export function WorkspaceNavMenu({
                       {t.workspace.officialWebsite}
                     </DropdownMenuItem>
                   </a>
-                  <a href={supportMailto("MicX support request")}>
+                  <a href={buildSupportMailto(brand.supportEmail, "MicX support request")}>
                     <DropdownMenuItem>
                       <MailIcon />
                       {t.workspace.contactUs}

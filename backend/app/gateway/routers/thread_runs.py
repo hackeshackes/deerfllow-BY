@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_user
 from app.gateway.deps import get_checkpointer, get_run_manager, get_store, get_stream_bridge
-from app.gateway.ownership import can_manage_thread, can_read_thread, require_thread_manage_access, require_thread_read_access
+from app.gateway.ownership import can_manage_thread, require_thread_manage_access, require_thread_read_access
 from app.gateway.services import sse_consumer, start_run
 from deerflow.runtime import RunRecord, serialize_channel_values
 

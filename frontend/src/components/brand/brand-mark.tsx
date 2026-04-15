@@ -1,4 +1,6 @@
-import { brand } from "@/core/brand/config";
+"use client";
+
+import { useBrand } from "@/components/brand/brand-provider";
 import { cn } from "@/lib/utils";
 
 export function BrandMark({
@@ -8,6 +10,7 @@ export function BrandMark({
   className?: string;
   compact?: boolean;
 }) {
+  const brand = useBrand();
   return (
     <div className={cn("flex items-center gap-3", className)}>
       <div className="from-primary to-primary/70 text-primary-foreground flex size-9 items-center justify-center rounded-2xl bg-linear-to-br text-sm font-semibold shadow-lg shadow-black/10">
@@ -19,7 +22,7 @@ export function BrandMark({
             {brand.name}
           </span>
           <span className="text-muted-foreground text-xs">
-            中文智能服务工作台
+            {brand.tagline}
           </span>
         </div>
       )}

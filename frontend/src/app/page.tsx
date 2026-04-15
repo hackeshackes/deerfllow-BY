@@ -1,7 +1,8 @@
 import { Footer } from "@/components/landing/footer";
 import { Header } from "@/components/landing/header";
 import { Hero } from "@/components/landing/hero";
-import { brand, supportMailto } from "@/core/brand/config";
+import { buildSupportMailto } from "@/core/brand/config";
+import { getRuntimeBranding } from "@/core/brand/runtime";
 
 const capabilities = [
   {
@@ -28,7 +29,8 @@ const workflows = [
   "带待办、进度与后续建议的长任务执行",
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const brand = await getRuntimeBranding();
   return (
     <div className="min-h-screen w-full bg-[#07111f] text-white">
       <Header />
@@ -90,7 +92,7 @@ export default function LandingPage() {
             </div>
             <a
               className="mt-6 inline-flex rounded-full border border-white/15 bg-white px-5 py-3 text-sm font-medium text-slate-950 transition hover:bg-cyan-50 md:mt-0"
-              href={supportMailto("MicX product inquiry")}
+              href={buildSupportMailto(brand.supportEmail, "MicX product inquiry")}
             >
               联系 MicX
             </a>

@@ -7,7 +7,6 @@ from fastapi import HTTPException, Request
 from app.gateway.auth import AuthUser, get_workspace_membership, require_user
 from app.gateway.auth_context import get_current_workspace_id
 from app.gateway.deps import get_checkpointer, get_store
-from deerflow.config.paths import get_paths
 
 THREAD_OWNER_KEY = "owner_user_id"
 THREAD_WORKSPACE_KEY = "workspace_id"

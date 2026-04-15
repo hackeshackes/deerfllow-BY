@@ -26,6 +26,8 @@ from langchain_openai.chat_models.base import (
 )
 
 _THINK_TAG_RE = re.compile(r"<think>\s*(.*?)\s*</think>", re.DOTALL)
+_INVOKE_TAG_RE = re.compile(r"<invoke\s+name=\"(?P<name>[^\"]+)\"\s*>(?P<body>[\s\S]*?)</invoke>", re.IGNORECASE)
+_PARAMETER_TAG_RE = re.compile(r"<parameter\s+name=\"(?P<name>[^\"]+)\"\s*>(?P<value>[\s\S]*?)</parameter>", re.IGNORECASE)
 
 
 def _extract_reasoning_text(
@@ -72,6 +74,43 @@ def _merge_reasoning(*values: str | None) -> str | None:
         if normalized and normalized not in merged:
             merged.append(normalized)
     return "\n\n".join(merged) if merged else None
+
+
+def _normalize_tool_arg_name(tool_name: str, arg_name: str) -> str:
+    normalized = arg_name.strip()
+    if tool_name == "read_file" and normalized == "image_path":
+        return "file_path"
+    return normalized
+
+
+def _extract_invoke_tool_calls(content: str | None) -> tuple[str | None, list[dict[str, Any]]]:
+    if not isinstance(content, str) or "<invoke" not in content:
+        return content, []
+
+    tool_calls: list[dict[str, Any]] = []
+
+    def _replace(match: re.Match[str]) -> str:
+        body = match.group("body") or ""
+        tool_name = (match.group("name") or "").strip()
+        args: dict[str, Any] = {}
+        for param_match in _PARAMETER_TAG_RE.finditer(body):
+            param_name = _normalize_tool_arg_name(tool_name, param_match.group("name") or "")
+            param_value = (param_match.group("value") or "").strip()
+            if param_name:
+                args[param_name] = param_value
+        if tool_name:
+            tool_calls.append(
+                {
+                    "name": tool_name,
+                    "args": args,
+                    "id": f"invoke_{len(tool_calls) + 1}",
+                    "type": "tool_call",
+                }
+            )
+        return ""
+
+    cleaned = _INVOKE_TAG_RE.sub(_replace, content).strip()
+    return cleaned, tool_calls
 
 
 def _with_reasoning_content(
@@ -197,8 +236,10 @@ class PatchedChatMiniMax(ChatOpenAI):
                 content = message.content if isinstance(message.content, str) else None
                 cleaned_content = content
                 inline_reasoning = None
+                xml_tool_calls: list[dict[str, Any]] = []
                 if isinstance(content, str):
                     cleaned_content, inline_reasoning = _strip_inline_think_tags(content)
+                    cleaned_content, xml_tool_calls = _extract_invoke_tool_calls(cleaned_content)
 
                 choice_message = choice.get("message", {}) if isinstance(choice, Mapping) else {}
                 split_reasoning = _extract_reasoning_text(choice_message.get("reasoning_details"))
@@ -207,6 +248,8 @@ class PatchedChatMiniMax(ChatOpenAI):
                 updated_message = message
                 if cleaned_content is not None and cleaned_content != message.content:
                     updated_message = updated_message.model_copy(update={"content": cleaned_content})
+                if xml_tool_calls and not updated_message.tool_calls:
+                    updated_message = updated_message.model_copy(update={"tool_calls": xml_tool_calls})
                 if merged_reasoning:
                     updated_message = _with_reasoning_content(updated_message, merged_reasoning)
 

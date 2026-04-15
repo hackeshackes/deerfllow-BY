@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { BrandMark } from "@/components/brand/brand-mark";
+import { useBrand } from "@/components/brand/brand-provider";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -12,12 +13,12 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { brand } from "@/core/brand/config";
 import { useI18n } from "@/core/i18n/hooks";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceHeader({ className }: { className?: string }) {
+  const brand = useBrand();
   const { t } = useI18n();
   const { state } = useSidebar();
   const pathname = usePathname();

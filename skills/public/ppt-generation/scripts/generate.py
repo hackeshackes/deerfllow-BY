@@ -4,7 +4,9 @@ from io import BytesIO
 
 from PIL import Image
 from pptx import Presentation
+from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches
+from pptx.util import Pt
 
 
 def generate_ppt(
@@ -50,6 +52,12 @@ def generate_ppt(
 
     # Add each slide image
     slides_info = plan.get("slides", [])
+
+    if not slide_images:
+        for slide_info in slides_info:
+            _add_text_slide(prs, blank_layout, slide_info)
+        prs.save(output_file)
+        return f"Successfully generated text-based presentation with {len(slides_info)} slides to {output_file}"
 
     for i, image_path in enumerate(slide_images):
         if not os.path.exists(image_path):
@@ -124,6 +132,48 @@ def generate_ppt(
     return f"Successfully generated presentation with {len(slide_images)} slides to {output_file}"
 
 
+def _add_text_slide(prs: Presentation, blank_layout, slide_info: dict) -> None:
+    slide = prs.slides.add_slide(blank_layout)
+    title_box = slide.shapes.add_textbox(Inches(0.8), Inches(0.6), Inches(11.7), Inches(1.2))
+    title_frame = title_box.text_frame
+    title_frame.clear()
+    title_paragraph = title_frame.paragraphs[0]
+    title_paragraph.text = slide_info.get("title", "Untitled Slide")
+    title_paragraph.font.size = Pt(26)
+    title_paragraph.font.bold = True
+    title_paragraph.alignment = PP_ALIGN.LEFT
+
+    subtitle = slide_info.get("subtitle")
+    if subtitle:
+        subtitle_box = slide.shapes.add_textbox(Inches(0.8), Inches(1.5), Inches(11.7), Inches(0.8))
+        subtitle_frame = subtitle_box.text_frame
+        subtitle_paragraph = subtitle_frame.paragraphs[0]
+        subtitle_paragraph.text = subtitle
+        subtitle_paragraph.font.size = Pt(16)
+
+    body_box = slide.shapes.add_textbox(Inches(0.9), Inches(2.3), Inches(11.3), Inches(4.3))
+    body_frame = body_box.text_frame
+    body_frame.word_wrap = True
+
+    key_points = slide_info.get("key_points") or []
+    visual_description = slide_info.get("visual_description")
+    content_lines = []
+    if key_points:
+        content_lines.extend([f"• {point}" for point in key_points])
+    if visual_description:
+        content_lines.append("")
+        content_lines.append(f"Visual direction: {visual_description}")
+    if not content_lines:
+        content_lines.append("No structured slide content was provided.")
+
+    first = True
+    for line in content_lines:
+        paragraph = body_frame.paragraphs[0] if first else body_frame.add_paragraph()
+        paragraph.text = line
+        paragraph.font.size = Pt(18 if line.startswith("•") else 14)
+        first = False
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -137,8 +187,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--slide-images",
-        nargs="+",
-        required=True,
+        nargs="*",
+        required=False,
+        default=[],
         help="Absolute paths to slide images in order (space-separated)",
     )
     parser.add_argument(

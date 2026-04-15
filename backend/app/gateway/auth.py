@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 import secrets
+import shutil
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -578,6 +579,65 @@ def add_workspace_member(workspace_id: str, user_id: str, role: str = "member") 
     payload["memberships"].append(record)
     _write_workspaces_payload(payload)
     return _to_membership(record)
+
+
+def update_workspace(workspace_id: str, *, name: str) -> Workspace:
+    normalized_name = name.strip()
+    if not normalized_name:
+        raise HTTPException(status_code=422, detail="空间名称不能为空")
+    payload = _read_workspaces_payload()
+    for record in payload["workspaces"]:
+        if record.get("id") != workspace_id:
+            continue
+        if record.get("default_personal"):
+            raise HTTPException(status_code=403, detail="个人空间不支持修改名称")
+        record["name"] = normalized_name
+        record["slug"] = _slugify_workspace_name(normalized_name)
+        _write_workspaces_payload(payload)
+        return _to_workspace(record)
+    raise HTTPException(status_code=404, detail="未找到该空间")
+
+
+def remove_workspace_member(workspace_id: str, user_id: str) -> WorkspaceMembership:
+    payload = _read_workspaces_payload()
+    workspace = next((workspace for workspace in payload["workspaces"] if workspace.get("id") == workspace_id), None)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="未找到该空间")
+    if workspace.get("default_personal"):
+        raise HTTPException(status_code=403, detail="个人空间不支持移除成员")
+
+    memberships = payload["memberships"]
+    removed = next((membership for membership in memberships if membership.get("workspace_id") == workspace_id and membership.get("user_id") == user_id), None)
+    if removed is None:
+        raise HTTPException(status_code=404, detail="该成员不在当前空间中")
+    if removed.get("role") == "owner":
+        raise HTTPException(status_code=403, detail="不能移除空间拥有者")
+
+    payload["memberships"] = [
+        membership
+        for membership in memberships
+        if not (membership.get("workspace_id") == workspace_id and membership.get("user_id") == user_id)
+    ]
+    _write_workspaces_payload(payload)
+    return _to_membership(removed)
+
+
+def delete_workspace(workspace_id: str) -> Workspace:
+    payload = _read_workspaces_payload()
+    workspace = next((workspace for workspace in payload["workspaces"] if workspace.get("id") == workspace_id), None)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="未找到该空间")
+    if workspace.get("default_personal"):
+        raise HTTPException(status_code=403, detail="个人空间不支持删除")
+
+    payload["workspaces"] = [record for record in payload["workspaces"] if record.get("id") != workspace_id]
+    payload["memberships"] = [membership for membership in payload["memberships"] if membership.get("workspace_id") != workspace_id]
+    _write_workspaces_payload(payload)
+
+    workspace_dir = get_paths().workspace_dir(workspace_id)
+    if workspace_dir.exists():
+        shutil.rmtree(workspace_dir)
+    return _to_workspace(workspace)
 
 
 def delete_user(user_id: str, *, actor_user_id: str | None = None) -> AuthUser:

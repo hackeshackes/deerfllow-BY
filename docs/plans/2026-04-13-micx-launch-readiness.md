@@ -15,6 +15,9 @@
 - Personal-workspace thread privacy enforcement
 - Stale thread fallback to safe new-chat route
 - Admin user deletion with safety guards
+- Workspace admin edit/delete/member-removal actions
+- Runtime MicX branding sourced from persisted admin config via gateway public branding API
+- Client-only guarded command palette rendering to avoid Radix hydration mismatch after login/user switching
 
 ## Verification Summary
 
@@ -60,6 +63,9 @@ Validated locally against the running MicX stack:
 - thread becomes hidden again after switching back to private
 - deleted thread disappears from other members' search results
 - stale direct thread URL redirects to `/workspace/chats/new`
+- shared workspace can be renamed and deleted by owner through API-backed admin flows
+- workspace members can be removed from shared workspaces
+- branding save updates sign-in page, landing page, metadata title, and support email rendering
 
 ## Known Verification Constraint
 
@@ -100,6 +106,10 @@ Before production rollout, confirm all items below in a Python 3.12 runtime:
 20. Verify thread share/private toggle propagates across users in the same shared workspace
 21. Verify personal-workspace threads do not expose share actions
 22. Verify thread delete removes access from direct URL and recent list
+23. Verify shared workspace name can be edited from admin console
+24. Verify shared workspace members can be removed
+25. Verify personal workspaces do not expose share/delete workspace actions
+26. Verify branding save updates sign-in and landing surfaces after refresh
 
 ## Suggested Smoke Test Plan
 
@@ -136,6 +146,21 @@ Before production rollout, confirm all items below in a Python 3.12 runtime:
 - owner deletes thread → direct URL and recent list no longer expose it
 - direct access to stale thread URL redirects to `/workspace/chats/new`
 
+### Workspace admin
+
+- create a temporary shared workspace
+- rename the shared workspace
+- add a member to the shared workspace
+- remove the member again
+- delete the shared workspace
+
+### Branding runtime
+
+- save MicX branding override in admin config
+- refresh `/sign-in` and verify name/tagline/support email changed
+- refresh `/` and verify landing copy and title changed
+- refresh workspace shell and verify compact branding changed where applicable
+
 ## Rollback Notes
 
 ### Frontend rollback
@@ -154,6 +179,7 @@ Before production rollout, confirm all items below in a Python 3.12 runtime:
   - admin audit log
   - skill metadata JSON
   - thread metadata store and checkpoint state, including `visibility` fields
+  - workspace records and memberships for any spaces created before rollback
 
 ### Data compatibility caution
 
@@ -171,5 +197,6 @@ This release introduces new admin-side persisted files. If a rollback target pre
 
 1. Promote to staging
 2. Complete the conversation-system smoke checks above in staging
-3. Verify nginx/backend restart order in deployment automation to avoid temporary upstream drift
-4. Approve production rollout after staging pass
+3. Complete workspace-admin and branding smoke checks above in staging
+4. Verify nginx/backend/frontend restart order in deployment automation to avoid temporary upstream drift
+5. Approve production rollout after staging pass

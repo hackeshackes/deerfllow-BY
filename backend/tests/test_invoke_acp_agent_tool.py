@@ -682,6 +682,7 @@ def test_get_available_tools_includes_invoke_acp_agent_when_agents_configured(mo
         models=[],
         tool_search=SimpleNamespace(enabled=False),
         get_model_config=lambda name: None,
+        get_default_model_name=lambda: "test-model",
     )
     monkeypatch.setattr("deerflow.tools.tools.get_app_config", lambda: fake_config)
     monkeypatch.setattr(

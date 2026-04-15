@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Button } from "@/components/ui/button";
-import { brand, supportMailto } from "@/core/brand/config";
+import { buildSupportMailto } from "@/core/brand/config";
+import { getRuntimeBranding } from "@/core/brand/runtime";
 import type { Locale } from "@/core/i18n/locale";
 import { getI18n } from "@/core/i18n/server";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ export type HeaderProps = {
 
 export async function Header({ className, homeURL, locale }: HeaderProps) {
   const { locale: resolvedLocale, t } = await getI18n(locale);
+  const brand = await getRuntimeBranding();
   const lang = resolvedLocale.substring(0, 2);
 
   return (
@@ -32,7 +34,7 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
         <Link href={`/${lang}/docs`} className="transition-colors hover:text-white">
           {t.home.docs}
         </Link>
-        <a href={supportMailto("MicX support")} className="transition-colors hover:text-white">
+        <a href={buildSupportMailto(brand.supportEmail, "MicX support")} className="transition-colors hover:text-white">
           联系我们
         </a>
       </nav>

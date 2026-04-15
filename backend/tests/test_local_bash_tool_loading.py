@@ -17,6 +17,7 @@ def _make_config(*, allow_host_bash: bool, sandbox_use: str = "deerflow.sandbox.
         ),
         tool_search=SimpleNamespace(enabled=False),
         get_model_config=lambda name: None,
+        get_default_model_name=lambda: "test-model",
     )
 
 
