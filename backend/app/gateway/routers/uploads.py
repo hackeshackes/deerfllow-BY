@@ -27,6 +27,24 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/threads/{thread_id}/uploads", tags=["uploads"])
 
+# Max upload size in bytes (default 10MB)
+MAX_UPLOAD_SIZE_BYTES = int(os.getenv("DEER_FLOW_MAX_UPLOAD_SIZE_MB", "10")) * 1024 * 1024
+
+
+def _validate_file_size(content: bytes, filename: str) -> None:
+    """Validate file size is within limits.
+
+    Raises:
+        HTTPException: 413 if file is too large
+    """
+    size = len(content)
+    if size > MAX_UPLOAD_SIZE_BYTES:
+        max_mb = MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"File '{filename}' is too large. Maximum size: {max_mb}MB (got {size // (1024 * 1024)}MB)",
+        )
+
 
 class UploadResponse(BaseModel):
     """Response model for file upload."""
@@ -88,6 +106,7 @@ async def upload_files(
 
         try:
             content = await file.read()
+            _validate_file_size(content, safe_filename)
             file_path = uploads_dir / safe_filename
             file_path.write_bytes(content)
 

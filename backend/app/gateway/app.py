@@ -1,8 +1,11 @@
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.gateway.auth import get_default_workspace_id_for_user, get_workspace_membership, session_payload_from_request, session_user_from_request
 from app.gateway.auth_context import current_user_email, current_user_id, current_user_role, current_workspace_id, current_workspace_role
@@ -27,6 +30,22 @@ from app.gateway.routers import (
     users,
 )
 from deerflow.config.app_config import get_app_config
+
+# Request ID context variable for tracing
+request_id_ctx_var: ContextVar[str | None] = ContextVar("request_id", default=None)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Middleware to add X-Request-ID header for request tracing."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID")
+        if not request_id:
+            request_id = str(uuid.uuid4())
+        request_id_ctx_var.set(request_id)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 # Configure logging
 logging.basicConfig(
@@ -169,6 +188,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     )
 
     # CORS is handled by nginx - no need for FastAPI middleware
+
+    # Request ID middleware for tracing
+    app.add_middleware(RequestIDMiddleware)
 
     @app.middleware("http")
     async def attach_current_user(request, call_next):
