@@ -471,6 +471,7 @@ make test         # Run tests
 
 ### Documentation
 
+- [Changelog](./CHANGELOG.md) - Version history and release notes
 - [PRD Document](./docs/plans/2026-04-13-micx-vnext-prd.md)
 - [Execution Plan](./docs/plans/2026-04-13-micx-vnext-execution.md)
 - [Fix Plan](./docs/plans/2026-04-15-micx-fix-plan.md)
