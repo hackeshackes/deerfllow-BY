@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_owner_user, require_user
+from deerflow.admin import SkillShare, get_visible_skills_for_user, save_skill_share
 from app.gateway.path_utils import resolve_thread_virtual_path
 from deerflow.admin import append_admin_audit_record, upsert_skill_metadata
 from deerflow.agents.lead_agent.prompt import refresh_skills_system_prompt_cache_async
@@ -224,10 +225,16 @@ def _load_custom_skill_response(skill_name: str) -> CustomSkillContentResponse:
     description="Retrieve a list of all available skills from both public and custom directories.",
 )
 async def list_skills(request: Request) -> SkillsListResponse:
-    require_user(request)
+    user = require_user(request)
     try:
-        skills = load_skills(enabled_only=False)
-        return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])
+        visible_skill_names = get_visible_skills_for_user(
+            user_id=user.id,
+            is_owner=user.is_owner,
+            workspace_id=getattr(request.state, "active_workspace_id", None),
+        )
+        all_skills = load_skills(enabled_only=False)
+        visible_skills = [s for s in all_skills if s.name in visible_skill_names]
+        return SkillsListResponse(skills=[_skill_to_response(skill) for skill in visible_skills])
     except Exception as e:
         logger.error(f"Failed to load skills: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to load skills: {str(e)}")
@@ -294,6 +301,14 @@ async def install_skill_from_remote(request: SkillRemoteInstallRequest, http_req
             author=skill.author,
             compatibility=skill.compatibility,
         )
+
+        share = SkillShare(
+            skill_name=result["skill_name"],
+            owner_id=user.id,
+            visibility="private",
+        )
+        save_skill_share(share)
+
         await refresh_skills_system_prompt_cache_async()
         append_admin_audit_record(
             "skill.installed_remote",
@@ -347,10 +362,19 @@ async def update_skill_metadata(skill_name: str, body: SkillMetadataUpdateReques
 
 @router.get("/skills/custom", response_model=SkillsListResponse, summary="List Custom Skills")
 async def list_custom_skills(request: Request) -> SkillsListResponse:
-    require_user(request)
+    user = require_user(request)
     try:
-        skills = [skill for skill in load_skills(enabled_only=False) if skill.category == "custom"]
-        return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])
+        all_custom_skills = [skill for skill in load_skills(enabled_only=False) if skill.category == "custom"]
+        if user.is_owner:
+            return SkillsListResponse(skills=[_skill_to_response(skill) for skill in all_custom_skills])
+
+        visible_skill_names = get_visible_skills_for_user(
+            user_id=user.id,
+            is_owner=user.is_owner,
+            workspace_id=getattr(request.state, "active_workspace_id", None),
+        )
+        visible_skills = [s for s in all_custom_skills if s.name in visible_skill_names]
+        return SkillsListResponse(skills=[_skill_to_response(skill) for skill in visible_skills])
     except Exception as e:
         logger.error("Failed to list custom skills: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to list custom skills: {str(e)}")
@@ -358,7 +382,7 @@ async def list_custom_skills(request: Request) -> SkillsListResponse:
 
 @router.post("/skills/custom", response_model=CustomSkillContentResponse, status_code=201, summary="Create Custom Skill")
 async def create_custom_skill(request: CustomSkillCreateRequest, http_request: Request) -> CustomSkillContentResponse:
-    require_owner_user(http_request)
+    user = require_owner_user(http_request)
     try:
         skill_name = request.name.strip()
         if not skill_name:
@@ -390,6 +414,14 @@ async def create_custom_skill(request: CustomSkillCreateRequest, http_request: R
                 "scanner": {"decision": scan.decision, "reason": scan.reason},
             },
         )
+
+        share = SkillShare(
+            skill_name=skill_name,
+            owner_id=user.id,
+            visibility="private",
+        )
+        save_skill_share(share)
+
         await refresh_skills_system_prompt_cache_async()
         return _load_custom_skill_response(skill_name)
     except HTTPException:
