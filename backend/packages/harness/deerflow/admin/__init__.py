@@ -15,8 +15,10 @@ from .user_skill_store import (
     get_skill_share,
     get_shared_skills,
     get_user_skill_config,
+    get_visible_skills_for_user,
     save_skill_share,
     save_user_skill_config,
+    user_is_in_workspace,
 )
 
 __all__ = [
@@ -36,6 +38,7 @@ __all__ = [
     "get_skill_share",
     "get_shared_skills",
     "get_user_skill_config",
+    "get_visible_skills_for_user",
     "is_secret_ref",
     "mask_secret_value",
     "read_admin_audit_records",
@@ -47,4 +50,5 @@ __all__ = [
     "save_user_skill_config",
     "upsert_skill_metadata",
     "upsert_secret",
+    "user_is_in_workspace",
 ]
