@@ -8,7 +8,7 @@ import {
   SquareArrowOutUpRightIcon,
   XIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 
@@ -94,10 +94,15 @@ export function ArtifactFileDetail({
   const [viewMode, setViewMode] = useState<"code" | "preview">("code");
   const [isInstalling, setIsInstalling] = useState(false);
   const { isMock } = useThread();
+
+  // Only auto-switch to preview on initial load, not on every language change
+  // This prevents flickering when content is re-fetched
+  const hasInitialized = useRef(false);
   useEffect(() => {
-    if (isSupportPreview) {
+    if (!hasInitialized.current && isSupportPreview) {
+      hasInitialized.current = true;
       setViewMode("preview");
-    } else {
+    } else if (!isSupportPreview) {
       setViewMode("code");
     }
   }, [isSupportPreview]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { ActivityIcon, BlocksIcon, LayoutDashboardIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
+import { ActivityIcon, BlocksIcon, CoinsIcon, LayoutDashboardIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -12,6 +12,7 @@ const adminLinks = [
   { href: "/workspace/admin", label: "后台总览", icon: LayoutDashboardIcon },
   { href: "/workspace/admin/config", label: "配置中心", icon: Settings2Icon },
   { href: "/workspace/admin/monitoring", label: "监控中心", icon: ActivityIcon },
+  { href: "/workspace/admin/token-usage", label: "Token 统计", icon: CoinsIcon },
   { href: "/workspace/admin/skills", label: "技能管理", icon: BlocksIcon },
   { href: "/workspace/admin/users", label: "用户管理", icon: ShieldCheckIcon },
   { href: "/workspace/admin/workspaces", label: "空间管理", icon: ShieldCheckIcon },

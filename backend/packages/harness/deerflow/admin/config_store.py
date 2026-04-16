@@ -62,6 +62,7 @@ class AdminSandboxConfig(BaseModel):
 class AdminModelConfig(BaseModel):
     name: str = Field(..., description="Model name identifier")
     display_name: str = Field(..., description="Display name for UI")
+    description: str | None = Field(default=None, description="Model description")
     use: str = Field(..., description="Model provider class path")
     model: str = Field(..., description="Model name for API")
     api_key: str | None = Field(default=None, description="API key (encrypted)")
@@ -72,7 +73,12 @@ class AdminModelConfig(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
     supports_vision: bool = Field(default=False, description="Whether model supports vision")
     supports_thinking: bool = Field(default=False, description="Whether model supports thinking mode")
+    supports_reasoning_effort: bool = Field(default=False, description="Whether model supports reasoning effort")
     is_default: bool = Field(default=False, description="Is this the default model")
+    use_responses_api: bool = Field(default=False, description="Use OpenAI Responses API")
+    output_version: str | None = Field(default=None, description="Structured output version")
+    thinking: dict | None = Field(default=None, description="Thinking configuration")
+    when_thinking_enabled: dict | None = Field(default=None, description="Settings when thinking is enabled")
 
 
 class AdminToolConfig(BaseModel):
@@ -80,6 +86,7 @@ class AdminToolConfig(BaseModel):
     group: str = Field(..., description="Tool group")
     use: str = Field(..., description="Tool implementation class path")
     enabled: bool = Field(default=True, description="Whether tool is enabled")
+    extra_params: dict = Field(default_factory=dict, description="Additional tool parameters")
 
 
 class AdminSkillConfig(BaseModel):
@@ -89,9 +96,13 @@ class AdminSkillConfig(BaseModel):
 
 class AdminMCPServerConfig(BaseModel):
     name: str = Field(..., description="MCP server name")
+    type: str = Field(default="stdio", description="Transport type: stdio, sse, or http")
     command: str = Field(..., description="Command to start MCP server")
     args: list[str] = Field(default_factory=list, description="Command arguments")
     env: dict[str, str] = Field(default_factory=dict, description="Environment variables")
+    url: str | None = Field(default=None, description="MCP server URL for sse/http type")
+    headers: dict[str, str] = Field(default_factory=dict, description="HTTP headers for sse/http type")
+    description: str = Field(default="", description="Human-readable description")
     enabled: bool = Field(default=True, description="Whether MCP server is enabled")
 
 

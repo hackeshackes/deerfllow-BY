@@ -14,6 +14,7 @@ from app.gateway.deps import langgraph_runtime
 from app.gateway.routers import (
     admin_config,
     admin_monitoring,
+    admin_token_usage,
     agents,
     artifacts,
     assistants_compat,
@@ -227,6 +228,7 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     # Include routers
     app.include_router(admin_config.router)
     app.include_router(admin_monitoring.router)
+    app.include_router(admin_token_usage.router)
 
     # Models API is mounted at /api/models
     app.include_router(models.router)

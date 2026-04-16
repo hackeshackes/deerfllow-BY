@@ -111,7 +111,7 @@ export function SkillsAdminPage() {
       <Card>
         <CardHeader>
           <CardTitle>远程安装</CardTitle>
-          <CardDescription>输入可访问的 `.skill` 地址，安装后默认会保持禁用状态。</CardDescription>
+          <CardDescription>输入可访问的 `.skill` / `.zip` / `.tar.gz` 地址，安装后默认会保持禁用状态。</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-[1.6fr_0.8fr_0.8fr_auto]" onSubmit={installRemoteSkill}>

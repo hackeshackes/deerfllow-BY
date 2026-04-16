@@ -26,10 +26,17 @@ class ModelResponse(BaseModel):
     base_url: str | None = Field(None, description="Provider base URL")
     api_key: str | None = Field(None, description="API key value or env placeholder")
     api_key_configured: bool = Field(default=False, description="Whether an API key or secret reference is configured")
+    request_timeout: int = Field(default=120)
+    max_retries: int = Field(default=3)
+    max_tokens: int = Field(default=8192)
     temperature: float | None = Field(None, description="Sampling temperature")
     supports_thinking: bool = Field(default=False)
     supports_reasoning_effort: bool = Field(default=False)
     supports_vision: bool = Field(default=False)
+    use_responses_api: bool = Field(default=False)
+    output_version: str | None = Field(None)
+    thinking: dict[str, Any] | None = Field(None)
+    when_thinking_enabled: dict[str, Any] | None = Field(None)
     enabled: bool = Field(default=True)
     is_default: bool = Field(default=False)
 
@@ -46,10 +53,17 @@ class ModelMutationRequest(BaseModel):
     model: str
     base_url: str | None = None
     api_key: str | None = None
+    request_timeout: int = 120
+    max_retries: int = 3
+    max_tokens: int = 8192
     temperature: float | None = None
     supports_thinking: bool = False
     supports_reasoning_effort: bool = False
     supports_vision: bool = False
+    use_responses_api: bool = False
+    output_version: str | None = None
+    thinking: dict[str, Any] | None = None
+    when_thinking_enabled: dict[str, Any] | None = None
     enabled: bool = True
     is_default: bool = False
 
@@ -104,21 +118,28 @@ def _persist_and_reload(data: dict[str, Any]):
 
 
 def _model_to_response(model: ModelConfig, *, is_default: bool = False, include_sensitive: bool = False) -> ModelResponse:
-    api_key = getattr(model, "api_key", None)
+    api_key = model.api_key
     return ModelResponse(
         name=model.name,
         model=model.model,
         display_name=model.display_name,
         description=model.description,
         use=model.use if include_sensitive else None,
-        base_url=getattr(model, "base_url", None) if include_sensitive else None,
+        base_url=model.base_url if include_sensitive else None,
         api_key=api_key if include_sensitive else None,
         api_key_configured=bool(api_key),
-        temperature=getattr(model, "temperature", None),
+        request_timeout=model.request_timeout,
+        max_retries=model.max_retries,
+        max_tokens=model.max_tokens,
+        temperature=model.temperature,
         supports_thinking=model.supports_thinking,
         supports_reasoning_effort=model.supports_reasoning_effort,
         supports_vision=model.supports_vision,
-        enabled=bool(getattr(model, "enabled", True)),
+        use_responses_api=model.use_responses_api or False,
+        output_version=model.output_version,
+        thinking=model.thinking,
+        when_thinking_enabled=model.when_thinking_enabled,
+        enabled=bool(model.enabled) if model.enabled is not None else True,
         is_default=is_default,
     )
 

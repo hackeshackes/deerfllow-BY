@@ -9,6 +9,7 @@ import posixpath
 import re
 import shutil
 import stat
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -160,8 +161,13 @@ def install_skill_from_archive(
         if not path.exists():
             raise FileNotFoundError(f"Skill file not found: {zip_path}")
         raise ValueError(f"Path is not a file: {zip_path}")
-    if path.suffix != ".skill":
-        raise ValueError("File must have .skill extension")
+
+    suffix = path.suffix.lower()
+    if suffix == ".gz" and path.stem.endswith(".tar"):
+        suffix = ".tar.gz"
+    allowed_suffixes = {".skill", ".zip", ".tar.gz"}
+    if suffix not in allowed_suffixes:
+        raise ValueError(f"File must have .skill, .zip, or .tar.gz extension, got: {path.suffix}")
 
     if skills_root is None:
         skills_root = get_skills_root_path()
@@ -171,18 +177,35 @@ def install_skill_from_archive(
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
 
-        try:
-            zf = zipfile.ZipFile(path, "r")
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Skill file not found: {zip_path}") from None
-        except (zipfile.BadZipFile, IsADirectoryError):
+        if suffix in (".zip", ".skill"):
             try:
-                _extract_plain_skill_file(path, tmp_path)
-            except UnicodeDecodeError:
-                raise ValueError("File is not a valid ZIP archive") from None
-        else:
-            with zf:
-                safe_extract_skill_archive(zf, tmp_path)
+                zf = zipfile.ZipFile(path, "r")
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Skill file not found: {zip_path}") from None
+            except (zipfile.BadZipFile, IsADirectoryError):
+                if suffix == ".zip":
+                    raise ValueError("File is not a valid ZIP archive")
+                try:
+                    _extract_plain_skill_file(path, tmp_path)
+                except UnicodeDecodeError:
+                    raise ValueError("File is not a valid skill archive") from None
+            else:
+                with zf:
+                    safe_extract_skill_archive(zf, tmp_path)
+        elif suffix == ".tar.gz":
+            try:
+                tf = tarfile.open(path, "r:gz")
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Skill file not found: {zip_path}") from None
+            except (tarfile.TarError, IsADirectoryError):
+                raise ValueError("File is not a valid tar.gz archive") from None
+            else:
+                try:
+                    tf.extractall(tmp_path)
+                except Exception as e:
+                    raise ValueError(f"Failed to extract tar.gz archive: {e}") from e
+                finally:
+                    tf.close()
 
         skill_dir = resolve_skill_dir_from_archive(tmp_path)
 

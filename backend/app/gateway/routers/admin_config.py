@@ -16,7 +16,7 @@ from deerflow.admin.config_store import (
     AdminTracingConfig,
     AdminUploadConfig,
 )
-from deerflow.config import reset_tracing_config
+from deerflow.config import get_app_config, reset_tracing_config
 from deerflow.config.app_config import reload_app_config
 
 router = APIRouter(prefix="/api/admin", tags=["admin-config"])
@@ -69,6 +69,7 @@ class AdminSandboxResponse(BaseModel):
 class AdminModelResponse(BaseModel):
     name: str
     display_name: str
+    description: str | None = None
     use: str
     model: str
     api_key: str | None = None
@@ -79,7 +80,12 @@ class AdminModelResponse(BaseModel):
     temperature: float = 0.7
     supports_vision: bool = False
     supports_thinking: bool = False
+    supports_reasoning_effort: bool = False
     is_default: bool = False
+    use_responses_api: bool = False
+    output_version: str | None = None
+    thinking: dict | None = None
+    when_thinking_enabled: dict | None = None
 
 
 class AdminToolResponse(BaseModel):
@@ -87,6 +93,7 @@ class AdminToolResponse(BaseModel):
     group: str
     use: str
     enabled: bool = True
+    extra_params: dict = Field(default_factory=dict)
 
 
 class AdminSkillResponse(BaseModel):
@@ -132,8 +139,11 @@ class AdminAuditListResponse(BaseModel):
 
 def _to_response() -> AdminConfigResponse:
     config = get_admin_config().masked()
+    app_config = get_app_config()
+    system_data = config.system.model_dump()
+    system_data["token_usage_enabled"] = app_config.token_usage.enabled
     return AdminConfigResponse(
-        system=AdminSystemResponse(**config.system.model_dump()),
+        system=AdminSystemResponse(**system_data),
         tracing=AdminTracingResponse(
             langsmith=AdminTracingProviderResponse(**config.tracing.langsmith.model_dump()),
             langfuse=AdminTracingProviderResponse(**config.tracing.langfuse.model_dump()),

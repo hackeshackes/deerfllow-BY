@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileJson, FileText } from "lucide-react";
+import { Download, FileJson, FileSpreadsheet, FileText, FileType } from "lucide-react";
 import { useCallback } from "react";
 import { toast } from "sonner";
 
@@ -9,12 +9,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/core/i18n/hooks";
 import {
+  exportThreadAsExcel,
   exportThreadAsJSON,
   exportThreadAsMarkdown,
+  exportThreadAsPDF,
+  exportThreadAsWord,
 } from "@/core/threads/export";
 import type { AgentThread } from "@/core/threads/types";
 
@@ -28,7 +32,7 @@ export function ExportTrigger({ threadId }: { threadId: string }) {
   const messages = thread.messages;
 
   const handleExport = useCallback(
-    (format: "markdown" | "json") => {
+    (format: "markdown" | "json" | "word" | "excel" | "pdf") => {
       if (messages.length === 0) {
         toast.error(t.conversation.noMessages);
         return;
@@ -39,10 +43,22 @@ export function ExportTrigger({ threadId }: { threadId: string }) {
         values: thread.values,
       } as AgentThread;
 
-      if (format === "markdown") {
-        exportThreadAsMarkdown(agentThread, messages);
-      } else {
-        exportThreadAsJSON(agentThread, messages);
+      switch (format) {
+        case "markdown":
+          exportThreadAsMarkdown(agentThread, messages);
+          break;
+        case "json":
+          exportThreadAsJSON(agentThread, messages);
+          break;
+        case "word":
+          exportThreadAsWord(agentThread, messages);
+          break;
+        case "excel":
+          exportThreadAsExcel(agentThread, messages);
+          break;
+        case "pdf":
+          exportThreadAsPDF(agentThread, messages);
+          break;
       }
       toast.success(t.common.exportSuccess);
     },
@@ -74,6 +90,19 @@ export function ExportTrigger({ threadId }: { threadId: string }) {
         <DropdownMenuItem onSelect={() => handleExport("json")}>
           <FileJson className="text-muted-foreground" />
           <span>{t.common.exportAsJSON}</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => handleExport("word")}>
+          <FileType className="text-muted-foreground" />
+          <span>{t.common.exportAsWord}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => handleExport("excel")}>
+          <FileSpreadsheet className="text-muted-foreground" />
+          <span>{t.common.exportAsExcel}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => handleExport("pdf")}>
+          <FileType className="text-muted-foreground" />
+          <span>{t.common.exportAsPDF}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
