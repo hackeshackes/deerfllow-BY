@@ -9,6 +9,7 @@ from deerflow.admin import (
     get_skill_average_rating,
     get_skill_ratings,
     get_user_skill_config,
+    get_visible_skills_for_user,
     save_user_skill_config,
 )
 from deerflow.skills import load_skills
@@ -52,10 +53,19 @@ async def list_user_skills(request: Request) -> UserSkillConfigListResponse:
     store = get_user_skill_config()
     user_configs = {c.skill_name: c for c in store.get_user_configs(user.id)}
 
-    skills = load_skills()
+    workspace_id = getattr(request.state, "active_workspace_id", None)
+    visible_skill_names = get_visible_skills_for_user(
+        user_id=user.id,
+        is_owner=user.is_owner,
+        workspace_id=workspace_id,
+    )
+
+    all_skills = load_skills()
 
     result: list[UserSkillConfigResponse] = []
     for skill_name, config in user_configs.items():
+        if skill_name not in visible_skill_names:
+            continue
         display_name, description = _get_skill_info(skill_name)
         result.append(
             UserSkillConfigResponse(
@@ -69,8 +79,8 @@ async def list_user_skills(request: Request) -> UserSkillConfigListResponse:
             )
         )
 
-    for skill in skills:
-        if skill.name not in user_configs:
+    for skill in all_skills:
+        if skill.name not in user_configs and skill.name in visible_skill_names:
             display_name = skill.display_name_zh or skill.name
             description = skill.description_zh or skill.description
             result.append(

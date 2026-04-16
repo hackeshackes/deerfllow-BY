@@ -225,3 +225,57 @@ def get_skill_average_rating(skill_name: str) -> float | None:
     if not ratings:
         return None
     return sum(r.rating for r in ratings) / len(ratings)
+
+
+def user_is_in_workspace(user_id: str, workspace_id: str | None) -> bool:
+    """Check if user is a member of the given workspace."""
+    if workspace_id is None:
+        return False
+    from deerflow.admin.user_store import list_workspace_memberships
+
+    for membership in list_workspace_memberships():
+        if membership.user_id == user_id and membership.workspace_id == workspace_id:
+            return True
+    return False
+
+
+def get_visible_skills_for_user(user_id: str, is_owner: bool, workspace_id: str | None = None) -> list[str]:
+    """Get list of skill names visible to a user based on ownership and visibility rules.
+
+    Rules:
+    - Admin (is_owner=True): sees ALL skills
+    - Regular user: sees skills where:
+      1. No share record exists (system skill, visible to all)
+      2. skill.owner_id == user_id (own skill)
+      3. skill.visibility == "public" (admin shared publicly)
+      4. skill.visibility == "workspace" AND user is in that workspace
+    """
+    if is_owner:
+        # Admin sees all skills
+        from deerflow.skills import load_skills
+
+        return [s.name for s in load_skills(enabled_only=False)]
+
+    shares = _get_skill_shares()
+    visible_skill_names: list[str] = []
+
+    # System skills (no share record) are visible to all
+    from deerflow.skills import load_skills
+
+    all_skills = load_skills(enabled_only=False)
+    for skill in all_skills:
+        share = shares.get(skill.name)
+        if share is None:
+            # No share record = system skill, visible to all
+            visible_skill_names.append(skill.name)
+        elif share.owner_id == user_id:
+            # Own skill
+            visible_skill_names.append(skill.name)
+        elif share.visibility == "public":
+            # Admin shared publicly
+            visible_skill_names.append(skill.name)
+        elif share.visibility == "workspace" and user_is_in_workspace(user_id, share.workspace_id):
+            # User is in the same workspace
+            visible_skill_names.append(skill.name)
+
+    return visible_skill_names
