@@ -12,26 +12,32 @@ from deerflow.admin.token_usage import get_token_usage_store
 logger = logging.getLogger(__name__)
 
 
-class TokenUsageMiddleware(AgentMiddleware):
+class TokenUsageMiddleware(AgentMiddleware[AgentState]):
     """Records token usage from model response usage_metadata to file storage."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        logger.warning("TokenUsageMiddleware: instantiated")
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        logger.warning("TokenUsageMiddleware.after_model called")
         return self._record_usage(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        logger.warning("TokenUsageMiddleware.aafter_model called")
         return self._record_usage(state, runtime)
 
     def _record_usage(self, state: AgentState, runtime: Runtime) -> None:
         messages = state.get("messages", [])
         if not messages:
-            logger.debug("TokenUsageMiddleware: no messages in state")
+            logger.warning("TokenUsageMiddleware: no messages in state")
             return None
         last = messages[-1]
         usage = getattr(last, "usage_metadata", None)
         if not usage:
-            logger.debug("TokenUsageMiddleware: no usage_metadata on last message, type=%s", type(last).__name__)
+            logger.warning("TokenUsageMiddleware: no usage_metadata on last message, type=%s", type(last).__name__)
             return None
 
         thread_id = None
@@ -51,7 +57,7 @@ class TokenUsageMiddleware(AgentMiddleware):
         model_name = metadata.get("model_name") or "unknown"
         run_id = metadata.get("run_id")
 
-        logger.info(
+        logger.warning(
             "TokenUsageMiddleware: recording usage user_id=%s model=%s input=%s output=%s total=%s",
             user_id,
             model_name,

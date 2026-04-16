@@ -80,9 +80,13 @@ type AdminSkillConfig = {
 
 type AdminMCPServerConfig = {
   name: string;
+  type: string;
   command: string;
   args: string[];
   env: Record<string, string>;
+  url: string | null;
+  headers: Record<string, string>;
+  description: string;
   enabled: boolean;
 };
 
@@ -418,24 +422,63 @@ export function ConfigAdminPage() {
           {form.tools.length === 0 ? (
             <p className="text-sm text-slate-500">暂无工具配置。</p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-4">
               {form.tools.map((tool, index) => (
-                <div key={tool.name || index} className="flex items-center justify-between rounded-2xl border p-4">
-                  <div>
-                    <div className="font-medium">{tool.name}</div>
-                    <div className="text-sm text-slate-500">{tool.group}</div>
+                <div key={tool.name || index} className="rounded-2xl border p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{tool.name}</div>
+                      <div className="text-sm text-slate-500">{tool.group}</div>
+                    </div>
+                    <Switch
+                      checked={tool.enabled}
+                      onCheckedChange={(checked) => {
+                        const updated = [...form.tools];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { enabled: checked });
+                          setForm((current) => (current ? { ...current, tools: updated } : current));
+                        }
+                      }}
+                    />
                   </div>
-                  <Switch
-                    checked={tool.enabled}
-                    onCheckedChange={(checked) => {
-                      const updated = [...form.tools];
-                      const item = updated[index];
-                      if (item) {
-                        updated[index] = Object.assign({}, item, { enabled: checked });
-                        setForm((current) => (current ? { ...current, tools: updated } : current));
-                      }
-                    }}
-                  />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="text-sm font-medium">实现类路径</div>
+                      <Input
+                        value={tool.use || ""}
+                        onChange={(event) => {
+                          const updated = [...form.tools];
+                          const item = updated[index];
+                          if (item) {
+                            updated[index] = Object.assign({}, item, { use: event.target.value });
+                            setForm((current) => (current ? { ...current, tools: updated } : current));
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="text-sm font-medium">额外参数 (JSON 格式)</div>
+                      <Textarea
+                        value={JSON.stringify(tool.extra_params || {}, null, 2)}
+                        onChange={(event) => {
+                          const updated = [...form.tools];
+                          const item = updated[index];
+                          if (item) {
+                            try {
+                              const extra_params = event.target.value ? JSON.parse(event.target.value) : {};
+                              updated[index] = Object.assign({}, item, { extra_params });
+                              setForm((current) => (current ? { ...current, tools: updated } : current));
+                            } catch {
+                              // Invalid JSON, ignore
+                            }
+                          }
+                        }}
+                        rows={3}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -470,9 +513,28 @@ export function ConfigAdminPage() {
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <div className="text-sm font-medium">命令</div>
+                    <div className="text-sm font-medium">类型</div>
+                    <select
+                      className="w-full rounded-lg border px-3 py-2"
+                      value={server.type || "stdio"}
+                      onChange={(event) => {
+                        const updated = [...form.mcp];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { type: event.target.value });
+                          setForm((current) => (current ? { ...current, mcp: updated } : current));
+                        }
+                      }}
+                    >
+                      <option value="stdio">stdio</option>
+                      <option value="sse">sse</option>
+                      <option value="http">http</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">命令 (仅 stdio)</div>
                     <Input
-                      value={server.command}
+                      value={server.command || ""}
                       onChange={(event) => {
                         const updated = [...form.mcp];
                         const item = updated[index];
@@ -483,10 +545,26 @@ export function ConfigAdminPage() {
                       }}
                     />
                   </div>
+                  {(server.type === "sse" || server.type === "http") && (
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">URL ({server.type})</div>
+                      <Input
+                        value={server.url || ""}
+                        onChange={(event) => {
+                          const updated = [...form.mcp];
+                          const item = updated[index];
+                          if (item) {
+                            updated[index] = Object.assign({}, item, { url: event.target.value });
+                            setForm((current) => (current ? { ...current, mcp: updated } : current));
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <div className="text-sm font-medium">参数 (逗号分隔)</div>
                     <Input
-                      value={server.args.join(", ")}
+                      value={(server.args || []).join(", ")}
                       onChange={(event) => {
                         const updated = [...form.mcp];
                         const item = updated[index];
@@ -502,7 +580,7 @@ export function ConfigAdminPage() {
                   <div className="space-y-2 md:col-span-2">
                     <div className="text-sm font-medium">环境变量 (key=value, 逗号分隔)</div>
                     <Input
-                      value={Object.entries(server.env).map(([k, v]) => `${k}=${v}`).join(", ")}
+                      value={Object.entries(server.env || {}).map(([k, v]) => `${k}=${v}`).join(", ")}
                       onChange={(event) => {
                         const updated = [...form.mcp];
                         const item = updated[index];
@@ -515,6 +593,43 @@ export function ConfigAdminPage() {
                             }
                           });
                           updated[index] = Object.assign({}, item, { env });
+                          setForm((current) => (current ? { ...current, mcp: updated } : current));
+                        }
+                      }}
+                    />
+                  </div>
+                  {(server.type === "sse" || server.type === "http") && (
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="text-sm font-medium">请求头 (key=value, 逗号分隔)</div>
+                      <Input
+                        value={Object.entries(server.headers || {}).map(([k, v]) => `${k}=${v}`).join(", ")}
+                        onChange={(event) => {
+                          const updated = [...form.mcp];
+                          const item = updated[index];
+                          if (item) {
+                            const headers: Record<string, string> = {};
+                            event.target.value.split(",").forEach((pair) => {
+                              const [key, ...valueParts] = pair.split("=");
+                              if (key?.trim()) {
+                                headers[key.trim()] = valueParts.join("=").trim();
+                              }
+                            });
+                            updated[index] = Object.assign({}, item, { headers });
+                            setForm((current) => (current ? { ...current, mcp: updated } : current));
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="text-sm font-medium">描述</div>
+                    <Input
+                      value={server.description || ""}
+                      onChange={(event) => {
+                        const updated = [...form.mcp];
+                        const item = updated[index];
+                        if (item) {
+                          updated[index] = Object.assign({}, item, { description: event.target.value });
                           setForm((current) => (current ? { ...current, mcp: updated } : current));
                         }
                       }}

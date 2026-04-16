@@ -224,6 +224,26 @@ export function ArtifactFileDetail({
                 tooltip={t.clipboard.copyToClipboard}
               />
             )}
+            {viewMode === "preview" && language === "markdown" && (
+              <Tooltip content={t.common.downloadMarkdown}>
+                <ArtifactAction
+                  icon={DownloadIcon}
+                  label={t.common.downloadMarkdown}
+                  tooltip={t.common.downloadMarkdown}
+                  onClick={() => {
+                    const blob = new Blob([displayContent ?? ""], { type: "text/markdown;charset=utf-8" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${getFileName(filepath)}.md`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                />
+              </Tooltip>
+            )}
             {!isWriteFile && (
               <ArtifactAction
                 icon={DownloadIcon}
@@ -249,28 +269,30 @@ export function ArtifactFileDetail({
         </div>
       </ArtifactHeader>
       <ArtifactContent className="p-0">
-        {isSupportPreview &&
-          viewMode === "preview" &&
-          (language === "markdown" || language === "html") && (
+        <div className={cn("size-full", viewMode === "code" ? "block" : "hidden")}>
+          {isCodeFile && (
+            <CodeEditor
+              className="size-full resize-none rounded-none border-none"
+              value={displayContent ?? ""}
+              readonly
+            />
+          )}
+          {!isCodeFile && (
+            <iframe
+              className="size-full"
+              src={urlOfArtifact({ filepath, threadId, isMock })}
+            />
+          )}
+        </div>
+        {isSupportPreview && (
+          <div className={cn("size-full", viewMode === "preview" ? "block" : "hidden")}>
             <ArtifactFilePreview
               content={displayContent}
               isWriteFile={isWriteFile}
               language={language ?? "text"}
               url={url}
             />
-          )}
-        {isCodeFile && viewMode === "code" && (
-          <CodeEditor
-            className="size-full resize-none rounded-none border-none"
-            value={displayContent ?? ""}
-            readonly
-          />
-        )}
-        {!isCodeFile && (
-          <iframe
-            className="size-full"
-            src={urlOfArtifact({ filepath, threadId, isMock })}
-          />
+          </div>
         )}
       </ArtifactContent>
     </Artifact>

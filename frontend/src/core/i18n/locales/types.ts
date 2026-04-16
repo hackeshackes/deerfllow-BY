@@ -19,6 +19,7 @@ export interface Translations {
     more: string;
     search: string;
     download: string;
+    downloadMarkdown: string;
     thinking: string;
     artifacts: string;
     public: string;
