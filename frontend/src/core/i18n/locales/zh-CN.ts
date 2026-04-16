@@ -1,4 +1,4 @@
-﻿import {
+import {
   CompassIcon,
   GraduationCapIcon,
   ImageIcon,
@@ -48,6 +48,9 @@ export const zhCN: Translations = {
     export: "导出",
     exportAsMarkdown: "导出为 Markdown",
     exportAsJSON: "导出为 JSON",
+    exportAsWord: "导出为 Word",
+    exportAsExcel: "导出为 Excel",
+    exportAsPDF: "导出为 PDF",
     exportSuccess: "对话已导出",
   },
 

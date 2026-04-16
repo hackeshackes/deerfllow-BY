@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import shutil
 import tempfile
 from datetime import UTC, datetime
@@ -34,6 +35,35 @@ from deerflow.skills.security_scanner import scan_skill_content
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["skills"])
+
+_GITHUB_REPO_RE = re.compile(r"^https://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/([^/]+))?$")
+_GITHUB_ARCHIVE_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/(?:archive|tarball|releases/download)/")
+
+
+def _resolve_archive_url(url: str) -> tuple[str, str]:
+    if _GITHUB_ARCHIVE_RE.match(url):
+        url_path = Path(url)
+        suffix = url_path.suffix.lower()
+        if suffix == ".gz" and str(url_path).endswith(".tar.gz"):
+            return url, ".tar.gz"
+        if suffix == ".gz":
+            return url, ".tar.gz"
+        return url, ".zip"
+
+    match = _GITHUB_REPO_RE.match(url)
+    if match:
+        _user, _repo, branch = match.groups()
+        resolved_branch = branch or "main"
+        archive_url = f"https://github.com/{_user}/{_repo}/archive/refs/heads/{resolved_branch}.zip"
+        return archive_url, ".zip"
+
+    url_path = Path(url)
+    url_suffix = url_path.suffix.lower()
+    if url_suffix == ".gz" and url_path.stem.endswith(".tar"):
+        return url, ".tar.gz"
+    if url_suffix in {".skill", ".zip", ".tar.gz"}:
+        return url, url_suffix
+    return url, ".skill"
 
 
 class SkillResponse(BaseModel):
@@ -240,10 +270,12 @@ async def install_skill(request: SkillInstallRequest, http_request: Request) -> 
 async def install_skill_from_remote(request: SkillRemoteInstallRequest, http_request: Request) -> SkillInstallResponse:
     user = require_owner_user(http_request)
     try:
+        download_url, archive_extension = _resolve_archive_url(request.url)
+
         with tempfile.TemporaryDirectory() as temp_dir:
-            archive_path = Path(temp_dir) / "remote.skill"
-            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-                response = await client.get(request.url)
+            archive_path = Path(temp_dir) / f"remote{archive_extension}"
+            async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
+                response = await client.get(download_url)
                 response.raise_for_status()
             archive_path.write_bytes(response.content)
             result = install_skill_from_archive(

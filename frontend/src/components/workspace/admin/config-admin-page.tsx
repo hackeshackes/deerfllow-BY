@@ -46,6 +46,7 @@ type AdminSandboxConfig = {
 type AdminModelConfig = {
   name: string;
   display_name: string;
+  description: string | null;
   use: string;
   model: string;
   api_key: string | null;
@@ -56,7 +57,12 @@ type AdminModelConfig = {
   temperature: number;
   supports_vision: boolean;
   supports_thinking: boolean;
+  supports_reasoning_effort: boolean;
   is_default: boolean;
+  use_responses_api: boolean;
+  output_version: string | null;
+  thinking: Record<string, unknown> | null;
+  when_thinking_enabled: Record<string, unknown> | null;
 };
 
 type AdminToolConfig = {
@@ -64,6 +70,7 @@ type AdminToolConfig = {
   group: string;
   use: string;
   enabled: boolean;
+  extra_params: Record<string, unknown>;
 };
 
 type AdminSkillConfig = {
@@ -401,171 +408,6 @@ export function ConfigAdminPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>模型配置</CardTitle>
-          <CardDescription>配置可用的 AI 模型及其参数。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {form.models.length === 0 ? (
-            <p className="text-sm text-slate-500">暂无模型配置。</p>
-          ) : (
-            form.models.map((model, index) => (
-              <div key={model.name || index} className="rounded-2xl border p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="font-medium">{model.display_name || model.name}</div>
-                  <Switch
-                    checked={model.is_default}
-                      onCheckedChange={(checked) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { is_default: checked });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                  />
-                </div>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">名称</div>
-                    <Input
-                      value={model.name}
-                      onChange={(event) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { name: event.target.value });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">显示名称</div>
-                    <Input
-                      value={model.display_name}
-                      onChange={(event) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { display_name: event.target.value });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">API 模型</div>
-                    <Input
-                      value={model.model}
-                      onChange={(event) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { model: event.target.value });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2 lg:col-span-3">
-                    <div className="text-sm font-medium">API Key / $ENV_VAR</div>
-                    <Input
-                      value={model.api_key ?? ""}
-                      onChange={(event) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { api_key: event.target.value || null });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                      placeholder="sk-... 或 $OPENAI_API_KEY"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">最大 Tokens</div>
-                    <Input
-                      type="number"
-                      value={model.max_tokens}
-                      onChange={(event) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { max_tokens: Number(event.target.value) });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Temperature</div>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      value={model.temperature}
-                      onChange={(event) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { temperature: Number(event.target.value) });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">超时 (秒)</div>
-                    <Input
-                      type="number"
-                      value={model.request_timeout}
-                      onChange={(event) => {
-                        const updated = [...form.models];
-                        const item = updated[index];
-                        if (item) {
-                          updated[index] = Object.assign({}, item, { request_timeout: Number(event.target.value) });
-                          setForm((current) => (current ? { ...current, models: updated } : current));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={model.supports_vision}
-                        onCheckedChange={(checked) => {
-                          const updated = [...form.models];
-                          const item = updated[index];
-                          if (item) {
-                            updated[index] = Object.assign({}, item, { supports_vision: checked });
-                            setForm((current) => (current ? { ...current, models: updated } : current));
-                          }
-                        }}
-                      />
-                      <span className="text-sm">Vision</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={model.supports_thinking}
-                        onCheckedChange={(checked) => {
-                          const updated = [...form.models];
-                          const item = updated[index];
-                          if (item) {
-                            updated[index] = Object.assign({}, item, { supports_thinking: checked });
-                            setForm((current) => (current ? { ...current, models: updated } : current));
-                          }
-                        }}
-                      />
-                      <span className="text-sm">Thinking</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -690,6 +532,7 @@ export function ConfigAdminPage() {
         {message && <p className="text-sm text-emerald-600">{message}</p>}
         {error && <p className="text-sm text-rose-600">{error}</p>}
       </div>
+
     </AdminPageShell>
   );
 }

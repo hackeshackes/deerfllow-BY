@@ -48,6 +48,9 @@ export const enUS: Translations = {
     export: "Export",
     exportAsMarkdown: "Export as Markdown",
     exportAsJSON: "Export as JSON",
+    exportAsWord: "Export as Word",
+    exportAsExcel: "Export as Excel",
+    exportAsPDF: "Export as PDF",
     exportSuccess: "Conversation exported",
   },
 

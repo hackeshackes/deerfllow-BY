@@ -307,6 +307,7 @@ async def start_run(
     agent_factory = resolve_agent_factory(body.assistant_id)
     graph_input = normalize_input(body.input)
     config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id)
+    config.setdefault("metadata", {}).update({"user_id": user.id, "run_id": record.run_id})
 
     # Merge DeerFlow-specific context overrides into configurable.
     # The ``context`` field is a custom extension for the langgraph-compat layer
