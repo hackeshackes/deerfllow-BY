@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-04-17
+
+### Added
+
+#### Skill User Isolation
+- Regular users now only see skills they created or that are shared publicly by admin
+- Admin (owner) can see ALL skills
+- Skills without share records are treated as private
+- Visibility rules: own skills, public skills, workspace-shared skills
+- SkillShare records auto-created on custom skill creation and remote install
+
+#### Token Statistics
+- File-based token usage tracking per user
+- Admin token usage dashboard at `/workspace/admin/token-usage`
+- TokenUsageMiddleware logs token consumption with WARNING level
+
+#### Model Presets
+- 20+ pre-configured model presets for OpenAI, Anthropic, Google, Azure, Groq, DeepSeek, Ollama, etc.
+- Quick model selection in configuration center
+- Support for custom model endpoints
+
+#### Configuration Center Enhancements
+- MCP server configuration: type, url, headers, description fields
+- Tool configuration: use, extra_params fields
+- Full parameter support for MCP and tools
+
+### Fixed
+
+#### Preview Window Flicker
+- Fixed flickering during agent execution by using CSS visibility instead of conditional rendering
+
+#### Markdown Download
+- Added download button in preview mode for markdown files
+- Download button uses proper blob URL to save content with correct filename
+
+#### Artifact Download Links
+- Fixed artifact links in markdown content (Streamdown rendered) to properly trigger downloads
+- Added ArtifactLinkContextProvider to pass threadId through React context
+- ArtifactLink now converts internal /mnt/... paths to proper download URLs
+
+### Changed
+
+#### Frontend Updates
+- File cards in chat messages are now clickable and trigger downloads
+- Image files open in new tab for preview
+- Non-image files download directly when clicked
+- Download icon added to file cards for visual feedback
+
 ## [1.1.0] - 2026-04-16
 
 ### Added
