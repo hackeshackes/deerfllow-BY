@@ -38,7 +38,7 @@ import { checkCodeFile, getFileName } from "@/core/utils/files";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
-import { ArtifactLink } from "../citations/artifact-link";
+import { ArtifactLink, ArtifactLinkContextProvider } from "../citations/artifact-link";
 import { useThread } from "../messages/context";
 import { Tooltip } from "../tooltip";
 
@@ -291,6 +291,7 @@ export function ArtifactFileDetail({
               isWriteFile={isWriteFile}
               language={language ?? "text"}
               url={url}
+              threadId={threadId}
             />
           </div>
         )}
@@ -304,23 +305,27 @@ export function ArtifactFilePreview({
   isWriteFile,
   language,
   url,
+  threadId,
 }: {
   content: string;
   isWriteFile: boolean;
   language: string;
   url?: string;
+  threadId: string;
 }) {
   if (language === "markdown") {
     return (
-      <div className="size-full px-4">
-        <Streamdown
-          className="size-full"
-          {...streamdownPlugins}
-          components={{ a: ArtifactLink }}
-        >
-          {content ?? ""}
-        </Streamdown>
-      </div>
+      <ArtifactLinkContextProvider threadId={threadId}>
+        <div className="size-full px-4">
+          <Streamdown
+            className="size-full"
+            {...streamdownPlugins}
+            components={{ a: ArtifactLink }}
+          >
+            {content ?? ""}
+          </Streamdown>
+        </div>
+      </ArtifactLinkContextProvider>
     );
   }
   if (language === "html") {
