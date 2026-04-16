@@ -1,5 +1,5 @@
 import type { Message } from "@langchain/langgraph-sdk";
-import { FileIcon, Loader2Icon } from "lucide-react";
+import { DownloadIcon, FileIcon, Loader2Icon } from "lucide-react";
 import { memo, useMemo, type ImgHTMLAttributes } from "react";
 import rehypeKatex from "rehype-katex";
 
@@ -17,7 +17,7 @@ import {
 } from "@/components/ai-elements/reasoning";
 import { Task, TaskTrigger } from "@/components/ai-elements/task";
 import { Badge } from "@/components/ui/badge";
-import { resolveArtifactURL } from "@/core/artifacts/utils";
+import { urlOfArtifact } from "@/core/artifacts/utils";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   extractContentFromMessage,
@@ -100,7 +100,7 @@ function MessageImage({
     return <img className={imgClassName} src={src} alt={alt} {...props} />;
   }
 
-  const url = src.startsWith("/mnt/") ? resolveArtifactURL(src, threadId) : src;
+  const url = src.startsWith("/mnt/") ? urlOfArtifact({ filepath: src, threadId }) : src;
 
   return (
     <a href={url} target="_blank" rel="noopener noreferrer">
@@ -342,18 +342,19 @@ function RichFileCard({
 
   if (!file.path) return null;
 
-  const fileUrl = resolveArtifactURL(file.path, threadId);
+  const fileUrl = urlOfArtifact({ filepath: file.path, threadId, download: true });
+  const previewUrl = urlOfArtifact({ filepath: file.path, threadId });
 
   if (isImage) {
     return (
       <a
-        href={fileUrl}
+        href={previewUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="group border-border/40 relative block overflow-hidden rounded-lg border"
       >
         <img
-          src={fileUrl}
+          src={previewUrl}
           alt={file.filename}
           className="h-32 w-auto max-w-60 object-cover transition-transform group-hover:scale-105"
         />
@@ -362,7 +363,12 @@ function RichFileCard({
   }
 
   return (
-    <div className="bg-background border-border/40 flex max-w-50 min-w-30 flex-col gap-1 rounded-lg border p-3 shadow-sm">
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group border-border/40 flex max-w-50 min-w-30 flex-col gap-1 rounded-lg border p-3 shadow-sm transition-opacity hover:opacity-80"
+    >
       <div className="flex items-start gap-2">
         <FileIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
         <span
@@ -371,6 +377,7 @@ function RichFileCard({
         >
           {file.filename}
         </span>
+        <DownloadIcon className="text-muted-foreground ml-auto size-3 shrink-0 opacity-60 group-hover:opacity-100" />
       </div>
       <div className="flex items-center justify-between gap-2">
         <Badge
@@ -383,7 +390,7 @@ function RichFileCard({
           {formatBytes(file.size)}
         </span>
       </div>
-    </div>
+    </a>
   );
 }
 
