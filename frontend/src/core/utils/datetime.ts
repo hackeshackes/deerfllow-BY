@@ -14,13 +14,29 @@ function getDateFnsLocale(locale: Locale) {
   }
 }
 
-export function formatTimeAgo(date: Date | string | number, locale?: Locale) {
+export function formatTimeAgo(date: Date | string | number | null | undefined, locale?: Locale) {
+  if (!date || date === "null" || date === "undefined") {
+    return "";
+  }
+
+  let parsedDate: Date;
+  if (typeof date === "string") {
+    parsedDate = new Date(date);
+  } else if (typeof date === "number") {
+    parsedDate = new Date(date);
+  } else {
+    parsedDate = date;
+  }
+
+  if (isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
   const effectiveLocale =
     locale ??
     (getLocaleFromCookie() as Locale | null) ??
-    // Fallback when cookie is missing (or on first render)
     detectLocale();
-  return formatDistanceToNow(date, {
+  return formatDistanceToNow(parsedDate, {
     addSuffix: true,
     locale: getDateFnsLocale(effectiveLocale),
   });
