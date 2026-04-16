@@ -30,6 +30,7 @@ export const zhCN: Translations = {
     more: "更多",
     search: "搜索",
     download: "下载",
+    downloadMarkdown: "下载为 Markdown",
     thinking: "思考",
     artifacts: "文件",
     public: "公共",
