@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { PauseIcon, PlayIcon, TrashIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   WorkspaceBody,
@@ -32,7 +26,6 @@ import {
   type UpdateTaskRequest,
 } from "@/core/tasks";
 import { formatTimeAgo } from "@/core/utils/datetime";
-import { PlayIcon, PauseIcon, TrashIcon } from "lucide-react";
 
 export default function TaskDetailPage() {
   const { t } = useI18n();
@@ -64,7 +57,7 @@ export default function TaskDetailPage() {
         setTask(taskData);
         setExecutions(executionsData);
         setName(taskData.name);
-        setDescription(taskData.description || "");
+        setDescription(taskData.description ?? "");
         setPromptTemplate(taskData.prompt_template);
       } catch (err) {
         console.error("Failed to load task:", err);
@@ -72,7 +65,7 @@ export default function TaskDetailPage() {
         setLoading(false);
       }
     };
-    loadData();
+    loadData().catch(console.error);
   }, [taskId]);
 
   const handleSave = async () => {
