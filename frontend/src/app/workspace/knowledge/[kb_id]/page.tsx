@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FileIcon, SearchIcon, TrashIcon, UploadIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,6 @@ import {
   type SearchResult,
 } from "@/core/knowledge";
 import { formatTimeAgo } from "@/core/utils/datetime";
-import { UploadIcon, SearchIcon, TrashIcon, FileIcon, RefreshCwIcon } from "lucide-react";
 
 export default function KnowledgeDetailPage() {
   const { t } = useI18n();
@@ -58,7 +58,7 @@ export default function KnowledgeDetailPage() {
         setLoading(false);
       }
     };
-    loadData();
+    loadData().catch(console.error);
   }, [kbId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -12,7 +13,6 @@ import {
 import { useI18n } from "@/core/i18n/hooks";
 import { loadTasks, type Task } from "@/core/tasks";
 import { formatTimeAgo } from "@/core/utils/datetime";
-import { PlusIcon } from "lucide-react";
 
 export default function TasksPage() {
   const { t } = useI18n();

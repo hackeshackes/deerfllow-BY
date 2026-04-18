@@ -1,5 +1,6 @@
 "use client";
 
+import { DatabaseIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -17,7 +18,6 @@ import {
   type KnowledgeBase,
 } from "@/core/knowledge";
 import { formatTimeAgo } from "@/core/utils/datetime";
-import { PlusIcon, DatabaseIcon } from "lucide-react";
 
 export default function KnowledgePage() {
   const { t } = useI18n();
