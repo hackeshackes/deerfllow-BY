@@ -19,12 +19,14 @@ from app.gateway.routers import (
     artifacts,
     assistants_compat,
     channels,
+    knowledge,
     mcp,
     memory,
     models,
     runs,
     skills,
     suggestions,
+    tasks,
     thread_runs,
     threads,
     uploads,
@@ -258,6 +260,12 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     app.include_router(agents.router)
 
     app.include_router(users.router)
+
+    # Tasks API is mounted at /api/tasks
+    app.include_router(tasks.router)
+
+    # Knowledge API is mounted at /api/knowledge
+    app.include_router(knowledge.router)
 
     # Suggestions API is mounted at /api/threads/{thread_id}/suggestions
     app.include_router(suggestions.router)

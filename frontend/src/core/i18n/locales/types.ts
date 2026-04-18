@@ -230,6 +230,81 @@ export interface Translations {
     failed: string;
   };
 
+  // Tasks (Scheduled Tasks)
+  tasks: {
+    pageTitle: string;
+    createTask: string;
+    empty: string;
+    activeTasks: string;
+    pausedTasks: string;
+    statusActive: string;
+    statusPaused: string;
+    nextRun: string;
+    lastRun: string;
+    triggerType: string;
+    cron: string;
+    interval: string;
+    oneTime: string;
+    name: string;
+    namePlaceholder: string;
+    description: string;
+    descriptionPlaceholder: string;
+    promptTemplate: string;
+    promptPlaceholder: string;
+    cronExpression: string;
+    cronPlaceholder: string;
+    intervalUnit: string;
+    minutes: string;
+    hours: string;
+    days: string;
+    timezone: string;
+    skills: string;
+    model: string;
+    notifications: string;
+    enableNotifications: string;
+    saveTask: string;
+    runNow: string;
+    pause: string;
+    resume: string;
+    delete: string;
+    deleteConfirm: string;
+    executions: string;
+    executionHistory: string;
+    noExecutions: string;
+    executionStatus: {
+      pending: string;
+      running: string;
+      success: string;
+      failed: string;
+    };
+  };
+
+  // Knowledge
+  knowledge: {
+    pageTitle: string;
+    createKnowledgeBase: string;
+    empty: string;
+    name: string;
+    namePlaceholder: string;
+    description: string;
+    descriptionPlaceholder: string;
+    documents: string;
+    uploadDocument: string;
+    upload: string;
+    delete: string;
+    deleteConfirm: string;
+    reindex: string;
+    search: string;
+    searchPlaceholder: string;
+    noDocuments: string;
+    noResults: string;
+    status: {
+      processing: string;
+      ready: string;
+      error: string;
+    };
+  };
+
   // Token Usage
   tokenUsage: {
     title: string;
