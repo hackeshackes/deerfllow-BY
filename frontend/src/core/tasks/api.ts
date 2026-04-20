@@ -38,6 +38,7 @@ export interface Task {
   last_run_at?: string;
   created_at: string;
   updated_at: string;
+  thread_id?: string;
 }
 
 export interface TaskExecution {

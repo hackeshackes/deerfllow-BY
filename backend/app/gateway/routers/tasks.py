@@ -342,8 +342,8 @@ async def _create_thread_for_task(request: Request, task_id: str, user) -> str |
         await checkpointer.aput(config, empty_checkpoint(), ckpt_metadata, {})
 
         try:
-            from langgraph_sdk.client import AsyncClient
-            lg_client = AsyncClient(url="http://langgraph:2024")
+            from langgraph_sdk.client import get_client
+            lg_client = get_client(url="http://langgraph:2024")
             await lg_client.threads.create(thread_id=thread_id, metadata=metadata, if_exists=None)
         except Exception:
             logger.debug("Failed to sync thread to LangGraph Server (non-critical)")
@@ -811,8 +811,8 @@ async def _execute_task_in_thread(
         pass
 
     try:
-        from langgraph_sdk.client import AsyncClient
-        lg_client = AsyncClient(url="http://langgraph:2024")
+        from langgraph_sdk.client import get_client
+        lg_client = get_client(url="http://langgraph:2024")
         await lg_client.threads.update(thread_id, metadata={"task_executed": str(time.time())})
     except Exception:
         logger.debug("Failed to sync thread after task execution (non-critical)")

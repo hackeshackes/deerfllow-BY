@@ -176,6 +176,7 @@ export const enUS: Translations = {
     recentChats: "Recent chats",
     demoChats: "Demo chats",
     agents: "Agents",
+    scheduledTasks: "Scheduled Tasks",
   },
 
   // Agents
