@@ -8,10 +8,12 @@ import type {
 } from "./api";
 import {
   createCustomSkill,
+  deleteCustomSkill,
   disableUserSkill,
   enableSkill,
   enableUserSkill,
   loadCustomSkills,
+  loadMyCustomSkills,
   loadSharedSkills,
   loadUserSkills,
   rateSkill,
@@ -162,6 +164,14 @@ export function useCustomSkills() {
   return { skills: data ?? [], isLoading, error };
 }
 
+export function useMyCustomSkills() {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["my-custom-skills"],
+    queryFn: () => loadMyCustomSkills(),
+  });
+  return { skills: data ?? [], isLoading, error, refetch };
+}
+
 export function useCreateCustomSkill() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -170,6 +180,21 @@ export function useCreateCustomSkill() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["custom-skills"] });
+      void queryClient.invalidateQueries({ queryKey: ["skills"] });
+      void queryClient.invalidateQueries({ queryKey: ["user-skills"] });
+    },
+  });
+}
+
+export function useDeleteCustomSkill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (skillName: string) => {
+      return deleteCustomSkill(skillName);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["custom-skills"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-custom-skills"] });
       void queryClient.invalidateQueries({ queryKey: ["skills"] });
       void queryClient.invalidateQueries({ queryKey: ["user-skills"] });
     },

@@ -11,9 +11,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_owner_user, require_user
-from deerflow.admin import SkillShare, get_visible_skills_for_user, save_skill_share
 from app.gateway.path_utils import resolve_thread_virtual_path
-from deerflow.admin import append_admin_audit_record, upsert_skill_metadata
+from deerflow.admin import SkillShare, append_admin_audit_record, get_visible_skills_for_user, get_skill_share, save_skill_share, upsert_skill_metadata
 from deerflow.agents.lead_agent.prompt import refresh_skills_system_prompt_cache_async
 from deerflow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
 from deerflow.skills import Skill, load_skills
@@ -380,6 +379,21 @@ async def list_custom_skills(request: Request) -> SkillsListResponse:
         raise HTTPException(status_code=500, detail=f"Failed to list custom skills: {str(e)}")
 
 
+@router.get("/skills/custom/mine", response_model=SkillsListResponse, summary="List My Custom Skills Only")
+async def list_my_custom_skills(request: Request) -> SkillsListResponse:
+    user = require_user(request)
+    try:
+        all_custom_skills = [skill for skill in load_skills(enabled_only=False) if skill.category == "custom"]
+        my_skills = [
+            s for s in all_custom_skills
+            if (share := get_skill_share(s.name)) and share.owner_id == user.id
+        ]
+        return SkillsListResponse(skills=[_skill_to_response(skill) for skill in my_skills])
+    except Exception as e:
+        logger.error("Failed to list my custom skills: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to list my custom skills: {str(e)}")
+
+
 @router.post("/skills/custom", response_model=CustomSkillContentResponse, status_code=201, summary="Create Custom Skill")
 async def create_custom_skill(request: CustomSkillCreateRequest, http_request: Request) -> CustomSkillContentResponse:
     user = require_owner_user(http_request)
@@ -484,9 +498,13 @@ async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest
 
 @router.delete("/skills/custom/{skill_name}", summary="Delete Custom Skill")
 async def delete_custom_skill(skill_name: str, request: Request) -> dict[str, bool]:
-    require_owner_user(request)
+    user = require_user(request)
+    from deerflow.admin import get_skill_share
     try:
         ensure_custom_skill_is_editable(skill_name)
+        skill_share = get_skill_share(skill_name)
+        if skill_share and skill_share.owner_id != user.id and not user.is_owner:
+            raise HTTPException(status_code=403, detail="Only the skill owner or admin can delete this skill")
         skill_dir = get_custom_skill_dir(skill_name)
         prev_content = read_custom_skill_content(skill_name)
         append_history(

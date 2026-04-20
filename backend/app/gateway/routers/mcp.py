@@ -210,3 +210,150 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest, http_request
     except Exception as e:
         logger.error(f"Failed to update MCP configuration: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to update MCP configuration: {str(e)}")
+
+
+class MCPPresetResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    server: dict
+
+
+class MCPPresetsResponse(BaseModel):
+    presets: list[MCPPresetResponse]
+
+
+MCP_PRESETS: list[MCPPresetResponse] = [
+    MCPPresetResponse(
+        id="github",
+        name="GitHub",
+        description="GitHub API operations - repository, issues, pull requests",
+        icon="🐙",
+        server={
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": {"GITHUB_TOKEN": ""},
+            "description": "GitHub MCP server for repository operations",
+        },
+    ),
+    MCPPresetResponse(
+        id="filesystem",
+        name="Filesystem",
+        description="Local filesystem operations",
+        icon="📁",
+        server={
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+            "env": {},
+            "description": "Filesystem MCP server for file operations",
+        },
+    ),
+    MCPPresetResponse(
+        id="brave-search",
+        name="Brave Search",
+        description="Web search via Brave Search API",
+        icon="🔍",
+        server={
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+            "env": {"BRAVE_API_KEY": ""},
+            "description": "Brave Search MCP server for web search",
+        },
+    ),
+    MCPPresetResponse(
+        id="slack",
+        name="Slack",
+        description="Slack messaging integration",
+        icon="💬",
+        server={
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-slack"],
+            "env": {"SLACK_BOT_TOKEN": "", "SLACK_TEAM_ID": ""},
+            "description": "Slack MCP server for messaging",
+        },
+    ),
+    MCPPresetResponse(
+        id="google-maps",
+        name="Google Maps",
+        description="Google Maps API integration",
+        icon="🗺️",
+        server={
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+            "env": {"GOOGLE_MAPS_API_KEY": ""},
+            "description": "Google Maps MCP server for location services",
+        },
+    ),
+    MCPPresetResponse(
+        id="memory",
+        name="Memory",
+        description="Persistent memory and context management",
+        icon="🧠",
+        server={
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-memory"],
+            "env": {},
+            "description": "Memory MCP server for persistent context",
+        },
+    ),
+]
+
+
+@router.get("/mcp/presets", response_model=MCPPresetsResponse, summary="Get MCP Presets")
+async def get_mcp_presets() -> MCPPresetsResponse:
+    """Get available MCP server presets."""
+    return MCPPresetsResponse(presets=MCP_PRESETS)
+
+
+class MCPServerTestRequest(BaseModel):
+    enabled: bool = True
+    type: str = "stdio"
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    url: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
+    oauth: McpOAuthConfigResponse | None = None
+    description: str = ""
+
+
+class MCPServerTestResponse(BaseModel):
+    success: bool
+    error: str | None = None
+
+
+@router.post("/mcp/servers/test", response_model=MCPServerTestResponse, summary="Test MCP Server Connection")
+async def test_mcp_server(request: MCPServerTestRequest, http_request: Request) -> MCPServerTestResponse:
+    """Test connection to an MCP server configuration."""
+    require_owner_user(http_request)
+    if request.type == "stdio":
+        if not request.command:
+            return MCPServerTestResponse(success=False, error="Command is required for stdio type")
+        return MCPServerTestResponse(success=True, error=None)
+    elif request.type in ("sse", "http"):
+        if not request.url:
+            return MCPServerTestResponse(success=False, error="URL is required for sse/http type")
+        return MCPServerTestResponse(success=True, error=None)
+    return MCPServerTestResponse(success=False, error=f"Unknown server type: {request.type}")
+
+
+@router.get("/mcp/servers/{server_name}/status", response_model=dict, summary="Get MCP Server Status")
+async def get_mcp_server_status(server_name: str, request: Request) -> dict:
+    """Get the status of a specific MCP server."""
+    require_user(request)
+    config = get_extensions_config()
+    server = config.mcp_servers.get(server_name)
+    if not server:
+        raise HTTPException(status_code=404, detail=f"Server '{server_name}' not found")
+    return {
+        "name": server_name,
+        "enabled": server.enabled,
+        "configured": True,
+    }

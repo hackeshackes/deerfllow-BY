@@ -2,7 +2,6 @@ import type { AnchorHTMLAttributes } from "react";
 import { createContext, useContext } from "react";
 
 import { urlOfArtifact } from "@/core/artifacts/utils";
-
 import { cn } from "@/lib/utils";
 
 import { CitationLink } from "./citation-link";

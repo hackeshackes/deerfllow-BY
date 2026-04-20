@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-20
+
+### Added
+
+#### Scheduled Tasks (定时任务)
+- Task CRUD operations with SQLite persistence
+- Trigger types: Cron expressions and Interval (minutes/hours/days)
+- One-time task support
+- Task execution with LangGraph integration
+- Execution history with result summary (完整 AI 响应)
+- Pause/Resume task controls
+- Task sharing between users
+
+#### Knowledge Base (知识库)
+- RAG-based knowledge management system
+- Document upload and processing
+- Vector storage with embedding support
+- Knowledge retrieval in agent context
+- Web content extraction (jina.ai)
+- Knowledge base CRUD operations
+
+#### IM Channels Configuration (IM 渠道配置)
+- 飞书 (Feishu) integration
+- Slack integration with Socket Mode support
+- Telegram Bot integration
+- 企业微信 (WeCom) integration
+- 钉钉 (DingTalk) integration (NEW)
+- Channel enable/disable controls
+- Channel restart functionality
+- Admin UI for channel management at `/workspace/admin/models/mcp/channels`
+
+#### Navigation Restructuring
+- MCP Configuration moved to Admin Console
+- IM Channels moved to Admin Console
+- Consistent admin navigation structure
+- User Settings dropdown cleanup
+
+### Fixed
+
+#### Bug Fixes
+- nginx routing for `/api/tasks` and `/api/knowledge` endpoints
+- nginx routing for `/api/channels` endpoint (trailing slash handling)
+- TypeScript type errors in channels-admin-page.tsx
+- TypeScript type errors in mcp-admin-page.tsx
+- useMyCustomSkills hook missing refetch return value
+- Scheduled tasks datetime.UTC alias compatibility
+- Skills custom endpoint 403 permission error
+- Cron expression user guidance with examples
+
+### Changed
+
+#### Backend
+- Added `tasks` and `knowledge` to router exports
+- Updated channel models with new field types
+- Fixed _get_skill_shares import issues
+- Enhanced task execution with result summary
+
+#### Frontend
+- Enhanced task detail page with trigger editing
+- Added cron guidance i18n strings
+- Fixed nullish coalescing operator usage
+- Improved channel configuration UI
+
+## [1.3.0] - 2026-04-19
+
+### Added
+
+#### Scheduled Tasks System
+- Task creation with prompt templates
+- Cron and interval trigger configuration
+- Task pause/resume functionality
+- Task execution via "Run Now" button
+- Task sharing between users
+
+#### Knowledge Base
+- RAG knowledge management
+- Document embedding and retrieval
+- Web content extraction
+
+### Changed
+
+#### Backend
+- Task router with SQLite persistence
+- Knowledge router with vector storage
+- Channel service improvements
+
 ## [1.2.0] - 2026-04-17
 
 ### Added

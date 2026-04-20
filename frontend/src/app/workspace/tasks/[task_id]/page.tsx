@@ -1,11 +1,18 @@
 "use client";
 
-import { PauseIcon, PlayIcon, TrashIcon } from "lucide-react";
+import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   WorkspaceBody,
@@ -43,6 +50,12 @@ export default function TaskDetailPage() {
   const [description, setDescription] = useState("");
   const [promptTemplate, setPromptTemplate] = useState("");
 
+  const [editingTrigger, setEditingTrigger] = useState(false);
+  const [triggerType, setTriggerType] = useState<string>("cron");
+  const [cronExpression, setCronExpression] = useState("0 9 * * *");
+  const [intervalValue, setIntervalValue] = useState(1);
+  const [intervalUnit, setIntervalUnit] = useState("days");
+
   useEffect(() => {
     document.title = task ? `${task.name} - ${t.tasks.pageTitle}` : t.tasks.pageTitle;
   }, [task, t.tasks.pageTitle]);
@@ -59,6 +72,21 @@ export default function TaskDetailPage() {
         setName(taskData.name);
         setDescription(taskData.description ?? "");
         setPromptTemplate(taskData.prompt_template);
+        setTriggerType(taskData.trigger_type);
+        if (taskData.trigger_type === "cron") {
+          setCronExpression(taskData.trigger_config.cron ?? "0 9 * * *");
+        } else if (taskData.trigger_type === "interval") {
+          if (taskData.trigger_config.interval_days) {
+            setIntervalValue(taskData.trigger_config.interval_days);
+            setIntervalUnit("days");
+          } else if (taskData.trigger_config.interval_hours) {
+            setIntervalValue(taskData.trigger_config.interval_hours);
+            setIntervalUnit("hours");
+          } else if (taskData.trigger_config.interval_minutes) {
+            setIntervalValue(taskData.trigger_config.interval_minutes);
+            setIntervalUnit("minutes");
+          }
+        }
       } catch (err) {
         console.error("Failed to load task:", err);
       } finally {
@@ -82,6 +110,29 @@ export default function TaskDetailPage() {
       setTask(updated);
     } catch (err) {
       console.error("Failed to update task:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveTrigger = async () => {
+    setSaving(true);
+    try {
+      const request: UpdateTaskRequest = {
+        trigger_type: triggerType,
+        trigger_config: {
+          cron: triggerType === "cron" ? cronExpression : undefined,
+          interval_days: triggerType === "interval" && intervalUnit === "days" ? intervalValue : undefined,
+          interval_hours: triggerType === "interval" && intervalUnit === "hours" ? intervalValue : undefined,
+          interval_minutes: triggerType === "interval" && intervalUnit === "minutes" ? intervalValue : undefined,
+          timezone: "Asia/Shanghai",
+        },
+      };
+      const updated = await updateTask(taskId, request);
+      setTask(updated);
+      setEditingTrigger(false);
+    } catch (err) {
+      console.error("Failed to update trigger:", err);
     } finally {
       setSaving(false);
     }
@@ -204,16 +255,88 @@ export default function TaskDetailPage() {
               </div>
 
               <div className="rounded-lg border p-4">
-                <h3 className="font-medium mb-2">{t.tasks.triggerType}</h3>
-                <div className="text-sm text-muted-foreground">
-                  {task.trigger_type === "cron" && `Cron: ${task.trigger_config.cron}`}
-                  {task.trigger_type === "interval" && `Interval: ${JSON.stringify(task.trigger_config)}`}
-                  {task.trigger_type === "one_time" && "One time"}
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium">{t.tasks.triggerType}</h3>
+                  {!editingTrigger && (
+                    <Button size="sm" variant="ghost" onClick={() => setEditingTrigger(true)}>
+                      <EditIcon className="size-4 mr-1" />
+                      {t.common.edit}
+                    </Button>
+                  )}
                 </div>
-                {task.next_run_at && (
-                  <div className="text-sm mt-1">
-                    {t.tasks.nextRun}: {formatTimeAgo(task.next_run_at)}
+
+                {editingTrigger ? (
+                  <div className="space-y-4">
+                    <Select value={triggerType} onValueChange={setTriggerType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cron">{t.tasks.cron}</SelectItem>
+                        <SelectItem value="interval">{t.tasks.interval}</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {triggerType === "cron" && (
+                      <div className="space-y-2">
+                        <Input
+                          value={cronExpression}
+                          onChange={(e) => setCronExpression(e.target.value)}
+                          placeholder={t.tasks.cronPlaceholder}
+                        />
+                        <p className="text-muted-foreground text-sm">
+                          {t.tasks.cronGuidance}
+                        </p>
+                      </div>
+                    )}
+
+                    {triggerType === "interval" && (
+                      <div className="flex gap-4">
+                        <div className="flex-1 space-y-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={intervalValue}
+                            onChange={(e) => setIntervalValue(parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <Select value={intervalUnit} onValueChange={setIntervalUnit}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="minutes">{t.tasks.minutes}</SelectItem>
+                              <SelectItem value="hours">{t.tasks.hours}</SelectItem>
+                              <SelectItem value="days">{t.tasks.days}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveTrigger} disabled={saving}>
+                        {saving ? t.common.loading : t.common.save}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingTrigger(false)}>
+                        {t.common.cancel}
+                      </Button>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <div className="text-sm text-muted-foreground">
+                      {task.trigger_type === "cron" && `Cron: ${task.trigger_config.cron}`}
+                      {task.trigger_type === "interval" && `Interval: ${task.trigger_config.interval_days ? `${task.trigger_config.interval_days} days` : task.trigger_config.interval_hours ? `${task.trigger_config.interval_hours} hours` : task.trigger_config.interval_minutes ? `${task.trigger_config.interval_minutes} minutes` : "Interval"}`}
+                      {task.trigger_type === "one_time" && "One time"}
+                    </div>
+                    {task.next_run_at && (
+                      <div className="text-sm mt-1">
+                        {t.tasks.nextRun}: {formatTimeAgo(task.next_run_at)}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -260,7 +383,7 @@ export default function TaskDetailPage() {
                           )}
                         </div>
                         {exec.result_summary && (
-                          <p className="mt-2 text-sm">{exec.result_summary}</p>
+                          <div className="mt-2 text-sm whitespace-pre-wrap">{exec.result_summary}</div>
                         )}
                         {exec.error_message && (
                           <p className="mt-2 text-sm text-destructive">{exec.error_message}</p>

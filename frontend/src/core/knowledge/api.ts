@@ -3,12 +3,15 @@ import { getBackendBaseURL } from "@/core/config";
 export interface KnowledgeBase {
   id: string;
   user_id: string;
+  workspace_id?: string;
+  visibility: string;
   name: string;
   description?: string;
   embedding_model: string;
   document_count: number;
   created_at: string;
   updated_at: string;
+  shared_to: string[];
 }
 
 export interface Document {
@@ -138,4 +141,39 @@ export async function searchKnowledgeBase(
     body: JSON.stringify({ query, top_k: topK, similarity_threshold: similarityThreshold }),
   });
   return response.json();
+}
+
+export interface ShareResponse {
+  id: string;
+  knowledge_base_id: string;
+  target_workspace_id: string;
+  permission: string;
+  shared_by: string;
+  shared_at: string;
+}
+
+export async function shareKnowledgeBase(
+  kbId: string,
+  targetWorkspaceId: string,
+  permission = "read"
+): Promise<ShareResponse> {
+  const response = await fetch(`${getBackendBaseURL()}/api/knowledge/${kbId}/share`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_workspace_id: targetWorkspaceId, permission }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail ?? `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function unshareKnowledgeBase(
+  kbId: string,
+  shareId: string
+): Promise<void> {
+  await fetch(`${getBackendBaseURL()}/api/knowledge/${kbId}/share/${shareId}`, {
+    method: "DELETE",
+  });
 }
