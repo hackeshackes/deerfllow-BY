@@ -51,6 +51,13 @@ sandbox_image_cache.tar
 # ignore the legacy `web` folder
 web/
 
+# Database files
+*.db
+*.sqlite
+*.sqlite-journal
+backend/app/gateway/data/
+frontend/prisma/db.sqlite
+
 # Deployment artifacts
 backend/Dockerfile.langgraph
 config.yaml.bak
