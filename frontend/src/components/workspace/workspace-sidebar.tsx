@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { RecentChatList } from "./recent-chat-list";
+import { ScheduledTasksList } from "./scheduled-tasks-list";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceNavChatList } from "./workspace-nav-chat-list";
 import { WorkspaceNavMenu } from "./workspace-nav-menu";
@@ -34,6 +35,7 @@ export function WorkspaceSidebar({
         <SidebarContent>
           <WorkspaceNavChatList />
           {isSidebarOpen && <RecentChatList />}
+          {isSidebarOpen && <ScheduledTasksList />}
         </SidebarContent>
         <SidebarFooter>
           <WorkspaceNavMenu

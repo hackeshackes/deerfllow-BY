@@ -120,6 +120,7 @@ export interface Translations {
     chats: string;
     demoChats: string;
     agents: string;
+    scheduledTasks: string;
   };
 
   // Agents

@@ -1,6 +1,7 @@
 "use client";
 
-import { EditIcon, PauseIcon, PlayIcon, TrashIcon } from "lucide-react";
+import { EditIcon, MessageCircle, PauseIcon, PlayIcon, TrashIcon } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -206,6 +207,14 @@ export default function TaskDetailPage() {
     <WorkspaceContainer>
       <WorkspaceHeader>
         <div className="flex gap-2">
+          {task.thread_id && (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/workspace/chats/${task.thread_id}`}>
+                <MessageCircle className="size-4 mr-1" />
+                查看对话
+              </Link>
+            </Button>
+          )}
           {task.status === "active" ? (
             <Button size="sm" variant="outline" onClick={handlePause}>
               <PauseIcon className="size-4 mr-1" />
