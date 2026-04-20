@@ -53,6 +53,7 @@ def _init_db() -> None:
                 status TEXT DEFAULT 'active',
                 next_run_at TEXT,
                 last_run_at TEXT,
+                thread_id TEXT,
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL
             );
@@ -82,7 +83,12 @@ def _init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_task_executions_task_id ON task_executions(task_id);
             CREATE INDEX IF NOT EXISTS idx_task_shares_task_id ON task_shares(task_id);
         """)
-        conn.commit()
+        # Migration: add thread_id column if it doesn't exist (for existing databases)
+        try:
+            conn.execute("ALTER TABLE tasks ADD COLUMN thread_id TEXT")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
         conn.close()
 
 
@@ -160,6 +166,7 @@ class TaskResponse(BaseModel):
     created_at: str
     updated_at: str
     shared_to: list[str] = []
+    thread_id: str | None = None
 
 
 class TaskExecutionResponse(BaseModel):
@@ -201,6 +208,7 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
         "status": row["status"],
         "next_run_at": row["next_run_at"],
         "last_run_at": row["last_run_at"],
+        "thread_id": row["thread_id"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -297,7 +305,54 @@ def _task_response_from_row(row: sqlite3.Row) -> TaskResponse:
         created_at=str(task["created_at"]),
         updated_at=str(task["updated_at"]),
         shared_to=_get_task_shares(task["id"]),
+        thread_id=task.get("thread_id"),
     )
+
+
+async def _create_thread_for_task(request: Request, task_id: str, user) -> str | None:
+    try:
+        from langgraph.checkpoint.base import empty_checkpoint
+
+        from app.gateway.deps import get_checkpointer, get_store
+        from app.gateway.ownership import attach_owner_metadata
+        from app.gateway.routers.threads import _store_upsert
+
+        store = get_store(request)
+        checkpointer = get_checkpointer(request)
+        if store is None or checkpointer is None:
+            logger.warning("Store or checkpointer not available, cannot create thread for task")
+            return None
+
+        thread_id = str(uuid.uuid4())
+        now = time.time()
+        metadata = attach_owner_metadata({"task_id": task_id, "visibility": "workspace"}, user)
+
+        if store is not None:
+            await _store_upsert(store, thread_id, metadata=metadata)
+
+        config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+        ckpt_metadata = {
+            "step": -1,
+            "source": "input",
+            "writes": None,
+            "parents": {},
+            **metadata,
+            "created_at": now,
+        }
+        await checkpointer.aput(config, empty_checkpoint(), ckpt_metadata, {})
+
+        try:
+            from langgraph_sdk.client import AsyncClient
+            lg_client = AsyncClient(url="http://langgraph:2024")
+            await lg_client.threads.create(thread_id=thread_id, metadata=metadata, if_exists=None)
+        except Exception:
+            logger.debug("Failed to sync thread to LangGraph Server (non-critical)")
+
+        logger.info(f"Thread created for task {task_id}: {thread_id}")
+        return thread_id
+    except Exception:
+        logger.exception(f"Failed to create thread for task {task_id}")
+        return None
 
 
 @router.post("", response_model=TaskResponse)
@@ -309,13 +364,15 @@ async def create_task(body: TaskCreateRequest, request: Request) -> TaskResponse
     task_id = str(uuid.uuid4())
     now = time.time()
 
+    thread_id = await _create_thread_for_task(request, task_id, user)
+
     conn = _get_db()
     try:
         conn.execute(
             """INSERT INTO tasks (id, user_id, workspace_id, visibility, name, description,
                 trigger_type, trigger_config, prompt_template, model_name, skill_names,
-                notification_config, output_config, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                notification_config, output_config, status, thread_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 task_id,
                 user.id,
@@ -331,6 +388,7 @@ async def create_task(body: TaskCreateRequest, request: Request) -> TaskResponse
                 json.dumps(body.notification_config.model_dump()),
                 json.dumps(body.output_config.model_dump()),
                 "active",
+                thread_id,
                 now,
                 now,
             ),
@@ -571,7 +629,15 @@ async def run_task_now(task_id: str, request: Request) -> TaskExecutionResponse:
         )
         conn.commit()
 
-        thread_id = str(uuid.uuid4())
+        thread_id = task.get("thread_id")
+        if not thread_id:
+            thread_id = await _create_thread_for_task(request, task_id, user)
+            if thread_id:
+                conn.execute("UPDATE tasks SET thread_id = ? WHERE id = ?", (thread_id, task_id))
+                conn.commit()
+
+        if not thread_id:
+            raise HTTPException(status_code=500, detail="Failed to create or get thread for task execution")
 
         try:
             result_data = await _execute_task_in_thread(
@@ -743,6 +809,13 @@ async def _execute_task_in_thread(
                 return {"result_summary": ai_responses[-1], "error_message": None}
     except Exception:
         pass
+
+    try:
+        from langgraph_sdk.client import AsyncClient
+        lg_client = AsyncClient(url="http://langgraph:2024")
+        await lg_client.threads.update(thread_id, metadata={"task_executed": str(time.time())})
+    except Exception:
+        logger.debug("Failed to sync thread after task execution (non-critical)")
 
     return {"result_summary": "Task completed", "error_message": None}
 
