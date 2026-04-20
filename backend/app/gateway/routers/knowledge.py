@@ -1,19 +1,94 @@
-"""Knowledge Base API - RAG knowledge management."""
+"""Knowledge Base API - RAG knowledge management with SQLite persistence."""
 
 from __future__ import annotations
 
+import json
 import logging
+import sqlite3
+import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_user
+from app.gateway.auth_context import get_current_workspace_id
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+
+_db_path = Path(__file__).parent.parent / "data" / "knowledge.db"
+_db_lock = threading.Lock()
+
+
+def _get_db() -> sqlite3.Connection:
+    _db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(_db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_db() -> None:
+    with _db_lock:
+        conn = _get_db()
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS knowledge_bases (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                workspace_id TEXT,
+                visibility TEXT DEFAULT 'private',
+                name TEXT NOT NULL,
+                description TEXT,
+                embedding_model TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS documents (
+                id TEXT PRIMARY KEY,
+                knowledge_base_id TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                storage_path TEXT,
+                status TEXT NOT NULL,
+                chunk_count INTEGER DEFAULT 0,
+                token_count INTEGER DEFAULT 0,
+                uploaded_at REAL NOT NULL,
+                processed_at REAL,
+                FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS document_chunks (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                embedding BLOB,
+                metadata TEXT DEFAULT '{}',
+                chunk_index INTEGER DEFAULT 0,
+                FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_shares (
+                id TEXT PRIMARY KEY,
+                knowledge_base_id TEXT NOT NULL,
+                target_workspace_id TEXT NOT NULL,
+                permission TEXT DEFAULT 'read',
+                shared_by TEXT NOT NULL,
+                shared_at REAL NOT NULL,
+                FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE,
+                UNIQUE(knowledge_base_id, target_workspace_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_kb_user_id ON knowledge_bases(user_id);
+            CREATE INDEX IF NOT EXISTS idx_documents_kb_id ON documents(knowledge_base_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON document_chunks(document_id);
+            CREATE INDEX IF NOT EXISTS idx_kb_shares_kb_id ON knowledge_shares(knowledge_base_id);
+        """)
+        conn.commit()
+        conn.close()
+
+
+_init_db()
 
 
 class KnowledgeBaseCreate(BaseModel):
@@ -30,12 +105,29 @@ class KnowledgeBaseUpdate(BaseModel):
 class KnowledgeBaseResponse(BaseModel):
     id: str
     user_id: str
+    workspace_id: str | None = None
+    visibility: str = "private"
     name: str
     description: str | None = None
     embedding_model: str
     document_count: int = 0
     created_at: str
     updated_at: str
+    shared_to: list[str] = []
+
+
+class KnowledgeShareRequest(BaseModel):
+    target_workspace_id: str
+    permission: str = "read"
+
+
+class ShareResponse(BaseModel):
+    id: str
+    knowledge_base_id: str
+    target_workspace_id: str
+    permission: str
+    shared_by: str
+    shared_at: str
 
 
 class DocumentResponse(BaseModel):
@@ -71,9 +163,28 @@ class SearchResponse(BaseModel):
     knowledge_base_id: str
 
 
-_knowledge_bases: dict[str, dict] = {}
-_documents: dict[str, dict] = {}
-_document_chunks: dict[str, list[dict]] = {}
+def _get_kb_shares(kb_id: str) -> list[str]:
+    conn = _get_db()
+    try:
+        cursor = conn.execute(
+            "SELECT target_workspace_id FROM knowledge_shares WHERE knowledge_base_id = ?",
+            (kb_id,),
+        )
+        return [row["target_workspace_id"] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def _is_kb_shared_to_workspace(kb_id: str, workspace_id: str) -> bool:
+    conn = _get_db()
+    try:
+        cursor = conn.execute(
+            "SELECT 1 FROM knowledge_shares WHERE knowledge_base_id = ? AND target_workspace_id = ?",
+            (kb_id, workspace_id),
+        )
+        return cursor.fetchone() is not None
+    finally:
+        conn.close()
 
 
 def _calculate_embedding(text: str) -> list[float]:
@@ -84,297 +195,458 @@ def _calculate_similarity(embedding1: list[float], embedding2: list[float]) -> f
     return 0.85
 
 
+def _kb_response_from_row(row: sqlite3.Row, conn: sqlite3.Connection) -> KnowledgeBaseResponse:
+    kb_id = row["id"]
+    cursor = conn.execute("SELECT COUNT(*) as cnt FROM documents WHERE knowledge_base_id = ?", (kb_id,))
+    doc_count = cursor.fetchone()["cnt"]
+
+    return KnowledgeBaseResponse(
+        id=row["id"],
+        user_id=row["user_id"],
+        workspace_id=row["workspace_id"],
+        visibility=row["visibility"],
+        name=row["name"],
+        description=row["description"],
+        embedding_model=row["embedding_model"],
+        document_count=doc_count,
+        created_at=str(row["created_at"]),
+        updated_at=str(row["updated_at"]),
+        shared_to=_get_kb_shares(kb_id),
+    )
+
+
 @router.post("", response_model=KnowledgeBaseResponse)
 async def create_knowledge_base(body: KnowledgeBaseCreate, request: Request) -> KnowledgeBaseResponse:
     user = require_user(request)
+    workspace_id = get_current_workspace_id()
 
     kb_id = str(uuid.uuid4())
     now = time.time()
 
-    kb = {
-        "id": kb_id,
-        "user_id": user.id,
-        "name": body.name,
-        "description": body.description,
-        "embedding_model": body.embedding_model,
-        "created_at": now,
-        "updated_at": now,
-    }
-    _knowledge_bases[kb_id] = kb
-    logger.info(f"Knowledge base created: {kb_id} by user {user.id}")
+    conn = _get_db()
+    try:
+        conn.execute(
+            """INSERT INTO knowledge_bases
+                (id, user_id, workspace_id, visibility, name, description, embedding_model, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                kb_id,
+                user.id,
+                workspace_id,
+                "private",
+                body.name,
+                body.description,
+                body.embedding_model,
+                now,
+                now,
+            ),
+        )
+        conn.commit()
 
-    return KnowledgeBaseResponse(
-        id=kb["id"],
-        user_id=kb["user_id"],
-        name=kb["name"],
-        description=kb["description"],
-        embedding_model=kb["embedding_model"],
-        document_count=0,
-        created_at=str(kb["created_at"]),
-        updated_at=str(kb["updated_at"]),
-    )
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+        logger.info(f"Knowledge base created: {kb_id} by user {user.id} in workspace {workspace_id}")
+        return _kb_response_from_row(row, conn)
+    finally:
+        conn.close()
 
 
 @router.get("", response_model=list[KnowledgeBaseResponse])
 async def list_knowledge_bases(request: Request) -> list[KnowledgeBaseResponse]:
     user = require_user(request)
-    result = []
-    for kb in _knowledge_bases.values():
-        if kb["user_id"] == user.id:
-            doc_count = sum(1 for d in _documents.values() if d["knowledge_base_id"] == kb["id"])
-            result.append(
-                KnowledgeBaseResponse(
-                    id=kb["id"],
-                    user_id=kb["user_id"],
-                    name=kb["name"],
-                    description=kb["description"],
-                    embedding_model=kb["embedding_model"],
-                    document_count=doc_count,
-                    created_at=str(kb["created_at"]),
-                    updated_at=str(kb["updated_at"]),
-                )
-            )
-    result.sort(key=lambda x: x.updated_at, reverse=True)
-    return result
+    workspace_id = get_current_workspace_id()
+
+    conn = _get_db()
+    try:
+        cursor = conn.execute(
+            """SELECT * FROM knowledge_bases WHERE user_id = ? OR id IN
+                (SELECT knowledge_base_id FROM knowledge_shares WHERE target_workspace_id = ?)
+            ORDER BY updated_at DESC""",
+            (user.id, workspace_id),
+        )
+        rows = cursor.fetchall()
+        return [_kb_response_from_row(row, conn) for row in rows]
+    finally:
+        conn.close()
 
 
 @router.get("/{kb_id}", response_model=KnowledgeBaseResponse)
 async def get_knowledge_base(kb_id: str, request: Request) -> KnowledgeBaseResponse:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+    workspace_id = get_current_workspace_id()
 
-    doc_count = sum(1 for d in _documents.values() if d["knowledge_base_id"] == kb_id)
-    return KnowledgeBaseResponse(
-        id=kb["id"],
-        user_id=kb["user_id"],
-        name=kb["name"],
-        description=kb["description"],
-        embedding_model=kb["embedding_model"],
-        document_count=doc_count,
-        created_at=str(kb["created_at"]),
-        updated_at=str(kb["updated_at"]),
-    )
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb["user_id"] != user.id:
+            if not (workspace_id and _is_kb_shared_to_workspace(kb_id, workspace_id)):
+                raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        return _kb_response_from_row(row, conn)
+    finally:
+        conn.close()
 
 
 @router.put("/{kb_id}", response_model=KnowledgeBaseResponse)
 async def update_knowledge_base(kb_id: str, body: KnowledgeBaseUpdate, request: Request) -> KnowledgeBaseResponse:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    if body.name is not None:
-        kb["name"] = body.name
-    if body.description is not None:
-        kb["description"] = body.description
-    kb["updated_at"] = time.time()
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
 
-    doc_count = sum(1 for d in _documents.values() if d["knowledge_base_id"] == kb_id)
-    return KnowledgeBaseResponse(
-        id=kb["id"],
-        user_id=kb["user_id"],
-        name=kb["name"],
-        description=kb["description"],
-        embedding_model=kb["embedding_model"],
-        document_count=doc_count,
-        created_at=str(kb["created_at"]),
-        updated_at=str(kb["updated_at"]),
-    )
+        if not row or row["user_id"] != user.id:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        now = time.time()
+        updates = []
+        params = []
+
+        if body.name is not None:
+            updates.append("name = ?")
+            params.append(body.name)
+        if body.description is not None:
+            updates.append("description = ?")
+            params.append(body.description)
+
+        updates.append("updated_at = ?")
+        params.append(now)
+        params.append(kb_id)
+
+        conn.execute(f"UPDATE knowledge_bases SET {', '.join(updates)} WHERE id = ?", params)
+        conn.commit()
+
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+        return _kb_response_from_row(row, conn)
+    finally:
+        conn.close()
 
 
 @router.delete("/{kb_id}")
 async def delete_knowledge_base(kb_id: str, request: Request) -> dict:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    for doc_id in list(_documents.keys()):
-        if _documents[doc_id]["knowledge_base_id"] == kb_id:
-            del _documents[doc_id]
-            if doc_id in _document_chunks:
-                del _document_chunks[doc_id]
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
 
-    del _knowledge_bases[kb_id]
-    logger.info(f"Knowledge base deleted: {kb_id}")
-    return {"success": True, "message": f"Knowledge base {kb_id} deleted"}
+        if not row or row["user_id"] != user.id:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        conn.execute("DELETE FROM knowledge_shares WHERE knowledge_base_id = ?", (kb_id,))
+        cursor = conn.execute("SELECT id FROM documents WHERE knowledge_base_id = ?", (kb_id,))
+        for doc_row in cursor.fetchall():
+            doc_id = doc_row["id"]
+            conn.execute("DELETE FROM document_chunks WHERE document_id = ?", (doc_id,))
+        conn.execute("DELETE FROM documents WHERE knowledge_base_id = ?", (kb_id,))
+        conn.execute("DELETE FROM knowledge_bases WHERE id = ?", (kb_id,))
+        conn.commit()
+
+        logger.info(f"Knowledge base deleted: {kb_id}")
+        return {"success": True, "message": f"Knowledge base {kb_id} deleted"}
+    finally:
+        conn.close()
 
 
 @router.post("/{kb_id}/documents", response_model=DocumentResponse)
 async def upload_document(kb_id: str, request: Request, file: UploadFile = File(...)) -> DocumentResponse:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    doc_id = str(uuid.uuid4())
-    now = time.time()
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
 
-    file_type = file.filename.split(".")[-1].lower() if file.filename else "unknown"
-    allowed_types = ["pdf", "docx", "txt", "md", "csv"]
-    if file_type not in allowed_types:
-        raise HTTPException(status_code=422, detail=f"File type {file_type} not supported. Allowed: {allowed_types}")
+        if not row or row["user_id"] != user.id:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    content = await file.read()
-    file_size = len(content)
+        doc_id = str(uuid.uuid4())
+        now = time.time()
 
-    doc = {
-        "id": doc_id,
-        "knowledge_base_id": kb_id,
-        "original_name": file.filename or "unknown",
-        "file_type": file_type,
-        "file_size": file_size,
-        "storage_path": f"/mnt/user-data/knowledge/{kb_id}/{doc_id}/{file.filename}",
-        "status": "processing",
-        "chunk_count": 0,
-        "token_count": 0,
-        "uploaded_at": now,
-        "processed_at": None,
-    }
-    _documents[doc_id] = doc
-    _document_chunks[doc_id] = []
+        file_type = file.filename.split(".")[-1].lower() if file.filename else "unknown"
+        allowed_types = ["pdf", "docx", "txt", "md", "csv"]
+        if file_type not in allowed_types:
+            raise HTTPException(status_code=422, detail=f"File type {file_type} not supported. Allowed: {allowed_types}")
 
-    logger.info(f"Document uploaded: {doc_id} to knowledge base {kb_id}")
+        content = await file.read()
+        file_size = len(content)
 
-    doc["status"] = "ready"
-    doc["processed_at"] = time.time()
+        conn.execute(
+            """INSERT INTO documents
+                (id, knowledge_base_id, original_name, file_type, file_size, storage_path, status, uploaded_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                doc_id,
+                kb_id,
+                file.filename or "unknown",
+                file_type,
+                file_size,
+                f"/mnt/user-data/knowledge/{kb_id}/{doc_id}/{file.filename}",
+                "ready",
+                now,
+            ),
+        )
+        conn.commit()
 
-    return DocumentResponse(
-        id=doc["id"],
-        knowledge_base_id=doc["knowledge_base_id"],
-        original_name=doc["original_name"],
-        file_type=doc["file_type"],
-        file_size=doc["file_size"],
-        status=doc["status"],
-        chunk_count=doc["chunk_count"],
-        token_count=doc["token_count"],
-        uploaded_at=str(doc["uploaded_at"]),
-        processed_at=str(doc["processed_at"]) if doc["processed_at"] else None,
-    )
+        logger.info(f"Document uploaded: {doc_id} to knowledge base {kb_id}")
+        return DocumentResponse(
+            id=doc_id,
+            knowledge_base_id=kb_id,
+            original_name=file.filename or "unknown",
+            file_type=file_type,
+            file_size=file_size,
+            status="ready",
+            chunk_count=0,
+            token_count=0,
+            uploaded_at=str(now),
+            processed_at=str(now),
+        )
+    finally:
+        conn.close()
 
 
 @router.get("/{kb_id}/documents", response_model=list[DocumentResponse])
 async def list_documents(kb_id: str, request: Request) -> list[DocumentResponse]:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+    workspace_id = get_current_workspace_id()
 
-    result = []
-    for doc in _documents.values():
-        if doc["knowledge_base_id"] == kb_id:
-            result.append(
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb["user_id"] != user.id:
+            if not (workspace_id and _is_kb_shared_to_workspace(kb_id, workspace_id)):
+                raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        cursor = conn.execute(
+            "SELECT * FROM documents WHERE knowledge_base_id = ? ORDER BY uploaded_at DESC",
+            (kb_id,),
+        )
+        docs = []
+        for doc_row in cursor.fetchall():
+            docs.append(
                 DocumentResponse(
-                    id=doc["id"],
-                    knowledge_base_id=doc["knowledge_base_id"],
-                    original_name=doc["original_name"],
-                    file_type=doc["file_type"],
-                    file_size=doc["file_size"],
-                    status=doc["status"],
-                    chunk_count=doc["chunk_count"],
-                    token_count=doc["token_count"],
-                    uploaded_at=str(doc["uploaded_at"]),
-                    processed_at=str(doc["processed_at"]) if doc["processed_at"] else None,
+                    id=doc_row["id"],
+                    knowledge_base_id=doc_row["knowledge_base_id"],
+                    original_name=doc_row["original_name"],
+                    file_type=doc_row["file_type"],
+                    file_size=doc_row["file_size"],
+                    status=doc_row["status"],
+                    chunk_count=doc_row["chunk_count"],
+                    token_count=doc_row["token_count"],
+                    uploaded_at=str(doc_row["uploaded_at"]),
+                    processed_at=str(doc_row["processed_at"]) if doc_row["processed_at"] else None,
                 )
             )
-    result.sort(key=lambda x: x.uploaded_at, reverse=True)
-    return result
+        return docs
+    finally:
+        conn.close()
 
 
 @router.delete("/{kb_id}/documents/{doc_id}")
 async def delete_document(kb_id: str, doc_id: str, request: Request) -> dict:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    doc = _documents.get(doc_id)
-    if not doc or doc["knowledge_base_id"] != kb_id:
-        raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
 
-    if doc_id in _document_chunks:
-        del _document_chunks[doc_id]
-    del _documents[doc_id]
+        if not row or row["user_id"] != user.id:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    logger.info(f"Document deleted: {doc_id}")
-    return {"success": True, "message": f"Document {doc_id} deleted"}
+        cursor = conn.execute("SELECT * FROM documents WHERE id = ? AND knowledge_base_id = ?", (doc_id, kb_id))
+        doc = cursor.fetchone()
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
+
+        conn.execute("DELETE FROM document_chunks WHERE document_id = ?", (doc_id,))
+        conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        conn.commit()
+
+        logger.info(f"Document deleted: {doc_id}")
+        return {"success": True, "message": f"Document {doc_id} deleted"}
+    finally:
+        conn.close()
 
 
 @router.post("/{kb_id}/documents/{doc_id}/reindex")
 async def reindex_document(kb_id: str, doc_id: str, request: Request) -> DocumentResponse:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    doc = _documents.get(doc_id)
-    if not doc or doc["knowledge_base_id"] != kb_id:
-        raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
 
-    doc["status"] = "processing"
-    doc["processed_at"] = None
+        if not row or row["user_id"] != user.id:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    logger.info(f"Document reindex started: {doc_id}")
+        cursor = conn.execute("SELECT * FROM documents WHERE id = ? AND knowledge_base_id = ?", (doc_id, kb_id))
+        doc = cursor.fetchone()
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
 
-    doc["status"] = "ready"
-    doc["processed_at"] = time.time()
+        now = time.time()
+        conn.execute(
+            "UPDATE documents SET status = ?, processed_at = ? WHERE id = ?",
+            ("ready", now, doc_id),
+        )
+        conn.commit()
 
-    return DocumentResponse(
-        id=doc["id"],
-        knowledge_base_id=doc["knowledge_base_id"],
-        original_name=doc["original_name"],
-        file_type=doc["file_type"],
-        file_size=doc["file_size"],
-        status=doc["status"],
-        chunk_count=doc["chunk_count"],
-        token_count=doc["token_count"],
-        uploaded_at=str(doc["uploaded_at"]),
-        processed_at=str(doc["processed_at"]) if doc["processed_at"] else None,
-    )
+        logger.info(f"Document reindex started: {doc_id}")
+        return DocumentResponse(
+            id=doc["id"],
+            knowledge_base_id=doc["knowledge_base_id"],
+            original_name=doc["original_name"],
+            file_type=doc["file_type"],
+            file_size=doc["file_size"],
+            status="ready",
+            chunk_count=doc["chunk_count"],
+            token_count=doc["token_count"],
+            uploaded_at=str(doc["uploaded_at"]),
+            processed_at=str(now),
+        )
+    finally:
+        conn.close()
+
+
+@router.post("/{kb_id}/share", response_model=ShareResponse)
+async def share_knowledge_base(kb_id: str, body: KnowledgeShareRequest, request: Request) -> ShareResponse:
+    user = require_user(request)
+
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+
+        if not row or row["user_id"] != user.id:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        cursor = conn.execute(
+            "SELECT 1 FROM knowledge_shares WHERE knowledge_base_id = ? AND target_workspace_id = ?",
+            (kb_id, body.target_workspace_id),
+        )
+        if cursor.fetchone():
+            raise HTTPException(status_code=409, detail="Already shared to this workspace")
+
+        share_id = str(uuid.uuid4())
+        now = time.time()
+
+        conn.execute(
+            """INSERT INTO knowledge_shares
+                (id, knowledge_base_id, target_workspace_id, permission, shared_by, shared_at)
+            VALUES (?, ?, ?, ?, ?, ?)""",
+            (share_id, kb_id, body.target_workspace_id, body.permission, user.id, now),
+        )
+        conn.commit()
+
+        logger.info(f"Knowledge base {kb_id} shared to workspace {body.target_workspace_id}")
+        return ShareResponse(
+            id=share_id,
+            knowledge_base_id=kb_id,
+            target_workspace_id=body.target_workspace_id,
+            permission=body.permission,
+            shared_by=user.id,
+            shared_at=str(now),
+        )
+    finally:
+        conn.close()
+
+
+@router.delete("/{kb_id}/share/{share_id}")
+async def unshare_knowledge_base(kb_id: str, share_id: str, request: Request) -> dict:
+    user = require_user(request)
+
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+
+        if not row or row["user_id"] != user.id:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        cursor = conn.execute(
+            "SELECT * FROM knowledge_shares WHERE id = ? AND knowledge_base_id = ?",
+            (share_id, kb_id),
+        )
+        share = cursor.fetchone()
+        if not share:
+            raise HTTPException(status_code=404, detail=f"Share {share_id} not found")
+
+        conn.execute("DELETE FROM knowledge_shares WHERE id = ?", (share_id,))
+        conn.commit()
+
+        logger.info(f"Knowledge base {kb_id} unshared (share {share_id})")
+        return {"success": True, "message": f"Share {share_id} removed"}
+    finally:
+        conn.close()
 
 
 @router.post("/{kb_id}/search", response_model=SearchResponse)
 async def semantic_search(kb_id: str, body: SearchRequest, request: Request) -> SearchResponse:
     user = require_user(request)
-    kb = _knowledge_bases.get(kb_id)
-    if not kb or kb["user_id"] != user.id:
-        raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+    workspace_id = get_current_workspace_id()
 
-    query_embedding = _calculate_embedding(body.query)
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
 
-    all_chunks = []
-    for doc_id, chunks in _document_chunks.items():
-        doc = _documents.get(doc_id)
-        if not doc or doc["knowledge_base_id"] != kb_id:
-            continue
-        for chunk in chunks:
-            chunk_copy = dict(chunk)
-            chunk_copy["document_id"] = doc_id
-            chunk_copy["document_name"] = doc["original_name"]
-            chunk_copy["embedding"] = _calculate_embedding(chunk.get("content", ""))
-            chunk_copy["similarity"] = _calculate_similarity(query_embedding, chunk_copy["embedding"])
-            all_chunks.append(chunk_copy)
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-    results = []
-    for chunk in all_chunks:
-        if chunk["similarity"] >= body.similarity_threshold:
-            results.append(
-                SearchResult(
-                    document_id=chunk["document_id"],
-                    document_name=chunk["document_name"],
-                    chunk_content=chunk.get("content", ""),
-                    similarity_score=chunk["similarity"],
-                    metadata=chunk.get("metadata", {}),
+        kb = dict(row)
+        if kb["user_id"] != user.id:
+            if not (workspace_id and _is_kb_shared_to_workspace(kb_id, workspace_id)):
+                raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        query_embedding = _calculate_embedding(body.query)
+
+        cursor = conn.execute(
+            """SELECT dc.*, d.original_name FROM document_chunks dc
+                JOIN documents d ON dc.document_id = d.id
+                WHERE d.knowledge_base_id = ? AND d.status = 'ready'""",
+            (kb_id,),
+        )
+
+        results = []
+        for chunk_row in cursor.fetchall():
+            chunk_embedding = _calculate_embedding(chunk_row["content"])
+            similarity = _calculate_similarity(query_embedding, chunk_embedding)
+
+            if similarity >= body.similarity_threshold:
+                results.append(
+                    SearchResult(
+                        document_id=chunk_row["document_id"],
+                        document_name=chunk_row["original_name"],
+                        chunk_content=chunk_row["content"],
+                        similarity_score=similarity,
+                        metadata=json.loads(chunk_row["metadata"]) if chunk_row["metadata"] else {},
+                    )
                 )
-            )
 
-    results.sort(key=lambda x: x.similarity_score, reverse=True)
-    results = results[: body.top_k]
+        results.sort(key=lambda x: x.similarity_score, reverse=True)
+        results = results[: body.top_k]
 
-    return SearchResponse(
-        results=results,
-        query=body.query,
-        knowledge_base_id=kb_id,
-    )
+        return SearchResponse(
+            results=results,
+            query=body.query,
+            knowledge_base_id=kb_id,
+        )
+    finally:
+        conn.close()

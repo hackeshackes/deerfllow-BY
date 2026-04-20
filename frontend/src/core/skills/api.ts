@@ -204,3 +204,19 @@ export async function loadCustomSkills(): Promise<Skill[]> {
   const json = await response.json();
   return json.skills as Skill[];
 }
+
+export async function loadMyCustomSkills(): Promise<Skill[]> {
+  const response = await fetch(`${getBackendBaseURL()}/api/skills/custom/mine`);
+  const json = await response.json();
+  return json.skills as Skill[];
+}
+
+export async function deleteCustomSkill(skillName: string): Promise<void> {
+  const response = await fetch(`${getBackendBaseURL()}/api/skills/custom/${skillName}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail ?? `HTTP ${response.status}: ${response.statusText}`);
+  }
+}

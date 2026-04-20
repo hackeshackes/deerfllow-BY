@@ -19,6 +19,7 @@ _CHANNEL_REGISTRY: dict[str, str] = {
     "slack": "app.channels.slack:SlackChannel",
     "telegram": "app.channels.telegram:TelegramChannel",
     "wecom": "app.channels.wecom:WeComChannel",
+    "dingtalk": "app.channels.dingtalk:DingTalkChannel",
 }
 
 _CHANNELS_LANGGRAPH_URL_ENV = "DEER_FLOW_CHANNELS_LANGGRAPH_URL"

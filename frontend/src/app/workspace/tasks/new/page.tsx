@@ -127,7 +127,7 @@ export default function NewTaskPage() {
                       required={triggerType === "cron"}
                     />
                     <p className="text-muted-foreground text-sm">
-                      Format: minute hour day month weekday
+                      {t.tasks.cronGuidance}
                     </p>
                   </div>
                 )}

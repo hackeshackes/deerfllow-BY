@@ -253,6 +253,7 @@ export interface Translations {
     promptPlaceholder: string;
     cronExpression: string;
     cronPlaceholder: string;
+    cronGuidance: string;
     intervalUnit: string;
     minutes: string;
     hours: string;
@@ -298,6 +299,12 @@ export interface Translations {
     searchPlaceholder: string;
     noDocuments: string;
     noResults: string;
+    myKnowledge: string;
+    workspaceKnowledge: string;
+    share: string;
+    shareToWorkspace: string;
+    sharedWorkspaces: string;
+    noSharedWorkspaces: string;
     status: {
       processing: string;
       ready: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { BlocksIcon, PlusIcon, Share2Icon, StarIcon } from "lucide-react";
+import { BlocksIcon, PlusIcon, Share2Icon, StarIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateCustomSkill,
   useCustomSkills,
+  useDeleteCustomSkill,
   useDisableUserSkill,
   useEnableUserSkill,
+  useMyCustomSkills,
   useRateSkill,
   useShareSkill,
   useUnshareSkill,
@@ -150,7 +152,23 @@ function AllSkillsList() {
 }
 
 function CustomSkillsList() {
-  const { skills, isLoading, error } = useCustomSkills();
+  const { skills, isLoading, error, refetch } = useMyCustomSkills();
+  const deleteCustomSkill = useDeleteCustomSkill();
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; skillName: string | null }>({
+    open: false,
+    skillName: null,
+  });
+
+  const handleDelete = async () => {
+    if (!deleteConfirm.skillName) return;
+    try {
+      await deleteCustomSkill.mutateAsync(deleteConfirm.skillName);
+      await refetch();
+      setDeleteConfirm({ open: false, skillName: null });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "删除失败");
+    }
+  };
 
   if (isLoading) return <div className="text-muted-foreground text-sm">加载中...</div>;
   if (error) return <div>Error: {error.message}</div>;
@@ -166,31 +184,62 @@ function CustomSkillsList() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {skills.map((skill) => (
-        <Card key={skill.name}>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BlocksIcon className="size-5" />
-              {skill.name}
-            </CardTitle>
-            <CardDescription className="line-clamp-2">
-              {skill.description}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <span className={skill.enabled ? "text-green-600" : "text-muted-foreground"}>
-                {skill.enabled ? "已启用" : "已禁用"}
-              </span>
-              {skill.version && (
-                <span className="text-muted-foreground">v{skill.version}</span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+    <>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {skills.map((skill) => (
+          <Card key={skill.name}>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BlocksIcon className="size-5" />
+                {skill.name}
+              </CardTitle>
+              <CardDescription className="line-clamp-2">
+                {skill.description}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className={skill.enabled ? "text-green-600" : "text-muted-foreground"}>
+                    {skill.enabled ? "已启用" : "已禁用"}
+                  </span>
+                  {skill.version && (
+                    <span className="text-muted-foreground">v{skill.version}</span>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setDeleteConfirm({ open: true, skillName: skill.name })}
+                >
+                  <Trash2Icon className="size-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, skillName: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除技能</DialogTitle>
+            <DialogDescription>
+              确定要删除技能 &quot;{deleteConfirm.skillName}&quot; 吗？此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, skillName: null })}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteCustomSkill.isPending}>
+              {deleteCustomSkill.isPending ? "删除中..." : "删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

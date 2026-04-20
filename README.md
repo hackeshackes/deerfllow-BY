@@ -17,6 +17,10 @@
 | **沙箱执行** | ✅ | ✅ |
 | **工具系统** | ✅ | ✅ |
 | **MCP 集成** | ✅ | ✅ |
+| **定时任务** | ❌ | ✅ **新增 (v1.3)** |
+| **知识库 RAG** | ❌ | ✅ **新增 (v1.3)** |
+| **IM 渠道集成** | ❌ | ✅ **新增 (v1.4)** |
+| **钉钉支持** | ❌ | ✅ **新增 (v1.4)** |
 | **Admin 控制台** | ❌ | ✅ **新增** |
 | **监控中心** | ❌ | ✅ **新增** |
 | **配置中心** | ❌ | ✅ **新增** |
@@ -70,6 +74,86 @@
 | **上传限制** | 10MB 文件大小限制 |
 | **Rate Limiting** | Nginx 层 API 限流 (100r/s API, 10r/s auth) |
 | **Request ID** | 请求追踪中间件 |
+
+---
+
+### MicX v1.4 新增功能 (2026-04-20)
+
+#### 1. 定时任务 (Scheduled Tasks)
+
+| 功能 | 说明 |
+|------|------|
+| **任务创建** | 支持 Cron 表达式和间隔触发 |
+| **触发类型** | Cron (定时)、Interval (间隔)、One-time (一次性) |
+| **立即运行** | 点击即可立即执行任务，返回完整 AI 响应 |
+| **执行历史** | 显示每次执行的完整 AI 响应内容 |
+| **触发器编辑** | 可在任务详情页编辑 Cron 表达式和间隔时间 |
+| **任务暂停/恢复** | 随时暂停和恢复任务执行 |
+
+**API 端点:**
+```bash
+GET    /api/tasks                    # 列出所有任务
+POST   /api/tasks                   # 创建任务
+GET    /api/tasks/{id}              # 获取任务详情
+PUT    /api/tasks/{id}              # 更新任务
+DELETE /api/tasks/{id}              # 删除任务
+POST   /api/tasks/{id}/run          # 立即运行
+POST   /api/tasks/{id}/pause       # 暂停任务
+POST   /api/tasks/{id}/resume       # 恢复任务
+GET    /api/tasks/{id}/executions   # 获取执行历史
+```
+
+**Cron 表达式示例:**
+```
+0 9 * * *     # 每天上午 9:00 执行
+0 9 * * 1     # 每周一上午 9:00 执行
+30 14 * * *    # 每天下午 2:30 执行
+*/15 * * * *  # 每 15 分钟执行
+```
+
+#### 2. 知识库 (Knowledge Base)
+
+| 功能 | 说明 |
+|------|------|
+| **RAG 知识管理** | 向量存储，支持文档检索 |
+| **文档上传** | 支持多种文档格式 |
+| **知识检索** | 在 Agent 上下文中自动检索相关知识 |
+| **Web 内容提取** | 使用 jina.ai 提取网页内容 |
+
+**API 端点:**
+```bash
+GET    /api/knowledge              # 列出知识库
+POST   /api/knowledge              # 创建知识库
+GET    /api/knowledge/{id}          # 获取知识库详情
+PUT    /api/knowledge/{id}         # 更新知识库
+DELETE /api/knowledge/{id}         # 删除知识库
+POST   /api/knowledge/{id}/documents  # 添加文档
+```
+
+#### 3. IM 渠道配置 (IM Channels)
+
+| 渠道 | 配置字段 | 说明 |
+|------|----------|------|
+| **飞书** | app_id, app_secret | 字节跳动飞书平台 |
+| **Slack** | bot_token, app_token | Socket Mode 支持 |
+| **Telegram** | bot_token | Bot API 集成 |
+| **企业微信** | bot_id, bot_secret | 腾讯企业微信 |
+| **钉钉** | client_id, client_secret | 阿里巴巴钉钉平台 |
+
+**管理入口:** `/workspace/admin/models/mcp/channels`
+
+**API 端点:**
+```bash
+GET    /api/channels/                 # 获取渠道状态
+GET    /api/channels/config            # 获取渠道配置
+PUT    /api/channels/{type}            # 更新渠道配置
+POST   /api/channels/{type}/restart    # 重启渠道
+```
+
+#### 4. 导航结构调整
+
+- MCP 配置和 IM 渠道已移至 Admin 管理控制台
+- 访问路径: `/workspace/admin/models/mcp` 和 `/workspace/admin/models/mcp/channels`
 
 ---
 
@@ -253,6 +337,10 @@ make test         # 运行测试
 | **Sandbox Execution** | ✅ | ✅ |
 | **Tool System** | ✅ | ✅ |
 | **MCP Integration** | ✅ | ✅ |
+| **Scheduled Tasks** | ❌ | ✅ **New (v1.3)** |
+| **Knowledge Base RAG** | ❌ | ✅ **New (v1.3)** |
+| **IM Channels** | ❌ | ✅ **New (v1.4)** |
+| **DingTalk Support** | ❌ | ✅ **New (v1.4)** |
 | **Admin Console** | ❌ | ✅ **New** |
 | **Monitoring Center** | ❌ | ✅ **New** |
 | **Configuration Center** | ❌ | ✅ **New** |
@@ -306,6 +394,86 @@ make test         # 运行测试
 | **Upload Limit** | 10MB file size limit |
 | **Rate Limiting** | Nginx layer API rate limit (100r/s API, 10r/s auth) |
 | **Request ID** | Request tracing middleware |
+
+---
+
+### MicX v1.4 New Features (2026-04-20)
+
+#### 1. Scheduled Tasks
+
+| Feature | Description |
+|---------|-------------|
+| **Task Creation** | Cron expressions and interval triggers |
+| **Trigger Types** | Cron (scheduled), Interval (periodic), One-time |
+| **Run Now** | Execute task immediately, returns full AI response |
+| **Execution History** | Display complete AI response for each execution |
+| **Trigger Editing** | Edit Cron expression and interval in task detail page |
+| **Pause/Resume** | Control task execution state |
+
+**API Endpoints:**
+```bash
+GET    /api/tasks                    # List all tasks
+POST   /api/tasks                   # Create task
+GET    /api/tasks/{id}              # Get task details
+PUT    /api/tasks/{id}              # Update task
+DELETE /api/tasks/{id}              # Delete task
+POST   /api/tasks/{id}/run          # Run immediately
+POST   /api/tasks/{id}/pause       # Pause task
+POST   /api/tasks/{id}/resume      # Resume task
+GET    /api/tasks/{id}/executions   # Get execution history
+```
+
+**Cron Expression Examples:**
+```
+0 9 * * *     # Daily at 9:00 AM
+0 9 * * 1     # Every Monday at 9:00 AM
+30 14 * * *    # Daily at 2:30 PM
+*/15 * * * *  # Every 15 minutes
+```
+
+#### 2. Knowledge Base (RAG)
+
+| Feature | Description |
+|---------|-------------|
+| **RAG Knowledge Management** | Vector storage, document retrieval |
+| **Document Upload** | Support multiple document formats |
+| **Knowledge Retrieval** | Automatic retrieval in agent context |
+| **Web Content Extraction** | Extract content via jina.ai |
+
+**API Endpoints:**
+```bash
+GET    /api/knowledge              # List knowledge bases
+POST   /api/knowledge              # Create knowledge base
+GET    /api/knowledge/{id}          # Get knowledge base details
+PUT    /api/knowledge/{id}         # Update knowledge base
+DELETE /api/knowledge/{id}         # Delete knowledge base
+POST   /api/knowledge/{id}/documents  # Add documents
+```
+
+#### 3. IM Channels Configuration
+
+| Channel | Config Fields | Description |
+|---------|---------------|-------------|
+| **Feishu** | app_id, app_secret | ByteDance Feishu |
+| **Slack** | bot_token, app_token | Socket Mode supported |
+| **Telegram** | bot_token | Bot API integration |
+| **WeCom** | bot_id, bot_secret | Tencent WeCom |
+| **DingTalk** | client_id, client_secret | Alibaba DingTalk |
+
+**Admin Entry:** `/workspace/admin/models/mcp/channels`
+
+**API Endpoints:**
+```bash
+GET    /api/channels/                 # Get channel status
+GET    /api/channels/config            # Get channel config
+PUT    /api/channels/{type}            # Update channel config
+POST   /api/channels/{type}/restart    # Restart channel
+```
+
+#### 4. Navigation Restructuring
+
+- MCP Configuration and IM Channels moved to Admin Console
+- Access paths: `/workspace/admin/models/mcp` and `/workspace/admin/models/mcp/channels`
 
 ---
 

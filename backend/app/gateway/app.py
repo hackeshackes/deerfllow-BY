@@ -19,6 +19,7 @@ from app.gateway.routers import (
     artifacts,
     assistants_compat,
     channels,
+    custom_skills,
     knowledge,
     mcp,
     memory,
@@ -246,6 +247,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # User Skills API is mounted at /api/user/skills
     app.include_router(user_skills.router)
+
+    # Custom Skills CRUD API is mounted at /api/user/skills/custom
+    app.include_router(custom_skills.router)
 
     # Artifacts API is mounted at /api/threads/{thread_id}/artifacts
     app.include_router(artifacts.router)

@@ -251,6 +251,19 @@ export function WorkspaceNavMenu({
                       </DropdownMenuItem>
                     </>
                   )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/workspace/tasks">
+                      <ShieldCheckIcon />
+                      定时任务
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/workspace/knowledge">
+                      <ShieldCheckIcon />
+                      知识库
+                    </Link>
+                  </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

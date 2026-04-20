@@ -1,9 +1,11 @@
 "use client";
 
+import { Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +39,11 @@ export function SkillsAdminPage() {
   const [editingName, setEditingName] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; skill: SkillRecord | null }>({
+    open: false,
+    skill: null,
+  });
+  const [deleting, setDeleting] = useState(false);
 
   async function loadSkills() {
     const response = await fetch("/api/skills");
@@ -106,6 +113,26 @@ export function SkillsAdminPage() {
     await loadSkills();
   }
 
+  async function deleteSkill() {
+    if (!deleteConfirm.skill) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/skills/custom/${deleteConfirm.skill.name}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { detail?: string } | null;
+        throw new Error(body?.detail ?? "删除技能失败");
+      }
+      await loadSkills();
+      setDeleteConfirm({ open: false, skill: null });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "删除技能失败");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AdminPageShell title="技能管理" description="查看当前技能清单、切换启用状态，并从远程地址安装新的 skill 包。">
       <Card>
@@ -166,6 +193,16 @@ export function SkillsAdminPage() {
                   >
                     中文化
                   </Button>
+                  {skill.category === "custom" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setDeleteConfirm({ open: true, skill })}
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
+                  )}
                   <div className="text-sm text-slate-500">{skill.enabled ? "已启用" : "已禁用"}</div>
                   <Switch checked={skill.enabled} onCheckedChange={(checked) => void toggleSkill(skill, checked).catch((err) => setError(err instanceof Error ? err.message : "更新技能失败"))} />
                 </div>
@@ -174,6 +211,25 @@ export function SkillsAdminPage() {
           ))}
         </CardContent>
       </Card>
+
+      <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, skill: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除技能</DialogTitle>
+            <DialogDescription>
+              确定要删除技能 &quot;{deleteConfirm.skill?.name}&quot; 吗？此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, skill: null })}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={deleteSkill} disabled={deleting}>
+              {deleting ? "删除中..." : "删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminPageShell>
   );
 }
