@@ -90,6 +90,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception:
             logger.exception("No IM channels configured or channel service failed to start")
 
+        try:
+            from app.gateway.services.scheduler_service import load_scheduled_tasks_from_db, start_scheduler
+
+            start_scheduler()
+            await load_scheduled_tasks_from_db()
+            logger.info("Scheduler started and existing tasks loaded")
+        except Exception:
+            logger.exception("Failed to start scheduler or load tasks")
+
         yield
 
         # Stop channel service on shutdown

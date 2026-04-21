@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
-from typing import Any, Callable
+import sqlite3
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -135,3 +141,45 @@ def trigger_job_now(task_id: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to trigger job {job_id}: {e}")
         return False
+
+
+async def _execute_scheduled_task(task_id: str) -> None:
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"http://gateway:8001/api/tasks/{task_id}/run",
+                timeout=300.0,
+            )
+            if response.status_code == 200:
+                logger.info(f"Scheduled task {task_id} executed successfully")
+            else:
+                logger.error(f"Scheduled task {task_id} failed with status {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to execute scheduled task {task_id}: {e}")
+
+
+async def load_scheduled_tasks_from_db() -> None:
+    db_path = Path(__file__).parent.parent / "data" / "tasks.db"
+    if not db_path.exists():
+        logger.info("No tasks.db found, skipping task loading")
+        return
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT id, name, trigger_type, trigger_config FROM tasks WHERE status = 'active'"
+    )
+    for row in cursor.fetchall():
+        task_id = row["id"]
+        name = row["name"]
+        trigger_type = row["trigger_type"]
+        trigger_config = json.loads(row["trigger_config"])
+        add_scheduled_job(
+            task_id=task_id,
+            trigger_type=trigger_type,
+            trigger_config=trigger_config,
+            callback=lambda tid=task_id: asyncio.create_task(_execute_scheduled_task(tid)),
+            name=name,
+        )
+    conn.close()
+    logger.info("Loaded scheduled tasks from database")

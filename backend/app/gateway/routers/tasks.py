@@ -394,6 +394,20 @@ async def create_task(body: TaskCreateRequest, request: Request) -> TaskResponse
         )
         conn.commit()
 
+        try:
+            import asyncio
+
+            from app.gateway.services.scheduler_service import _execute_scheduled_task, add_scheduled_job
+            add_scheduled_job(
+                task_id=task_id,
+                trigger_type=body.trigger_type,
+                trigger_config=body.trigger_config.model_dump(),
+                callback=lambda tid=task_id: asyncio.create_task(_execute_scheduled_task(tid)),
+                name=body.name,
+            )
+        except Exception:
+            logger.exception("Failed to register scheduled job (non-critical)")
+
         cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
         row = cursor.fetchone()
         logger.info(f"Task created: {task_id} by user {user.id} in workspace {workspace_id}")
@@ -506,6 +520,27 @@ async def update_task(task_id: str, body: TaskUpdateRequest, request: Request) -
         cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
         row = cursor.fetchone()
         logger.info(f"Task updated: {task_id}")
+
+        try:
+            import asyncio
+            import json as json_module
+
+            from app.gateway.services.scheduler_service import _execute_scheduled_task, add_scheduled_job, remove_scheduled_job
+            remove_scheduled_job(task_id)
+            if row["status"] == "active":
+                trigger_config = body.trigger_config or TriggerConfig(**json_module.loads(row["trigger_config"]))
+                trigger_type = body.trigger_type or row["trigger_type"]
+                name = body.name or row["name"]
+                add_scheduled_job(
+                    task_id=task_id,
+                    trigger_type=trigger_type,
+                    trigger_config=trigger_config.model_dump(),
+                    callback=lambda tid=task_id: asyncio.create_task(_execute_scheduled_task(tid)),
+                    name=name,
+                )
+        except Exception:
+            logger.exception("Failed to update scheduled job (non-critical)")
+
         return _task_response_from_row(row)
     finally:
         conn.close()
@@ -522,6 +557,12 @@ async def delete_task(task_id: str, request: Request) -> dict:
 
         if not row or row["user_id"] != user.id:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+        try:
+            from app.gateway.services.scheduler_service import remove_scheduled_job
+            remove_scheduled_job(task_id)
+        except Exception:
+            logger.exception("Failed to remove scheduled job (non-critical)")
 
         conn.execute("DELETE FROM task_shares WHERE task_id = ?", (task_id,))
         conn.execute("DELETE FROM task_executions WHERE task_id = ?", (task_id,))
@@ -757,11 +798,24 @@ async def _execute_task_in_thread(
             messages = result["messages"]
             ai_responses = [m["content"] for m in messages if isinstance(m, dict) and m.get("type") == "ai" and "content" in m]
             if ai_responses:
+                title = _generate_task_title(prompt_template)
+                try:
+                    await lg_client.threads.update(thread_id, {"title": title})
+                except Exception:
+                    logger.debug("Failed to update thread title (non-critical)")
                 return {"result_summary": ai_responses[-1], "error_message": None}
     except Exception:
         logger.exception("Task execution failed")
 
     return {"result_summary": "Task completed", "error_message": None}
+
+
+def _generate_task_title(prompt_template: str, max_length: int = 50) -> str:
+    clean = prompt_template.strip()
+    if len(clean) <= max_length:
+        return clean
+    truncated = clean[:max_length].rstrip()
+    return truncated + "..."
 
 
 @router.post("/{task_id}/pause", response_model=TaskResponse)
@@ -779,6 +833,12 @@ async def pause_task(task_id: str, request: Request) -> TaskResponse:
         now = time.time()
         conn.execute("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?", ("paused", now, task_id))
         conn.commit()
+
+        try:
+            from app.gateway.services.scheduler_service import pause_scheduled_job
+            pause_scheduled_job(task_id)
+        except Exception:
+            logger.exception("Failed to pause scheduled job (non-critical)")
 
         cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
         row = cursor.fetchone()
@@ -803,6 +863,12 @@ async def resume_task(task_id: str, request: Request) -> TaskResponse:
         now = time.time()
         conn.execute("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?", ("active", now, task_id))
         conn.commit()
+
+        try:
+            from app.gateway.services.scheduler_service import resume_scheduled_job
+            resume_scheduled_job(task_id)
+        except Exception:
+            logger.exception("Failed to resume scheduled job (non-critical)")
 
         cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
         row = cursor.fetchone()
