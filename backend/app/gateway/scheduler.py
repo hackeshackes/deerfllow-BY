@@ -160,7 +160,7 @@ async def _execute_scheduled_task(task_id: str) -> None:
 
 
 async def load_scheduled_tasks_from_db() -> None:
-    db_path = Path(__file__).parent.parent / "data" / "tasks.db"
+    db_path = Path(__file__).parent / "data" / "tasks.db"
     if not db_path.exists():
         logger.info("No tasks.db found, skipping task loading")
         return
