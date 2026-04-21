@@ -811,18 +811,24 @@ async def _execute_task_in_thread(
             ai_responses = [m["content"] for m in messages if isinstance(m, dict) and m.get("type") == "ai" and "content" in m]
             if ai_responses:
                 title = _generate_task_title(prompt_template)
+                logger.info(f"Task {task_id} generated title: {title}")
                 try:
                     await lg_client.threads.update(thread_id, metadata={"title": title})
+                    logger.info(f"Updated LangGraph metadata title for thread {thread_id}")
                 except Exception:
-                    logger.debug("Failed to update thread title in LangGraph (non-critical)")
+                    logger.exception("Failed to update thread title in LangGraph")
                 try:
                     from app.gateway.deps import get_store
                     from app.gateway.routers.threads import _store_upsert
                     store = get_store(request)
+                    logger.info(f"Store for thread {thread_id}: {store}")
                     if store:
                         await _store_upsert(store, thread_id, values={"title": title})
+                        logger.info(f"Updated Store title for thread {thread_id}")
+                    else:
+                        logger.warning(f"Store is None, cannot update title for thread {thread_id}")
                 except Exception:
-                    logger.debug("Failed to update thread title in Store (non-critical)")
+                    logger.exception("Failed to update thread title in Store")
                 return {"result_summary": ai_responses[-1], "error_message": None}
     except Exception:
         logger.exception("Task execution failed")
