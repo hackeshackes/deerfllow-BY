@@ -814,7 +814,15 @@ async def _execute_task_in_thread(
                 try:
                     await lg_client.threads.update(thread_id, metadata={"title": title})
                 except Exception:
-                    logger.debug("Failed to update thread title (non-critical)")
+                    logger.debug("Failed to update thread title in LangGraph (non-critical)")
+                try:
+                    from app.gateway.deps import get_store
+                    from app.gateway.routers.threads import _store_upsert
+                    store = get_store(request)
+                    if store:
+                        await _store_upsert(store, thread_id, values={"title": title})
+                except Exception:
+                    logger.debug("Failed to update thread title in Store (non-critical)")
                 return {"result_summary": ai_responses[-1], "error_message": None}
     except Exception:
         logger.exception("Task execution failed")
