@@ -229,6 +229,9 @@ async def _sync_thread_title_after_run(
         if existing is None:
             return
 
+        if existing.get("values", {}).get("title"):
+            return
+
         updated = dict(existing)
         updated.setdefault("values", {})["title"] = title
         updated["updated_at"] = time.time()
