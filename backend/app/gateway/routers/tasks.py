@@ -397,7 +397,7 @@ async def create_task(body: TaskCreateRequest, request: Request) -> TaskResponse
         try:
             import asyncio
 
-            from app.gateway.services.scheduler_service import _execute_scheduled_task, add_scheduled_job
+            from app.gateway.scheduler import _execute_scheduled_task, add_scheduled_job
             add_scheduled_job(
                 task_id=task_id,
                 trigger_type=body.trigger_type,
@@ -525,7 +525,7 @@ async def update_task(task_id: str, body: TaskUpdateRequest, request: Request) -
             import asyncio
             import json as json_module
 
-            from app.gateway.services.scheduler_service import _execute_scheduled_task, add_scheduled_job, remove_scheduled_job
+            from app.gateway.scheduler import _execute_scheduled_task, add_scheduled_job, remove_scheduled_job
             remove_scheduled_job(task_id)
             if row["status"] == "active":
                 trigger_config = body.trigger_config or TriggerConfig(**json_module.loads(row["trigger_config"]))
@@ -559,7 +559,7 @@ async def delete_task(task_id: str, request: Request) -> dict:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
         try:
-            from app.gateway.services.scheduler_service import remove_scheduled_job
+            from app.gateway.scheduler import remove_scheduled_job
             remove_scheduled_job(task_id)
         except Exception:
             logger.exception("Failed to remove scheduled job (non-critical)")
@@ -835,7 +835,7 @@ async def pause_task(task_id: str, request: Request) -> TaskResponse:
         conn.commit()
 
         try:
-            from app.gateway.services.scheduler_service import pause_scheduled_job
+            from app.gateway.scheduler import pause_scheduled_job
             pause_scheduled_job(task_id)
         except Exception:
             logger.exception("Failed to pause scheduled job (non-critical)")
@@ -865,7 +865,7 @@ async def resume_task(task_id: str, request: Request) -> TaskResponse:
         conn.commit()
 
         try:
-            from app.gateway.services.scheduler_service import resume_scheduled_job
+            from app.gateway.scheduler import resume_scheduled_job
             resume_scheduled_job(task_id)
         except Exception:
             logger.exception("Failed to resume scheduled job (non-critical)")
