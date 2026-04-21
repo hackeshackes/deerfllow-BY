@@ -806,12 +806,15 @@ async def _execute_task_in_thread(
             config=config,
             context=context,
         )
-        if result and "messages" in result:
+        logger.info(f"Thread {thread_id} runs.wait result type: {type(result).__name__}, keys: {result.keys() if isinstance(result, dict) else 'N/A'}")
+        if result and isinstance(result, dict) and "messages" in result:
             messages = result["messages"]
+            logger.info(f"Thread {thread_id} messages count: {len(messages) if messages else 0}")
             ai_responses = [m["content"] for m in messages if isinstance(m, dict) and m.get("type") == "ai" and "content" in m]
+            logger.info(f"Thread {thread_id} ai_responses count: {len(ai_responses) if ai_responses else 0}")
             if ai_responses:
                 title = _generate_task_title(prompt_template)
-                logger.info(f"Task {task_id} generated title: {title}")
+                logger.info(f"Thread {thread_id} generated title: {title}")
                 try:
                     await lg_client.threads.update(thread_id, metadata={"title": title})
                     logger.info(f"Updated LangGraph metadata title for thread {thread_id}")
@@ -830,6 +833,10 @@ async def _execute_task_in_thread(
                 except Exception:
                     logger.exception("Failed to update thread title in Store")
                 return {"result_summary": ai_responses[-1], "error_message": None}
+            else:
+                logger.warning(f"Thread {thread_id} no AI responses found, messages: {messages[:3] if messages else 'empty'}")
+        else:
+            logger.warning(f"Thread {thread_id} result has no messages or wrong type: result={type(result).__name__}, is_dict={isinstance(result, dict)}, has_messages={'messages' in result if isinstance(result, dict) else 'N/A'}")
     except Exception:
         logger.exception("Task execution failed")
 
