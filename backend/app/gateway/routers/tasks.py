@@ -395,14 +395,12 @@ async def create_task(body: TaskCreateRequest, request: Request) -> TaskResponse
         conn.commit()
 
         try:
-            import asyncio
-
-            from app.gateway.scheduler import _execute_scheduled_task, add_scheduled_job
+            from app.gateway.scheduler import _run_scheduled_task_sync, add_scheduled_job
             add_scheduled_job(
                 task_id=task_id,
                 trigger_type=body.trigger_type,
                 trigger_config=body.trigger_config.model_dump(),
-                callback=lambda tid=task_id: asyncio.create_task(_execute_scheduled_task(tid)),
+                callback=_run_scheduled_task_sync,
                 name=body.name,
             )
         except Exception:
@@ -522,10 +520,9 @@ async def update_task(task_id: str, body: TaskUpdateRequest, request: Request) -
         logger.info(f"Task updated: {task_id}")
 
         try:
-            import asyncio
             import json as json_module
 
-            from app.gateway.scheduler import _execute_scheduled_task, add_scheduled_job, remove_scheduled_job
+            from app.gateway.scheduler import _run_scheduled_task_sync, add_scheduled_job, remove_scheduled_job
             remove_scheduled_job(task_id)
             if row["status"] == "active":
                 trigger_config = body.trigger_config or TriggerConfig(**json_module.loads(row["trigger_config"]))
@@ -535,7 +532,7 @@ async def update_task(task_id: str, body: TaskUpdateRequest, request: Request) -
                     task_id=task_id,
                     trigger_type=trigger_type,
                     trigger_config=trigger_config.model_dump(),
-                    callback=lambda tid=task_id: asyncio.create_task(_execute_scheduled_task(tid)),
+                    callback=_run_scheduled_task_sync,
                     name=name,
                 )
         except Exception:
@@ -800,7 +797,7 @@ async def _execute_task_in_thread(
             if ai_responses:
                 title = _generate_task_title(prompt_template)
                 try:
-                    await lg_client.threads.update(thread_id, {"title": title})
+                    await lg_client.threads.update(thread_id, metadata={"title": title})
                 except Exception:
                     logger.debug("Failed to update thread title (non-critical)")
                 return {"result_summary": ai_responses[-1], "error_message": None}
