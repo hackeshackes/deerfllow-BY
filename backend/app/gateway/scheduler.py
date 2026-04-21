@@ -159,6 +159,15 @@ async def _execute_scheduled_task(task_id: str) -> None:
         logger.error(f"Failed to execute scheduled task {task_id}: {e}")
 
 
+def _run_scheduled_task_sync(task_id: str) -> None:
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    loop.run_until_complete(_execute_scheduled_task(task_id))
+
+
 async def load_scheduled_tasks_from_db() -> None:
     db_path = Path(__file__).parent / "data" / "tasks.db"
     if not db_path.exists():
@@ -178,7 +187,7 @@ async def load_scheduled_tasks_from_db() -> None:
             task_id=task_id,
             trigger_type=trigger_type,
             trigger_config=trigger_config,
-            callback=lambda tid=task_id: asyncio.create_task(_execute_scheduled_task(tid)),
+            callback=_run_scheduled_task_sync,
             name=name,
         )
     conn.close()
