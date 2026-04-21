@@ -23,6 +23,8 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 _db_path = Path(__file__).parent.parent / "data" / "tasks.db"
 _db_lock = threading.Lock()
 
+_SCHEDULER_INTERNAL_KEY = "scheduler-internal-key-2026"
+
 
 def _get_db() -> sqlite3.Connection:
     _db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -645,97 +647,110 @@ async def unshare_task(task_id: str, share_id: str, request: Request) -> dict:
 
 @router.post("/{task_id}/run", response_model=TaskExecutionResponse)
 async def run_task_now(task_id: str, request: Request) -> TaskExecutionResponse:
-    user = require_user(request)
+    scheduler_key = request.headers.get("X-Scheduler-Key")
+    if scheduler_key == _SCHEDULER_INTERNAL_KEY:
+        from app.gateway.auth import get_user_by_id
 
-    conn = _get_db()
-    try:
+        conn = _get_db()
         cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
         row = cursor.fetchone()
-
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+        task_user = get_user_by_id(row["user_id"])
+        if not task_user:
+            raise HTTPException(status_code=404, detail=f"Task owner not found")
+        request.state.current_user = task_user
+        user = task_user
+        task = _row_to_task(row)
+    else:
+        user = require_user(request)
+        conn = _get_db()
+        cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        row = cursor.fetchone()
         if not row or row["user_id"] != user.id:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
         task = _row_to_task(row)
-        execution_id = str(uuid.uuid4())
-        now = time.time()
+
+    execution_id = str(uuid.uuid4())
+    now = time.time()
+
+    conn.execute(
+        """INSERT INTO task_executions (id, task_id, status, started_at)
+        VALUES (?, ?, ?, ?)""",
+        (execution_id, task_id, "running", now),
+    )
+    conn.commit()
+
+    thread_id = task.get("thread_id")
+    if not thread_id:
+        thread_id = await _create_thread_for_task(request, task_id, user)
+        if thread_id:
+            conn.execute("UPDATE tasks SET thread_id = ? WHERE id = ?", (thread_id, task_id))
+            conn.commit()
+
+    if not thread_id:
+        raise HTTPException(status_code=500, detail="Failed to create or get thread for task execution")
+
+    try:
+        result_data = await _execute_task_in_thread(
+            request=request,
+            thread_id=thread_id,
+            prompt_template=task["prompt_template"],
+            model_name=task.get("model_name"),
+            skill_names=task.get("skill_names", []),
+        )
+
+        completed_at = time.time()
+        result_summary = result_data.get("result_summary", "")
+        error_message = result_data.get("error_message")
+        status = "success" if not error_message else "failed"
 
         conn.execute(
-            """INSERT INTO task_executions (id, task_id, status, started_at)
-            VALUES (?, ?, ?, ?)""",
-            (execution_id, task_id, "running", now),
+            """UPDATE task_executions
+            SET status = ?, completed_at = ?, result_summary = ?, error_message = ?, thread_id = ?
+            WHERE id = ?""",
+            (status, completed_at, result_summary, error_message, thread_id, execution_id),
+        )
+        conn.execute("UPDATE tasks SET last_run_at = ? WHERE id = ?", (completed_at, task_id))
+        conn.commit()
+
+        logger.info(f"Task {task_id} execution {execution_id} completed with status {status}")
+        return TaskExecutionResponse(
+            id=execution_id,
+            task_id=task_id,
+            thread_id=thread_id,
+            status=status,
+            started_at=str(now),
+            completed_at=str(completed_at),
+            result_summary=result_summary,
+            error_message=error_message,
+            token_used=0,
+        )
+
+    except Exception as exc:
+        completed_at = time.time()
+        error_msg = str(exc)
+        logger.exception(f"Task {task_id} execution {execution_id} failed")
+
+        conn.execute(
+            """UPDATE task_executions
+            SET status = ?, completed_at = ?, error_message = ?, thread_id = ?
+            WHERE id = ?""",
+            ("failed", completed_at, error_msg, thread_id, execution_id),
         )
         conn.commit()
 
-        thread_id = task.get("thread_id")
-        if not thread_id:
-            thread_id = await _create_thread_for_task(request, task_id, user)
-            if thread_id:
-                conn.execute("UPDATE tasks SET thread_id = ? WHERE id = ?", (thread_id, task_id))
-                conn.commit()
-
-        if not thread_id:
-            raise HTTPException(status_code=500, detail="Failed to create or get thread for task execution")
-
-        try:
-            result_data = await _execute_task_in_thread(
-                request=request,
-                thread_id=thread_id,
-                prompt_template=task["prompt_template"],
-                model_name=task.get("model_name"),
-                skill_names=task.get("skill_names", []),
-            )
-
-            completed_at = time.time()
-            result_summary = result_data.get("result_summary", "")
-            error_message = result_data.get("error_message")
-            status = "success" if not error_message else "failed"
-
-            conn.execute(
-                """UPDATE task_executions
-                SET status = ?, completed_at = ?, result_summary = ?, error_message = ?, thread_id = ?
-                WHERE id = ?""",
-                (status, completed_at, result_summary, error_message, thread_id, execution_id),
-            )
-            conn.execute("UPDATE tasks SET last_run_at = ? WHERE id = ?", (completed_at, task_id))
-            conn.commit()
-
-            logger.info(f"Task {task_id} execution {execution_id} completed with status {status}")
-            return TaskExecutionResponse(
-                id=execution_id,
-                task_id=task_id,
-                thread_id=thread_id,
-                status=status,
-                started_at=str(now),
-                completed_at=str(completed_at),
-                result_summary=result_summary,
-                error_message=error_message,
-                token_used=0,
-            )
-
-        except Exception as exc:
-            completed_at = time.time()
-            error_msg = str(exc)
-            logger.exception(f"Task {task_id} execution {execution_id} failed")
-
-            conn.execute(
-                """UPDATE task_executions
-                SET status = ?, completed_at = ?, error_message = ?, thread_id = ?
-                WHERE id = ?""",
-                ("failed", completed_at, error_msg, thread_id, execution_id),
-            )
-            conn.commit()
-
-            return TaskExecutionResponse(
-                id=execution_id,
-                task_id=task_id,
-                thread_id=thread_id,
-                status="failed",
-                started_at=str(now),
-                completed_at=str(completed_at),
-                result_summary=None,
-                error_message=error_msg,
-                token_used=0,
-            )
+        return TaskExecutionResponse(
+            id=execution_id,
+            task_id=task_id,
+            thread_id=thread_id,
+            status="failed",
+            started_at=str(now),
+            completed_at=str(completed_at),
+            result_summary=None,
+            error_message=error_msg,
+            token_used=0,
+        )
 
     finally:
         conn.close()
