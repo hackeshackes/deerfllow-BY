@@ -78,6 +78,7 @@ def add_scheduled_job(
     scheduler.add_job(
         callback,
         trigger=trigger,
+        args=(task_id,),
         id=job_id,
         name=name or f"Scheduled task: {task_id}",
         replace_existing=True,
