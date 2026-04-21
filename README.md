@@ -80,6 +80,8 @@
 ### MicX v1.4 新增功能 (2026-04-20)
 
 > **Bug 修复 (2026-04-20)**: 修复定时任务在"最近的对话"中无法查看执行内容和进入会话的问题。任务执行后现在会正确同步到 LangGraph Server，确保前端可以加载完整的对话历史。
+>
+> **根本原因修复 (2026-04-21)**: 将 `_execute_task_in_thread` 改为使用 `lg_client.runs.wait()` API 执行任务，而非直接调用 `run_agent()` 函数，确保消息通过 LangGraph Server 正确索引。
 
 #### 1. 定时任务 (Scheduled Tasks)
 
