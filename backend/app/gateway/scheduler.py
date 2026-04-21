@@ -52,9 +52,9 @@ def _create_trigger(trigger_type: str, trigger_config: dict) -> Any:
     elif trigger_type == "interval":
         interval_seconds = (
             trigger_config.get("interval_seconds")
-            or (trigger_config.get("interval_minutes", 0) * 60)
-            or (trigger_config.get("interval_hours", 0) * 3600)
-            or (trigger_config.get("interval_days", 0) * 86400)
+            or ((trigger_config.get("interval_minutes") or 0) * 60)
+            or ((trigger_config.get("interval_hours") or 0) * 3600)
+            or ((trigger_config.get("interval_days") or 0) * 86400)
             or 60
         )
         return IntervalTrigger(seconds=interval_seconds, timezone=trigger_config.get("timezone", "Asia/Shanghai"))
