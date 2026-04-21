@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import sqlite3
@@ -711,22 +710,12 @@ async def _execute_task_in_thread(
     model_name: str | None,
     skill_names: list[str],
 ) -> dict[str, Any]:
-    from langchain_core.messages import HumanMessage
+    from langgraph_sdk.client import get_client
 
-    from app.gateway.deps import get_checkpointer, get_run_manager, get_store
     from app.gateway.ownership import attach_owner_metadata
-    from app.gateway.services import build_run_config, normalize_input, resolve_agent_factory
-    from deerflow.runtime import run_agent
-    from deerflow.runtime.runs.schemas import DisconnectMode
-    from deerflow.runtime.stream_bridge.memory import MemoryStreamBridge
-
-    run_mgr = get_run_manager(request)
-    checkpointer = get_checkpointer(request)
-    store = get_store(request)
+    from app.gateway.services import build_run_config
 
     metadata = attach_owner_metadata({}, request.state.current_user)
-
-    graph_input = normalize_input({"messages": [HumanMessage(content=prompt_template)]})
 
     context: dict[str, Any] = {}
     if model_name:
@@ -755,67 +744,22 @@ async def _execute_task_in_thread(
             if key in context:
                 configurable.setdefault(key, context[key])
 
-    agent_factory = resolve_agent_factory(None)
-
-    bridge = MemoryStreamBridge()
-
-    record = await run_mgr.create_or_reject(
-        thread_id,
-        None,
-        on_disconnect=DisconnectMode.cancel,
-        metadata=metadata,
-        kwargs={"input": graph_input, "config": config},
-        multitask_strategy="reject",
-    )
-
-    if store is not None:
-        try:
-            from app.gateway.routers.threads import _store_upsert
-            await _store_upsert(store, thread_id, metadata=metadata)
-        except Exception:
-            pass
-
-    task = asyncio.create_task(
-        run_agent(
-            bridge,
-            run_mgr,
-            record,
-            checkpointer=checkpointer,
-            store=store,
-            agent_factory=agent_factory,
-            graph_input=graph_input,
+    lg_client = get_client(url="http://langgraph:2024")
+    try:
+        result = await lg_client.runs.wait(
+            thread_id,
+            assistant_id="lead_agent",
+            input={"messages": [{"role": "human", "content": prompt_template}]},
             config=config,
-            stream_modes=["values"],
-            stream_subgraphs=False,
-            interrupt_before=None,
-            interrupt_after=None,
+            context=context,
         )
-    )
-
-    try:
-        await asyncio.wait({task})
-    except asyncio.CancelledError:
-        pass
-
-    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
-    try:
-        checkpoint_tuple = await checkpointer.aget_tuple(config)
-        if checkpoint_tuple is not None:
-            checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
-            channel_values = checkpoint.get("channel_values", {})
-            messages = channel_values.get("messages", [])
-            ai_responses = [m.content for m in messages if hasattr(m, "type") and m.type == "ai"]
+        if result and "messages" in result:
+            messages = result["messages"]
+            ai_responses = [m["content"] for m in messages if isinstance(m, dict) and m.get("type") == "ai" and "content" in m]
             if ai_responses:
                 return {"result_summary": ai_responses[-1], "error_message": None}
     except Exception:
-        pass
-
-    try:
-        from langgraph_sdk.client import get_client
-        lg_client = get_client(url="http://langgraph:2024")
-        await lg_client.threads.update(thread_id, metadata={"task_executed": str(time.time())})
-    except Exception:
-        logger.debug("Failed to sync thread after task execution (non-critical)")
+        logger.exception("Task execution failed")
 
     return {"result_summary": "Task completed", "error_message": None}
 
