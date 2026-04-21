@@ -144,12 +144,15 @@ def trigger_job_now(task_id: str) -> bool:
         return False
 
 
+_SCHEDULER_INTERNAL_KEY = "scheduler-internal-key-2026"
+
 async def _execute_scheduled_task(task_id: str) -> None:
     try:
         import httpx
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"http://gateway:8001/api/tasks/{task_id}/run",
+                headers={"X-Scheduler-Key": _SCHEDULER_INTERNAL_KEY},
                 timeout=300.0,
             )
             if response.status_code == 200:
