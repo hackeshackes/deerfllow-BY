@@ -104,6 +104,32 @@ async def _get_thread_record(request: Request, thread_id: str, user: AuthUser) -
             except Exception as e:
                 logger.warning("Failed to recover thread %s to store: %s", thread_id, e)
 
+    # Fallback: check if thread exists in LangGraph API (separate database)
+    if item is None:
+        try:
+            from langgraph_sdk.client import get_client
+            lg_client = get_client()
+            lg_thread = await lg_client.threads.get(thread_id)
+            if lg_thread is not None:
+                # Thread exists in LangGraph - create a minimal Store entry
+                now = 0
+                recovered = {
+                    "thread_id": thread_id,
+                    "status": "idle",
+                    "created_at": now,
+                    "updated_at": now,
+                    "metadata": lg_thread.get("metadata", {}),
+                    "values": {},
+                }
+                recovered.setdefault("metadata", {})
+                recovered["metadata"][THREAD_VISIBILITY_KEY] = normalize_thread_visibility(recovered["metadata"].get(THREAD_VISIBILITY_KEY))
+                recovered["metadata"][THREAD_OWNER_KEY] = user.id
+                await store.aput(("threads",), thread_id, recovered)
+                item = await store.aget(("threads",), thread_id)
+                logger.info("Recovered thread %s from LangGraph API to Store", thread_id)
+        except Exception as e:
+            logger.debug("LangGraph recovery failed for thread %s: %s", thread_id, e)
+
     if item is None:
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
 
