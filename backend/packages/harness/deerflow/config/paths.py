@@ -214,22 +214,45 @@ class Paths:
         This directory contains a `user-data/` subdirectory that is mounted
         as `/mnt/user-data/` inside the sandbox.
 
+        Resolution order (first match wins):
+        1. Current workspace path (if workspace_id is set in context and thread exists there)
+        2. Any workspace path (search all workspaces for this thread_id)
+        3. User-specific legacy path (if user_id is set in context)
+        4. Global legacy path
+
+        This ensures files uploaded with workspace context remain accessible
+        even when the workspace context is not available (e.g., during AI execution).
+
         Raises:
             ValueError: If `thread_id` contains unsafe characters (path separators
                         or `..`) that could cause directory traversal.
         """
         validated_thread_id = _validate_thread_id(thread_id)
+        legacy_thread_dir = self.base_dir / "threads" / validated_thread_id
+
         current_workspace_id = get_current_workspace_id()
-        if current_workspace_id and not os.getenv("PYTEST_CURRENT_TEST"):
+        is_test = bool(os.getenv("PYTEST_CURRENT_TEST"))
+
+        if current_workspace_id and not is_test:
             workspace_thread_dir = self.workspace_dir(current_workspace_id) / "threads" / validated_thread_id
-            legacy_thread_dir = self.base_dir / "threads" / validated_thread_id
-            if workspace_thread_dir.exists() or not legacy_thread_dir.exists():
+            if workspace_thread_dir.exists():
                 return workspace_thread_dir
-            return legacy_thread_dir
+
+        # Also check other workspaces for this thread_id
+        # (thread may have been created in a different workspace context)
+        # This ensures files uploaded with workspace context are accessible
+        # even when current_workspace_id is not set (e.g., during AI execution)
+        if self.workspaces_dir.exists():
+            for ws_dir in self.workspaces_dir.iterdir():
+                if ws_dir.is_dir() and ws_dir.name.startswith("ws-"):
+                    candidate = ws_dir / "threads" / validated_thread_id
+                    if candidate.exists():
+                        return candidate
+
         current_user_id = self._active_user_id()
         if current_user_id:
             return self.user_dir(current_user_id) / "threads" / validated_thread_id
-        return self.base_dir / "threads" / validated_thread_id
+        return legacy_thread_dir
 
     def sandbox_work_dir(self, thread_id: str) -> Path:
         """
