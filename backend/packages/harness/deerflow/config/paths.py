@@ -240,8 +240,6 @@ class Paths:
 
         # Also check other workspaces for this thread_id
         # (thread may have been created in a different workspace context)
-        # This ensures files uploaded with workspace context are accessible
-        # even when current_workspace_id is not set (e.g., during AI execution)
         if self.workspaces_dir.exists():
             for ws_dir in self.workspaces_dir.iterdir():
                 if ws_dir.is_dir() and ws_dir.name.startswith("ws-"):
@@ -249,9 +247,21 @@ class Paths:
                     if candidate.exists():
                         return candidate
 
+        # Check user-specific paths (thread may have been created in a user context)
+        # Search all users directories for this thread_id
+        users_dir = self.base_dir / "users"
+        if users_dir.exists():
+            for user_dir in users_dir.iterdir():
+                if user_dir.is_dir():
+                    candidate = user_dir / "threads" / validated_thread_id
+                    if candidate.exists():
+                        return candidate
+
         current_user_id = self._active_user_id()
         if current_user_id:
-            return self.user_dir(current_user_id) / "threads" / validated_thread_id
+            user_thread_dir = self.user_dir(current_user_id) / "threads" / validated_thread_id
+            if user_thread_dir.exists():
+                return user_thread_dir
         return legacy_thread_dir
 
     def sandbox_work_dir(self, thread_id: str) -> Path:
