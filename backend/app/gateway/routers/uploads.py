@@ -3,11 +3,22 @@
 import logging
 import os
 import stat
+import time
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from app.gateway.ownership import require_thread_manage_access, require_thread_read_access
+from app.gateway.auth import require_user
+from app.gateway.deps import get_checkpointer, get_store
+from app.gateway.ownership import (
+    THREAD_OWNER_KEY,
+    THREAD_VISIBILITY_KEY,
+    THREAD_VISIBILITY_PRIVATE,
+    attach_owner_metadata,
+    normalize_thread_visibility,
+    require_thread_manage_access,
+    require_thread_read_access,
+)
 from deerflow.config.paths import get_paths
 from deerflow.sandbox.sandbox_provider import get_sandbox_provider
 from deerflow.uploads.manager import (
@@ -24,6 +35,62 @@ from deerflow.uploads.manager import (
 from deerflow.utils.file_conversion import CONVERTIBLE_EXTENSIONS, convert_file_to_markdown
 
 logger = logging.getLogger(__name__)
+
+
+async def _auto_create_thread(request: Request, thread_id: str) -> None:
+    """Create a thread in the Store if it doesn't exist.
+
+    This is used by the upload endpoint to auto-create threads for new conversations.
+    """
+    try:
+        from langgraph.checkpoint.base import empty_checkpoint
+
+        store = get_store(request)
+        checkpointer = get_checkpointer(request)
+        user = require_user(request)
+
+        if store is None:
+            logger.warning("Store not available, cannot auto-create thread")
+            return
+
+        # Check if thread already exists
+        existing = await store.aget(("threads",), thread_id)
+        if existing is not None:
+            return
+
+        now = time.time()
+        metadata = attach_owner_metadata({"visibility": "private"}, user)
+
+        # Create thread record in Store
+        thread_record = {
+            "thread_id": thread_id,
+            "status": "idle",
+            "created_at": now,
+            "updated_at": now,
+            "metadata": metadata,
+        }
+        await store.aput(("threads",), thread_id, thread_record)
+
+        # Create checkpoint
+        if checkpointer is not None:
+            config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+            ckpt_metadata = {
+                "step": -1,
+                "source": "input",
+                "writes": None,
+                "parents": {},
+                **metadata,
+                "created_at": now,
+            }
+            try:
+                await checkpointer.aput(config, empty_checkpoint(), ckpt_metadata, {})
+            except Exception:
+                logger.debug("Failed to create checkpoint for auto-created thread %s", thread_id)
+
+        logger.info("Auto-created thread %s for file upload", thread_id)
+    except Exception:
+        logger.exception("Failed to auto-create thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to create thread")
 
 router = APIRouter(prefix="/api/threads/{thread_id}/uploads", tags=["uploads"])
 
@@ -79,9 +146,18 @@ async def upload_files(
     files: list[UploadFile] = File(...),
 ) -> UploadResponse:
     """Upload multiple files to a thread's uploads directory."""
-    await require_thread_manage_access(request, thread_id)
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
+
+    # Auto-create thread if it doesn't exist (for new conversation uploads)
+    try:
+        await require_thread_manage_access(request, thread_id)
+    except HTTPException as e:
+        if e.status_code == 404:
+            # Thread doesn't exist - create it automatically
+            await _auto_create_thread(request, thread_id)
+        else:
+            raise
 
     try:
         uploads_dir = ensure_uploads_dir(thread_id)
