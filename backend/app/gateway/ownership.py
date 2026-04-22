@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 
 from fastapi import HTTPException, Request
@@ -16,6 +17,8 @@ THREAD_SHARED_BY_KEY = "shared_by_user_id"
 THREAD_SHARED_AT_KEY = "shared_at"
 THREAD_VISIBILITY_PRIVATE = "private"
 THREAD_VISIBILITY_WORKSPACE = "workspace"
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_thread_visibility(value: str | None) -> str:
@@ -69,9 +72,10 @@ async def _get_thread_record(request: Request, thread_id: str, user: AuthUser) -
     item = await store.aget(("threads",), thread_id)
     if item is None:
         checkpointer = get_checkpointer(request)
+        recovered = None
         try:
             async for checkpoint_tuple in checkpointer.alist(None):
-                cfg = getattr(checkpoint_tuple, "config", {})
+                cfg = getattr(checkpoint_tuple, "config", {}) or {}
                 candidate_thread_id = cfg.get("configurable", {}).get("thread_id")
                 if candidate_thread_id != thread_id:
                     continue
@@ -89,11 +93,16 @@ async def _get_thread_record(request: Request, thread_id: str, user: AuthUser) -
                 }
                 recovered.setdefault("metadata", {})
                 recovered["metadata"][THREAD_VISIBILITY_KEY] = normalize_thread_visibility(recovered["metadata"].get(THREAD_VISIBILITY_KEY))
+                break
+        except Exception as e:
+            logger.debug("Checkpointer recovery failed for thread %s: %s", thread_id, e)
+
+        if recovered is not None:
+            try:
                 await store.aput(("threads",), thread_id, recovered)
                 item = await store.aget(("threads",), thread_id)
-                break
-        except Exception:
-            pass
+            except Exception as e:
+                logger.warning("Failed to recover thread %s to store: %s", thread_id, e)
 
     if item is None:
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
