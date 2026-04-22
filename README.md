@@ -131,6 +131,23 @@ DeerFlow 原版使用内存存储，重启后对话历史丢失。MicX 支持持
 - `sqlite` - 文件持久化 (开发推荐)
 - `postgres` - PostgreSQL 持久化 (生产推荐)
 
+### 7. 文件上传修复
+
+MicX 修复了 DeerFlow 原版文件上传的多个问题：
+
+| 问题 | 原因 | 修复 |
+|------|------|------|
+| 新对话无法上传文件 | 线程未创建 | 自动创建缺失线程 |
+| 上传后 AI 找不到文件 | 路径解析不一致 | 扩展路径搜索范围 |
+| 文件保存在错误位置 | 上下文丢失 | 搜索所有 workspaces/users 目录 |
+
+**路径解析逻辑:**
+1. 当前 workspace 路径
+2. 所有 workspaces 目录
+3. 所有 users 目录
+4. 用户特定 legacy 路径
+5. 全局 legacy 路径
+
 ---
 
 ## 快速开始
@@ -393,6 +410,23 @@ DeerFlow is single-user. MicX implements a complete multi-user system:
 | **Telegram** | bot_token | Bot API integration |
 | **WeCom** | bot_id, bot_secret | Tencent WeCom |
 | **DingTalk** | client_id, client_secret | Alibaba DingTalk |
+
+### 5. File Upload Fixes
+
+MicX fixes several file upload issues from DeerFlow:
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Cannot upload in new conversations | Thread not created | Auto-create missing threads |
+| AI cannot find uploaded files | Path resolution mismatch | Extended path search |
+| Files saved to wrong location | Context lost | Search all workspaces/users dirs |
+
+**Path Resolution Order:**
+1. Current workspace path
+2. All workspaces directories
+3. All users directories
+4. User-specific legacy path
+5. Global legacy path
 
 ---
 
