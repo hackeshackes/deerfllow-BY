@@ -148,6 +148,56 @@ MicX 修复了 DeerFlow 原版文件上传的多个问题：
 4. 用户特定 legacy 路径
 5. 全局 legacy 路径
 
+### 8. 知识库 (Knowledge Base)
+
+MicX 实现了完整的 RAG 知识库系统：
+
+| 功能 | 说明 |
+|------|------|
+| **文档上传** | 支持多种文档格式，自动转换为可检索内容 |
+| **向量存储** | 基于嵌入模型的语义检索 |
+| **知识检索** | Agent 上下文自动注入相关知识 |
+| **网页抓取** | Jina AI 驱动的网页内容提取 |
+| **CRUD 管理** | 完整的知识库管理 API |
+
+**API 端点:**
+```bash
+GET    /api/knowledge                    # 列出所有知识库
+POST   /api/knowledge                   # 创建知识库
+GET    /api/knowledge/{id}              # 获取知识库详情
+PUT    /api/knowledge/{id}              # 更新知识库
+DELETE /api/knowledge/{id}              # 删除知识库
+POST   /api/knowledge/{id}/documents   # 上传文档
+GET    /api/knowledge/{id}/search       # 搜索知识
+```
+
+**Admin 管理:** `/workspace/admin/knowledge` (计划中)
+
+### 9. 监控中心
+
+MicX 提供了完整的系统监控能力：
+
+| 功能 | 说明 |
+|------|------|
+| **健康状态** | 各服务组件运行状态一目了然 |
+| **指标概览** | 请求量、响应时间、错误率等核心指标 |
+| **追踪配置** | LangSmith / Langfuse 集成配置 |
+| **最近问题** | 自动记录和展示系统异常 |
+
+**Admin 管理:** `/workspace/admin/monitoring`
+
+### 10. 审计日志
+
+记录所有敏感操作，支持合规和问题排查：
+
+| 功能 | 说明 |
+|------|------|
+| **配置变更** | 所有配置修改的完整历史 |
+| **敏感操作** | 用户管理、权限变更等敏感操作记录 |
+| **时间线视图** | 按时间排序的操作记录 |
+
+**Admin 管理:** `/workspace/admin/audit`
+
 ---
 
 ## 快速开始
@@ -316,6 +366,12 @@ make dev          # 启动所有服务 (开发模式)
 
 ## 文档
 
+- [v1.4 PRD](./docs/plans/2026-04-19-micx-v1.4-prd.md)
+- [v1.4 执行计划](./docs/plans/2026-04-19-micx-v1.4-execution.md)
+- [v1.4 Bugfix 计划](./docs/plans/2026-04-19-micx-v1.4-bugfix-plan.md)
+- [v1.3 PRD](./docs/plans/2026-04-17-micx-v1.3-prd.md)
+- [v1.3 执行计划](./docs/plans/2026-04-17-micx-v1.3-execution.md)
+- [v1.2 计划](./docs/plans/2026-04-16-micx-v1.2-plan.md)
 - [PRD 文档](./docs/plans/2026-04-13-micx-vnext-prd.md)
 - [执行计划](./docs/plans/2026-04-13-micx-vnext-execution.md)
 - [修复计划](./docs/plans/2026-04-15-micx-fix-plan.md)
@@ -428,6 +484,54 @@ MicX fixes several file upload issues from DeerFlow:
 4. User-specific legacy path
 5. Global legacy path
 
+### 6. Knowledge Base (RAG)
+
+MicX implements a complete RAG-based knowledge management system:
+
+| Feature | Description |
+|---------|-------------|
+| **Document Upload** | Multiple formats, auto-converted to searchable content |
+| **Vector Storage** | Embedding-based semantic retrieval |
+| **Knowledge Retrieval** | Auto-injected relevant knowledge in agent context |
+| **Web Scraping** | Jina AI-powered web content extraction |
+| **CRUD API** | Complete knowledge base management |
+
+**API Endpoints:**
+```bash
+GET    /api/knowledge                    # List all knowledge bases
+POST   /api/knowledge                   # Create knowledge base
+GET    /api/knowledge/{id}              # Get knowledge base details
+PUT    /api/knowledge/{id}              # Update knowledge base
+DELETE /api/knowledge/{id}              # Delete knowledge base
+POST   /api/knowledge/{id}/documents   # Upload documents
+GET    /api/knowledge/{id}/search       # Search knowledge
+```
+
+### 7. Monitoring Center
+
+MicX provides comprehensive system monitoring:
+
+| Feature | Description |
+|---------|-------------|
+| **Health Status** | Clear view of all service component statuses |
+| **Metrics Overview** | Request volume, response time, error rate KPIs |
+| **Tracing Config** | LangSmith / Langfuse integration |
+| **Recent Issues** | Auto-logged system anomalies |
+
+**Admin:** `/workspace/admin/monitoring`
+
+### 8. Audit Logs
+
+Complete audit trail for compliance and troubleshooting:
+
+| Feature | Description |
+|---------|-------------|
+| **Config Changes** | Full history of all configuration modifications |
+| **Sensitive Operations** | User management, permission changes |
+| **Timeline View** | Chronologically sorted operation records |
+
+**Admin:** `/workspace/admin/audit`
+
 ---
 
 ## Quick Start
@@ -530,6 +634,12 @@ make dev          # Start all services (dev mode)
 
 ## Documentation
 
+- [v1.4 PRD](./docs/plans/2026-04-19-micx-v1.4-prd.md)
+- [v1.4 Execution](./docs/plans/2026-04-19-micx-v1.4-execution.md)
+- [v1.4 Bugfix Plan](./docs/plans/2026-04-19-micx-v1.4-bugfix-plan.md)
+- [v1.3 PRD](./docs/plans/2026-04-17-micx-v1.3-prd.md)
+- [v1.3 Execution](./docs/plans/2026-04-17-micx-v1.3-execution.md)
+- [v1.2 Plan](./docs/plans/2026-04-16-micx-v1.2-plan.md)
 - [PRD Document](./docs/plans/2026-04-13-micx-vnext-prd.md)
 - [Execution Plan](./docs/plans/2026-04-13-micx-vnext-execution.md)
 - [Fix Plan](./docs/plans/2026-04-15-micx-fix-plan.md)
