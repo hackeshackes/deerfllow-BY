@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-04-25
+
+### Added
+
+#### Feishu Platform Tools (飞书平台工具)
+
+**Cloud Drive (云盘)**
+- `feishu_drive_file_delete` - Delete cloud drive files
+- `feishu_drive_file_move` - Move files within cloud drive
+- `feishu_drive_file_copy` - Copy files in cloud drive
+
+**Bitable (多维表格)**
+- `feishu_bitable_record_create` - Create single record in bitable table
+- `feishu_bitable_record_update` - Update single record in bitable table
+- `feishu_bitable_record_delete` - Delete single record from bitable table
+- `feishu_bitable_table_list` - List all tables in a bitable
+- `feishu_bitable_field_list` - List all fields in a bitable table
+
+**IM (消息增强)**
+- `feishu_message_get` - Get message content by ID
+
+**Calendar (日历)**
+- `feishu_calendar_event_get` - Get calendar event by ID
+
+**Task (任务)**
+- `feishu_task_get` - Get task details by GUID
+
+**Mail (邮件)**
+- `feishu_mail_create_draft` - Create mail draft
+
+**Sheets (电子表格)**
+- `feishu_sheet_create` - Create new spreadsheet in folder
+
+### Fixed
+
+- `feishu_doc_write` - Fixed block_id and response parsing bugs
+- `feishu_sheet_write` - Fixed request body format and response field names
+- `feishu_sheet_read` / `feishu_sheet_range` - Fixed response data access
+
 ## [1.4.0] - 2026-04-20
 
 ### Added
