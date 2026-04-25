@@ -123,7 +123,124 @@ MicX 提供了完整的 Admin 控制台：
 | **企业微信** | bot_id, bot_secret | 腾讯企业微信 |
 | **钉钉** | client_id, client_secret | 阿里巴巴钉钉平台 |
 
-### 6. Checkpoint 持久化
+### 6. 飞书平台工具 (Feishu Tools)
+
+MicX 实现了完整的飞书平台 API 工具集，共 **57 个工具**，覆盖云文档、多维表格、日历、任务、邮件等模块：
+
+#### 云文档 (Docx) - 5 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_doc_read` | 读取文档内容 |
+| `feishu_doc_search` | 搜索文档 |
+| `feishu_doc_meta` | 获取文档元数据 |
+| `feishu_doc_create` | 创建新文档 |
+| `feishu_doc_write` | 写入文档内容（追加块） |
+
+#### 多维表格 (Bitable) - 7 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_bitable_read` | 读取多维表格数据 |
+| `feishu_bitable_write` | 批量写入多维表格 |
+| `feishu_bitable_record_create` | 创建单条记录 |
+| `feishu_bitable_record_update` | 更新单条记录 |
+| `feishu_bitable_record_delete` | 删除单条记录 |
+| `feishu_bitable_table_list` | 列出所有表格 |
+| `feishu_bitable_field_list` | 列出所有字段 |
+
+#### 日历 (Calendar) - 7 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_calendar_list` | 列出日历 |
+| `feishu_calendar_event_list` | 列出日历事件 |
+| `feishu_calendar_event_create` | 创建日历事件 |
+| `feishu_calendar_event_get` | 获取事件详情 |
+| `feishu_calendar_event_update` | 更新日历事件 |
+| `feishu_calendar_event_delete` | 删除日历事件 |
+| `feishu_calendar_freebusy` | 查询忙闲状态 |
+
+#### 任务 (Task) - 6 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_task_list` | 列出任务 |
+| `feishu_task_add` | 添加新任务 |
+| `feishu_task_get` | 获取任务详情 |
+| `feishu_task_update` | 更新任务 |
+| `feishu_task_complete` | 完成任务 |
+| `feishu_task_delete` | 删除任务 |
+
+#### 邮件 (Mail) - 4 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_mail_list` | 列出邮件 |
+| `feishu_mail_get` | 获取邮件内容 |
+| `feishu_mail_send` | 发送邮件 |
+| `feishu_mail_create_draft` | 创建邮件草稿 |
+
+#### 电子表格 (Sheets) - 4 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_sheet_read` | 读取表格数据 |
+| `feishu_sheet_write` | 写入表格数据 |
+| `feishu_sheet_range` | 读取指定范围 |
+| `feishu_sheet_create` | 在文件夹中创建表格 |
+
+#### 云盘 (Drive) - 8 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_drive_file_list` | 列出文件 |
+| `feishu_drive_file_meta` | 获取文件元数据 |
+| `feishu_drive_file_download` | 下载文件 |
+| `feishu_drive_file_delete` | 删除文件 |
+| `feishu_drive_file_move` | 移动文件 |
+| `feishu_drive_file_copy` | 复制文件 |
+| `feishu_drive_create_folder` | 创建文件夹 |
+| `feishu_drive_file_upload` | 上传文件 |
+
+#### 消息增强 (IM) - 3 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_send_message` | 发送消息 |
+| `feishu_download_file` | 下载消息附件 |
+| `feishu_message_get` | 获取消息内容 |
+
+#### 通讯录 (Contact) - 2 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_contact_user` | 查询用户信息 |
+| `feishu_contact_dept` | 查询部门信息 |
+
+#### 审批 (Approval) - 3 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_approval_list` | 列出审批实例 |
+| `feishu_approval_get` | 获取审批详情 |
+| `feishu_approval_action` | 操作审批（通过/拒绝） |
+
+#### 妙记 (Minutes) - 2 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_minutes_get` | 获取妙记摘要 |
+| `feishu_minutes_content` | 获取妙记全文内容 |
+
+#### OKR - 3 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_okr_period_list` | 列出 OKR 周期 |
+| `feishu_okr_get` | 获取 OKR 详情 |
+| `feishu_okr_progress` | 获取 OKR 进度 |
+
+#### 考勤 (Attendance) - 2 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_attendance_record` | 查询考勤记录 |
+| `feishu_attendance_group` | 查询考勤组 |
+
+#### 消息 (Messages) - 1 个
+| 工具 | 说明 |
+|------|------|
+| `feishu_get_messages` | 获取会话消息列表 |
+
+### 7. Checkpoint 持久化
 
 DeerFlow 原版使用内存存储，重启后对话历史丢失。MicX 支持持久化：
 
@@ -131,7 +248,7 @@ DeerFlow 原版使用内存存储，重启后对话历史丢失。MicX 支持持
 - `sqlite` - 文件持久化 (开发推荐)
 - `postgres` - PostgreSQL 持久化 (生产推荐)
 
-### 7. 文件上传修复
+### 8. 文件上传修复
 
 MicX 修复了 DeerFlow 原版文件上传的多个问题：
 
@@ -148,7 +265,7 @@ MicX 修复了 DeerFlow 原版文件上传的多个问题：
 4. 用户特定 legacy 路径
 5. 全局 legacy 路径
 
-### 8. 知识库 (Knowledge Base)
+### 9. 知识库 (Knowledge Base)
 
 MicX 实现了完整的 RAG 知识库系统：
 
@@ -173,7 +290,7 @@ GET    /api/knowledge/{id}/search       # 搜索知识
 
 **Admin 管理:** `/workspace/admin/knowledge` (计划中)
 
-### 9. 监控中心
+### 10. 监控中心
 
 MicX 提供了完整的系统监控能力：
 
@@ -186,7 +303,7 @@ MicX 提供了完整的系统监控能力：
 
 **Admin 管理:** `/workspace/admin/monitoring`
 
-### 10. 审计日志
+### 11. 审计日志
 
 记录所有敏感操作，支持合规和问题排查：
 
@@ -467,7 +584,124 @@ DeerFlow is single-user. MicX implements a complete multi-user system:
 | **WeCom** | bot_id, bot_secret | Tencent WeCom |
 | **DingTalk** | client_id, client_secret | Alibaba DingTalk |
 
-### 5. File Upload Fixes
+### 5. Feishu Platform Tools
+
+MicX implements a comprehensive Feishu platform API toolset with **57 tools** covering Docs, Bitable, Calendar, Tasks, Mail, and more:
+
+#### Docx - 5 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_doc_read` | Read document content |
+| `feishu_doc_search` | Search documents |
+| `feishu_doc_meta` | Get document metadata |
+| `feishu_doc_create` | Create new document |
+| `feishu_doc_write` | Write content to document (append blocks) |
+
+#### Bitable - 7 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_bitable_read` | Read bitable data |
+| `feishu_bitable_write` | Batch write to bitable |
+| `feishu_bitable_record_create` | Create single record |
+| `feishu_bitable_record_update` | Update single record |
+| `feishu_bitable_record_delete` | Delete single record |
+| `feishu_bitable_table_list` | List all tables |
+| `feishu_bitable_field_list` | List all fields |
+
+#### Calendar - 7 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_calendar_list` | List calendars |
+| `feishu_calendar_event_list` | List calendar events |
+| `feishu_calendar_event_create` | Create calendar event |
+| `feishu_calendar_event_get` | Get event details |
+| `feishu_calendar_event_update` | Update calendar event |
+| `feishu_calendar_event_delete` | Delete calendar event |
+| `feishu_calendar_freebusy` | Query free/busy status |
+
+#### Task - 6 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_task_list` | List tasks |
+| `feishu_task_add` | Add new task |
+| `feishu_task_get` | Get task details |
+| `feishu_task_update` | Update task |
+| `feishu_task_complete` | Complete task |
+| `feishu_task_delete` | Delete task |
+
+#### Mail - 4 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_mail_list` | List emails |
+| `feishu_mail_get` | Get email content |
+| `feishu_mail_send` | Send email |
+| `feishu_mail_create_draft` | Create email draft |
+
+#### Sheets - 4 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_sheet_read` | Read sheet data |
+| `feishu_sheet_write` | Write sheet data |
+| `feishu_sheet_range` | Read specific range |
+| `feishu_sheet_create` | Create spreadsheet in folder |
+
+#### Drive - 8 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_drive_file_list` | List files |
+| `feishu_drive_file_meta` | Get file metadata |
+| `feishu_drive_file_download` | Download file |
+| `feishu_drive_file_delete` | Delete file |
+| `feishu_drive_file_move` | Move file |
+| `feishu_drive_file_copy` | Copy file |
+| `feishu_drive_create_folder` | Create folder |
+| `feishu_drive_file_upload` | Upload file |
+
+#### IM - 3 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_send_message` | Send message |
+| `feishu_download_file` | Download message attachment |
+| `feishu_message_get` | Get message content |
+
+#### Contact - 2 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_contact_user` | Query user info |
+| `feishu_contact_dept` | Query department info |
+
+#### Approval - 3 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_approval_list` | List approval instances |
+| `feishu_approval_get` | Get approval details |
+| `feishu_approval_action` | Approve/reject approval |
+
+#### Minutes - 2 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_minutes_get` | Get minutes summary |
+| `feishu_minutes_content` | Get minutes full content |
+
+#### OKR - 3 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_okr_period_list` | List OKR periods |
+| `feishu_okr_get` | Get OKR details |
+| `feishu_okr_progress` | Get OKR progress |
+
+#### Attendance - 2 tools
+| Tool | Description |
+|------|-------------|
+| `feishu_attendance_record` | Query attendance records |
+| `feishu_attendance_group` | Query attendance groups |
+
+#### Messages - 1 tool
+| Tool | Description |
+|------|-------------|
+| `feishu_get_messages` | Get conversation message list |
+
+### 6. File Upload Fixes
 
 MicX fixes several file upload issues from DeerFlow:
 
@@ -484,7 +718,7 @@ MicX fixes several file upload issues from DeerFlow:
 4. User-specific legacy path
 5. Global legacy path
 
-### 6. Knowledge Base (RAG)
+### 7. Knowledge Base (RAG)
 
 MicX implements a complete RAG-based knowledge management system:
 
@@ -507,7 +741,7 @@ POST   /api/knowledge/{id}/documents   # Upload documents
 GET    /api/knowledge/{id}/search       # Search knowledge
 ```
 
-### 7. Monitoring Center
+### 8. Monitoring Center
 
 MicX provides comprehensive system monitoring:
 
@@ -520,7 +754,7 @@ MicX provides comprehensive system monitoring:
 
 **Admin:** `/workspace/admin/monitoring`
 
-### 8. Audit Logs
+### 9. Audit Logs
 
 Complete audit trail for compliance and troubleshooting:
 
