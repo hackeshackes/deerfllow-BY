@@ -280,7 +280,7 @@ MicX 实现了完整的 RAG 知识库系统：
 **API 端点:**
 ```bash
 GET    /api/knowledge                    # 列出所有知识库
-POST   /api/knowledge                   # 创建知识库
+POST   /api/knowledge                   # 创建知识库（支持 visibility 字段）
 GET    /api/knowledge/{id}              # 获取知识库详情
 PUT    /api/knowledge/{id}              # 更新知识库
 DELETE /api/knowledge/{id}              # 删除知识库
@@ -288,7 +288,15 @@ POST   /api/knowledge/{id}/documents   # 上传文档
 GET    /api/knowledge/{id}/search       # 搜索知识
 ```
 
-**Admin 管理:** `/workspace/admin/knowledge` (计划中)
+**可见性选项:**
+- `private` - 私有，仅创建者可见
+- `workspace` - 工作区共享，工作区成员可见
+- `global` - 全局（仅管理员可创建）
+
+**Admin 管理:** `/workspace/admin/knowledge`
+- 查看所有用户的知识库
+- 编辑知识库（名称、描述、可见性）
+- 支持修改为私有/工作区共享/全局
 
 ### 10. 监控中心
 
@@ -733,13 +741,23 @@ MicX implements a complete RAG-based knowledge management system:
 **API Endpoints:**
 ```bash
 GET    /api/knowledge                    # List all knowledge bases
-POST   /api/knowledge                   # Create knowledge base
+POST   /api/knowledge                   # Create knowledge base (supports visibility field)
 GET    /api/knowledge/{id}              # Get knowledge base details
 PUT    /api/knowledge/{id}              # Update knowledge base
 DELETE /api/knowledge/{id}              # Delete knowledge base
 POST   /api/knowledge/{id}/documents   # Upload documents
 GET    /api/knowledge/{id}/search       # Search knowledge
 ```
+
+**Visibility Options:**
+- `private` - Private, only creator can access
+- `workspace` - Workspace shared, visible to workspace members
+- `global` - Global (admin only)
+
+**Admin:** `/workspace/admin/knowledge`
+- View all users' knowledge bases
+- Edit knowledge bases (name, description, visibility)
+- Can change visibility to private/workspace/global
 
 ### 8. Monitoring Center
 

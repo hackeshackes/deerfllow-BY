@@ -35,6 +35,7 @@ type FormState = {
   when_thinking_enabled: string;
   enabled: boolean;
   is_default: boolean;
+  capabilities: string[];
 };
 
 const emptyForm: FormState = {
@@ -58,6 +59,7 @@ const emptyForm: FormState = {
   when_thinking_enabled: "",
   enabled: true,
   is_default: false,
+  capabilities: ["text"],
 };
 
 export function ModelsAdminPage() {
@@ -118,6 +120,7 @@ export function ModelsAdminPage() {
       when_thinking_enabled: model.when_thinking_enabled ? JSON.stringify(model.when_thinking_enabled, null, 2) : "",
       enabled: Boolean(model.enabled ?? true),
       is_default: Boolean(model.is_default),
+      capabilities: model.capabilities ?? ["text"],
     });
     setDialogOpen(true);
   }
@@ -207,6 +210,7 @@ export function ModelsAdminPage() {
       when_thinking_enabled: preset.when_thinking_enabled ? JSON.stringify(preset.when_thinking_enabled, null, 2) : "",
       enabled: true,
       is_default: models.length === 0,
+      capabilities: ["text"],
     });
     setPresetOpen(false);
     setDialogOpen(true);
@@ -261,6 +265,9 @@ export function ModelsAdminPage() {
                     {model.supports_vision && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Vision</span>}
                     {model.supports_thinking && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Thinking</span>}
                     {model.supports_reasoning_effort && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Reasoning</span>}
+                    {model.capabilities?.map((cap) => (
+                      <span key={cap} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{cap}</span>
+                    ))}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">

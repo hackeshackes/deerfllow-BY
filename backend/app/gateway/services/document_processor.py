@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
-import uuid
-from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +70,7 @@ async def process_docx(file_path: str) -> list[dict]:
 
 async def process_txt(file_path: str) -> list[dict]:
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
         chunks = chunk_text(content)
         for chunk in chunks:
@@ -103,7 +100,7 @@ async def process_csv(file_path: str) -> list[dict]:
 
 async def process_markdown(file_path: str) -> list[dict]:
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
         chunks = chunk_text(content)
         for chunk in chunks:

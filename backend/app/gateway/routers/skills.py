@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -12,18 +13,20 @@ from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_owner_user, require_user
 from app.gateway.path_utils import resolve_thread_virtual_path
-from deerflow.admin import SkillShare, append_admin_audit_record, get_visible_skills_for_user, get_skill_share, save_skill_share, upsert_skill_metadata
+from deerflow.admin import SkillShare, append_admin_audit_record, get_skill_share, get_visible_skills_for_user, read_skill_metadata, save_skill_share, upsert_skill_metadata
 from deerflow.agents.lead_agent.prompt import refresh_skills_system_prompt_cache_async
-from deerflow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
+from deerflow.config.extensions_config import ExtensionsConfig, SkillModelBinding, SkillStateConfig, get_extensions_config, reload_extensions_config
 from deerflow.skills import Skill, load_skills
 from deerflow.skills.installer import SkillAlreadyExistsError, install_skill_from_archive
 from deerflow.skills.manager import (
+    SKILL_FILE_NAME,
     append_history,
     atomic_write,
     custom_skill_exists,
     ensure_custom_skill_is_editable,
     get_custom_skill_dir,
     get_custom_skill_file,
+    get_public_skill_dir,
     get_skill_history_file,
     public_skill_exists,
     read_custom_skill_content,
@@ -81,6 +84,7 @@ class SkillResponse(BaseModel):
     installed_at: str | None = Field(None, description="Install timestamp")
     display_name_zh: str | None = Field(None, description="Chinese display name")
     description_zh: str | None = Field(None, description="Chinese description")
+    installed_by: str | None = Field(None, description="User ID who installed this skill")
 
 
 class SkillsListResponse(BaseModel):
@@ -164,8 +168,29 @@ class SharedSkillsResponse(BaseModel):
     skills: list[SkillShareResponse]
 
 
-def _skill_to_response(skill: Skill) -> SkillResponse:
-    """Convert a Skill object to a SkillResponse."""
+class SkillModelBindingRequest(BaseModel):
+    model_name: str = Field(..., description="Model name to bind to the skill")
+    is_override_allowed: bool = Field(default=True, description="Whether users can override this binding")
+
+
+class SkillModelBindingResponse(BaseModel):
+    skill_name: str
+    model_name: str
+    is_override_allowed: bool
+    created_by: str | None = None
+    created_at: str | None = None
+
+
+class SkillModelBindingsListResponse(BaseModel):
+    bindings: dict[str, SkillModelBindingResponse]
+
+
+def _skill_to_response(skill: Skill, config: Any = None) -> SkillResponse:
+    installed_by = None
+    all_metadata = read_skill_metadata()
+    if skill.name in all_metadata:
+        installed_by = all_metadata[skill.name].get("installed_by")
+
     return SkillResponse(
         name=skill.name,
         description=skill.description,
@@ -179,6 +204,7 @@ def _skill_to_response(skill: Skill) -> SkillResponse:
         installed_at=skill.installed_at,
         display_name_zh=skill.display_name_zh,
         description_zh=skill.description_zh,
+        installed_by=installed_by,
     )
 
 
@@ -190,16 +216,12 @@ def _extensions_config_path() -> Path:
 
 
 def _set_skill_enabled_state(skill_name: str, enabled: bool) -> None:
-    config_path = _extensions_config_path()
     current_config = get_extensions_config()
-    config_data = {
-        "mcpServers": {name: server.model_dump() for name, server in current_config.mcp_servers.items()},
-        "skills": {name: {"enabled": skill.enabled} for name, skill in current_config.skills.items()},
-    }
-    config_data["skills"][skill_name] = {"enabled": enabled}
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False), encoding="utf-8")
-    reload_extensions_config()
+    if skill_name not in current_config.skills:
+        current_config.skills[skill_name] = SkillStateConfig(enabled=enabled)
+    else:
+        current_config.skills[skill_name].enabled = enabled
+    _save_extensions_config(current_config)
 
 
 def _current_skill(skill_name: str) -> Skill:
@@ -209,12 +231,20 @@ def _current_skill(skill_name: str) -> Skill:
     return skill
 
 
+def _read_skill_content(skill_name: str) -> str:
+    if custom_skill_exists(skill_name):
+        return get_custom_skill_file(skill_name).read_text(encoding="utf-8")
+    elif public_skill_exists(skill_name):
+        return (get_public_skill_dir(skill_name) / SKILL_FILE_NAME).read_text(encoding="utf-8")
+    raise FileNotFoundError(f"Skill '{skill_name}' not found")
+
+
 def _load_custom_skill_response(skill_name: str) -> CustomSkillContentResponse:
     skills = load_skills(enabled_only=False)
-    skill = next((s for s in skills if s.name == skill_name and s.category == "custom"), None)
+    skill = next((s for s in skills if s.name == skill_name), None)
     if skill is None:
-        raise HTTPException(status_code=404, detail=f"Custom skill '{skill_name}' not found")
-    return CustomSkillContentResponse(**_skill_to_response(skill).model_dump(), content=read_custom_skill_content(skill_name))
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
+    return CustomSkillContentResponse(**_skill_to_response(skill).model_dump(), content=_read_skill_content(skill_name))
 
 
 @router.get(
@@ -251,7 +281,7 @@ async def install_skill(request: SkillInstallRequest, http_request: Request) -> 
         skill_file_path = resolve_thread_virtual_path(request.thread_id, request.path)
         result = install_skill_from_archive(skill_file_path)
         _set_skill_enabled_state(result["skill_name"], True)
-        upsert_skill_metadata(result["skill_name"], source=f"thread:{request.thread_id}:{request.path}", installed_at=datetime.now(UTC).isoformat())
+        upsert_skill_metadata(result["skill_name"], source=f"thread:{request.thread_id}:{request.path}", installed_at=datetime.now(UTC).isoformat(), installed_by=user.id)
         await refresh_skills_system_prompt_cache_async()
         append_admin_audit_record("skill.installed", actor_id=user.id, target=result["skill_name"], details={"source": f"thread:{request.thread_id}:{request.path}"})
         return SkillInstallResponse(**result)
@@ -296,6 +326,7 @@ async def install_skill_from_remote(request: SkillRemoteInstallRequest, http_req
             result["skill_name"],
             source=request.url,
             installed_at=datetime.now(UTC).isoformat(),
+            installed_by=user.id,
             version=skill.version,
             author=skill.author,
             compatibility=skill.compatibility,
@@ -396,7 +427,7 @@ async def list_my_custom_skills(request: Request) -> SkillsListResponse:
 
 @router.post("/skills/custom", response_model=CustomSkillContentResponse, status_code=201, summary="Create Custom Skill")
 async def create_custom_skill(request: CustomSkillCreateRequest, http_request: Request) -> CustomSkillContentResponse:
-    user = require_owner_user(http_request)
+    user = require_user(http_request)
     try:
         skill_name = request.name.strip()
         if not skill_name:
@@ -461,14 +492,26 @@ async def get_custom_skill(skill_name: str, request: Request) -> CustomSkillCont
 
 @router.put("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Edit Custom Skill")
 async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest, http_request: Request) -> CustomSkillContentResponse:
-    require_owner_user(http_request)
+    user = require_user(http_request)
+    from deerflow.admin import get_skill_share
+
+    skill_share = get_skill_share(skill_name)
+    if skill_share and skill_share.owner_id != user.id and not user.is_owner:
+        raise HTTPException(status_code=403, detail="仅技能所有者或管理员可执行此操作")
+
     try:
-        ensure_custom_skill_is_editable(skill_name)
+        if custom_skill_exists(skill_name):
+            pass
+        elif public_skill_exists(skill_name):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="内置技能只能由管理员编辑")
+        else:
+            raise HTTPException(status_code=404, detail=f"Custom skill '{skill_name}' not found.")
         validate_skill_markdown_content(skill_name, request.content)
         scan = await scan_skill_content(request.content, executable=False, location=f"{skill_name}/SKILL.md")
         if scan.decision == "block":
             raise HTTPException(status_code=400, detail=f"Security scan blocked the edit: {scan.reason}")
-        skill_file = get_custom_skill_dir(skill_name) / "SKILL.md"
+        skill_file = get_custom_skill_dir(skill_name) / "SKILL.md" if custom_skill_exists(skill_name) else get_public_skill_dir(skill_name) / "SKILL.md"
         prev_content = skill_file.read_text(encoding="utf-8")
         atomic_write(skill_file, request.content)
         append_history(
@@ -501,8 +544,19 @@ async def delete_custom_skill(skill_name: str, request: Request) -> dict[str, bo
     user = require_user(request)
     from deerflow.admin import get_skill_share
     try:
-        ensure_custom_skill_is_editable(skill_name)
+        all_metadata = read_skill_metadata()
+        skill_metadata = all_metadata.get(skill_name, {})
+        skill_source = skill_metadata.get("source", "")
         skill_share = get_skill_share(skill_name)
+
+        if skill_source.startswith("system:"):
+            raise HTTPException(status_code=403, detail="System skills cannot be deleted")
+
+        if skill_source.startswith("admin:") or (skill_share and skill_share.owner_id != user.id):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Admin skills or other user's skills can only be deleted by admin")
+
+        ensure_custom_skill_is_editable(skill_name)
         if skill_share and skill_share.owner_id != user.id and not user.is_owner:
             raise HTTPException(status_code=403, detail="Only the skill owner or admin can delete this skill")
         skill_dir = get_custom_skill_dir(skill_name)
@@ -643,7 +697,7 @@ async def get_skill(skill_name: str, request: Request) -> SkillResponse:
     description="Update a skill's enabled status by modifying the extensions_config.json file.",
 )
 async def update_skill(skill_name: str, request: SkillUpdateRequest, http_request: Request) -> SkillResponse:
-    require_owner_user(http_request)
+    require_user(http_request)
     try:
         skills = load_skills(enabled_only=False)
         skill = next((s for s in skills if s.name == skill_name), None)
@@ -763,3 +817,89 @@ async def rate_skill(skill_name: str, body: SkillRatingRequest, request: Request
     add_skill_rating(rating)
 
     return {"success": True, "message": "Rating submitted successfully"}
+
+
+@router.get("/skills/model-bindings", response_model=SkillModelBindingsListResponse)
+async def list_skill_model_bindings(request: Request) -> SkillModelBindingsListResponse:
+    require_owner_user(request)
+    config = get_extensions_config()
+    bindings = {}
+    for skill_name, binding in config.skill_model_bindings.items():
+        bindings[skill_name] = SkillModelBindingResponse(
+            skill_name=skill_name,
+            model_name=binding.model_name,
+            is_override_allowed=binding.is_override_allowed,
+            created_by=binding.created_by,
+            created_at=binding.created_at,
+        )
+    return SkillModelBindingsListResponse(bindings=bindings)
+
+
+@router.put("/skills/model-bindings/{skill_name}", response_model=SkillModelBindingResponse)
+async def create_or_update_skill_model_binding(
+    skill_name: str, body: SkillModelBindingRequest, request: Request
+) -> SkillModelBindingResponse:
+    require_owner_user(request)
+
+    from datetime import UTC, datetime
+
+    config = get_extensions_config()
+    existing = config.get_skill_model_binding(skill_name)
+    binding = SkillModelBinding(
+        model_name=body.model_name,
+        is_override_allowed=body.is_override_allowed,
+        created_by=existing.created_by if existing else request.state.user.id if hasattr(request.state, "user") else None,
+        created_at=existing.created_at if existing else datetime.now(UTC).isoformat(),
+    )
+
+    config.set_skill_model_binding(skill_name, binding)
+    _save_extensions_config(config)
+
+    append_admin_audit_record(
+        "skill.model_binding.set",
+        actor_id=request.state.user.id if hasattr(request.state, "user") else None,
+        target=skill_name,
+        details={"model_name": body.model_name, "is_override_allowed": body.is_override_allowed},
+    )
+
+    return SkillModelBindingResponse(
+        skill_name=skill_name,
+        model_name=binding.model_name,
+        is_override_allowed=binding.is_override_allowed,
+        created_by=binding.created_by,
+        created_at=binding.created_at,
+    )
+
+
+@router.delete("/skills/model-bindings/{skill_name}")
+async def delete_skill_model_binding(skill_name: str, request: Request) -> dict:
+    require_owner_user(request)
+    config = get_extensions_config()
+    deleted = config.delete_skill_model_binding(skill_name)
+    if deleted:
+        _save_extensions_config(config)
+        append_admin_audit_record(
+            "skill.model_binding.deleted",
+            actor_id=request.state.user.id if hasattr(request.state, "user") else None,
+            target=skill_name,
+            details={},
+        )
+        return {"success": True, "message": f"Binding for skill '{skill_name}' deleted"}
+    return {"success": True, "message": f"No binding found for skill '{skill_name}'"}
+
+
+def _save_extensions_config(config: ExtensionsConfig) -> None:
+    config_path = _extensions_config_path()
+    config_data = {
+        "mcpServers": {name: server.model_dump() for name, server in config.mcp_servers.items()},
+        "skills": {name: {"enabled": skill.enabled} for name, skill in config.skills.items()},
+        "skillModelBindings": {
+            name: binding.model_dump() for name, binding in config.skill_model_bindings.items()
+        },
+        "skillsMetadata": {
+            name: metadata.model_dump() for name, metadata in config.skills_metadata.items()
+        },
+    }
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False), encoding="utf-8")
+    reload_extensions_config()

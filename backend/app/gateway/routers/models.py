@@ -39,6 +39,10 @@ class ModelResponse(BaseModel):
     when_thinking_enabled: dict[str, Any] | None = Field(None)
     enabled: bool = Field(default=True)
     is_default: bool = Field(default=False)
+    capabilities: list[str] = Field(
+        default=["text"],
+        description="Supported capabilities: text, image-gen, video-gen, code-gen, vision, thinking",
+    )
 
 
 class ModelsListResponse(BaseModel):
@@ -66,6 +70,7 @@ class ModelMutationRequest(BaseModel):
     when_thinking_enabled: dict[str, Any] | None = None
     enabled: bool = True
     is_default: bool = False
+    capabilities: list[str] = ["text"]
 
 
 class ModelTestResponse(BaseModel):
@@ -141,6 +146,7 @@ def _model_to_response(model: ModelConfig, *, is_default: bool = False, include_
         when_thinking_enabled=model.when_thinking_enabled,
         enabled=bool(model.enabled) if model.enabled is not None else True,
         is_default=is_default,
+        capabilities=model.capabilities,
     )
 
 

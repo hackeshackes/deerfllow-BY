@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-04-26
+
+### Added
+
+#### Admin Knowledge Base Management (管理员知识库管理)
+- Admin knowledge base list page at `/workspace/admin/knowledge`
+- Edit knowledge bases (name, description, visibility) via admin interface
+- Admin API endpoint: `PUT /api/admin/knowledge/{kb_id}`
+
+#### User Knowledge Base Creation (用户知识库创建)
+- User knowledge base creation now respects visibility field
+- Options: Private (私有) / Workspace (工作区共享)
+- Visibility is properly saved during creation
+
+### Fixed
+
+#### Knowledge Base Creation Bug
+- Fixed KB creation ignoring "workspace knowledge" selection
+- Visibility field is now properly used instead of hardcoded "private"
+
+#### Skill Management Permissions (技能管理权限)
+- Fixed: Regular users could not create custom skills
+  - Changed `POST /api/skills/custom` from `require_owner_user` to `require_user`
+- Fixed: Admins could not edit built-in (public) skills
+  - Updated `PUT /api/skills/custom/{skill_name}` to support admin editing of public skills
+  - Added proper handling for both custom and public skill files
+
+#### HTTP 413 Upload Error
+- Fixed nginx configuration for large file uploads
+- Added `client_max_body_size 100M` and `proxy_request_buffering off`
+- Fixed uvicorn command to remove invalid `--limit-max-bytes` parameter
+
 ## [1.4.2] - 2026-04-25
 
 ### Added

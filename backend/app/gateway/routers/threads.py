@@ -412,6 +412,7 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
     # Phase 1: Store
     # -----------------------------------------------------------------------
     merged: dict[str, ThreadResponse] = {}
+    is_admin = user.is_owner
 
     if store is not None:
         try:
@@ -423,11 +424,12 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
         for item in items:
             val = item.value
             metadata = val.get("metadata", {})
-            if active_workspace_id:
-                if not _is_visible_to_user(metadata, user.id, active_workspace_id):
+            if not is_admin:
+                if active_workspace_id:
+                    if not _is_visible_to_user(metadata, user.id, active_workspace_id):
+                        continue
+                elif metadata.get(THREAD_OWNER_KEY) != user.id:
                     continue
-            elif metadata.get(THREAD_OWNER_KEY) != user.id:
-                continue
             metadata[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(metadata.get(THREAD_VISIBILITY_KEY))
             merged[val["thread_id"]] = ThreadResponse(
                 thread_id=val["thread_id"],
@@ -465,11 +467,12 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
             if title := channel_values.get("title"):
                 ckpt_values["title"] = title
 
-            if active_workspace_id:
-                if not _is_visible_to_user(user_meta, user.id, active_workspace_id):
+            if not is_admin:
+                if active_workspace_id:
+                    if not _is_visible_to_user(user_meta, user.id, active_workspace_id):
+                        continue
+                elif user_meta.get(THREAD_OWNER_KEY) != user.id:
                     continue
-            elif user_meta.get(THREAD_OWNER_KEY) != user.id:
-                continue
             user_meta[THREAD_VISIBILITY_KEY] = normalize_thread_visibility(user_meta.get(THREAD_VISIBILITY_KEY))
 
             thread_resp = ThreadResponse(

@@ -153,6 +153,8 @@ async def require_thread_owner(request: Request, thread_id: str) -> tuple[AuthUs
         return test_user, {}
     user = require_user(request)
     record = await _get_thread_record(request, thread_id, user)
+    if user.is_owner:
+        return user, record
     if not can_manage_thread(record, user):
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     return user, record
@@ -172,6 +174,8 @@ async def require_thread_read_access(request: Request, thread_id: str) -> tuple[
         return test_user, {"metadata": {THREAD_VISIBILITY_KEY: THREAD_VISIBILITY_PRIVATE, THREAD_OWNER_KEY: test_user.id}}
     user = require_user(request)
     record = await _get_thread_record(request, thread_id, user)
+    if user.is_owner:
+        return user, record
     if not can_read_thread(record, user):
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
     return user, record

@@ -658,7 +658,7 @@ async def run_task_now(task_id: str, request: Request) -> TaskExecutionResponse:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
         task_user = get_user_by_id(row["user_id"])
         if not task_user:
-            raise HTTPException(status_code=404, detail=f"Task owner not found")
+            raise HTTPException(status_code=404, detail="Task owner not found")
         request.state.current_user = task_user
         user = task_user
         task = _row_to_task(row)

@@ -13,6 +13,7 @@ from app.gateway.config import get_gateway_config
 from app.gateway.deps import langgraph_runtime
 from app.gateway.routers import (
     admin_config,
+    admin_knowledge,
     admin_monitoring,
     admin_token_usage,
     agents,
@@ -239,6 +240,7 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Include routers
     app.include_router(admin_config.router)
+    app.include_router(admin_knowledge.router)
     app.include_router(admin_monitoring.router)
     app.include_router(admin_token_usage.router)
 
