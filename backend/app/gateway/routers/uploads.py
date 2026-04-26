@@ -11,11 +11,7 @@ from pydantic import BaseModel
 from app.gateway.auth import require_user
 from app.gateway.deps import get_checkpointer, get_store
 from app.gateway.ownership import (
-    THREAD_OWNER_KEY,
-    THREAD_VISIBILITY_KEY,
-    THREAD_VISIBILITY_PRIVATE,
     attach_owner_metadata,
-    normalize_thread_visibility,
     require_thread_manage_access,
     require_thread_read_access,
 )

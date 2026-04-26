@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   WorkspaceBody,
@@ -46,6 +47,7 @@ export default function KnowledgePage() {
   const [sharingKb, setSharingKb] = useState<KnowledgeBase | null>(null);
   const [shareWorkspaceId, setShareWorkspaceId] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [newVisibility, setNewVisibility] = useState<string>("private");
 
   useEffect(() => {
     document.title = `${t.knowledge.pageTitle} - ${t.pages.appName}`;
@@ -82,9 +84,10 @@ export default function KnowledgePage() {
 
     setCreating(true);
     try {
-      const kb = await createKnowledgeBase(newName.trim());
+      const kb = await createKnowledgeBase(newName.trim(), undefined, newVisibility);
       setKnowledgeBases((prev) => [kb, ...prev]);
       setNewName("");
+      setNewVisibility("private");
       setShowCreate(false);
     } catch (err) {
       console.error("Failed to create knowledge base:", err);
@@ -177,9 +180,18 @@ export default function KnowledgePage() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder={t.knowledge.namePlaceholder}
-              className="w-64"
+              className="w-48"
               autoFocus
             />
+            <Select value={newVisibility} onValueChange={setNewVisibility}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">私有</SelectItem>
+                <SelectItem value="workspace">工作区共享</SelectItem>
+              </SelectContent>
+            </Select>
             <Button type="submit" size="sm" disabled={creating}>
               {creating ? t.common.loading : t.common.create}
             </Button>
@@ -190,6 +202,7 @@ export default function KnowledgePage() {
               onClick={() => {
                 setShowCreate(false);
                 setNewName("");
+                setNewVisibility("private");
               }}
             >
               {t.common.cancel}

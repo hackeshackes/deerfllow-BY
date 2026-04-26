@@ -85,6 +85,15 @@ def _init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_kb_shares_kb_id ON knowledge_shares(knowledge_base_id);
         """)
         conn.commit()
+
+        # Migration: add is_global column if not exists
+        cursor = conn.execute("PRAGMA table_info(knowledge_bases)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "is_global" not in columns:
+            conn.execute("ALTER TABLE knowledge_bases ADD COLUMN is_global BOOLEAN DEFAULT FALSE")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_kb_is_global ON knowledge_bases(is_global)")
+            conn.commit()
+
         conn.close()
 
 
@@ -95,6 +104,8 @@ class KnowledgeBaseCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = None
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    is_global: bool = Field(default=False, description="Admin only: create as global knowledge base")
+    visibility: str = Field(default="private", description="Visibility: private, workspace, or global")
 
 
 class KnowledgeBaseUpdate(BaseModel):
@@ -114,6 +125,7 @@ class KnowledgeBaseResponse(BaseModel):
     created_at: str
     updated_at: str
     shared_to: list[str] = []
+    is_global: bool = False
 
 
 class KnowledgeShareRequest(BaseModel):
@@ -212,6 +224,7 @@ def _kb_response_from_row(row: sqlite3.Row, conn: sqlite3.Connection) -> Knowled
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
         shared_to=_get_kb_shares(kb_id),
+        is_global=bool(row["is_global"]) if "is_global" in row.keys() and row["is_global"] is not None else False,
     )
 
 
@@ -223,29 +236,35 @@ async def create_knowledge_base(body: KnowledgeBaseCreate, request: Request) -> 
     kb_id = str(uuid.uuid4())
     now = time.time()
 
+    is_global = bool(body.is_global) and user.is_owner
+    visibility = body.visibility if body.visibility in ("private", "workspace", "global") else "private"
+    if visibility == "global" and not user.is_owner:
+        visibility = "private"
+
     conn = _get_db()
     try:
         conn.execute(
             """INSERT INTO knowledge_bases
-                (id, user_id, workspace_id, visibility, name, description, embedding_model, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (id, user_id, workspace_id, visibility, name, description, embedding_model, created_at, updated_at, is_global)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 kb_id,
                 user.id,
                 workspace_id,
-                "private",
+                visibility,
                 body.name,
                 body.description,
                 body.embedding_model,
                 now,
                 now,
+                is_global,
             ),
         )
         conn.commit()
 
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
-        logger.info(f"Knowledge base created: {kb_id} by user {user.id} in workspace {workspace_id}")
+        logger.info(f"Knowledge base created: {kb_id} by user {user.id} in workspace {workspace_id}, is_global={is_global}")
         return _kb_response_from_row(row, conn)
     finally:
         conn.close()
@@ -259,8 +278,10 @@ async def list_knowledge_bases(request: Request) -> list[KnowledgeBaseResponse]:
     conn = _get_db()
     try:
         cursor = conn.execute(
-            """SELECT * FROM knowledge_bases WHERE user_id = ? OR id IN
-                (SELECT knowledge_base_id FROM knowledge_shares WHERE target_workspace_id = ?)
+            """SELECT * FROM knowledge_bases WHERE
+                user_id = ? OR
+                id IN (SELECT knowledge_base_id FROM knowledge_shares WHERE target_workspace_id = ?) OR
+                is_global = 1
             ORDER BY updated_at DESC""",
             (user.id, workspace_id),
         )
@@ -284,6 +305,8 @@ async def get_knowledge_base(kb_id: str, request: Request) -> KnowledgeBaseRespo
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
         kb = dict(row)
+        if kb["is_global"]:
+            return _kb_response_from_row(row, conn)
         if kb["user_id"] != user.id:
             if not (workspace_id and _is_kb_shared_to_workspace(kb_id, workspace_id)):
                 raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
@@ -302,7 +325,14 @@ async def update_knowledge_base(kb_id: str, body: KnowledgeBaseUpdate, request: 
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
 
-        if not row or row["user_id"] != user.id:
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb.get("is_global"):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Only admin can update global knowledge base")
+        elif row["user_id"] != user.id:
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
         now = time.time()
@@ -339,8 +369,11 @@ async def delete_knowledge_base(kb_id: str, request: Request) -> dict:
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
 
-        if not row or row["user_id"] != user.id:
+        if not row:
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        if row["user_id"] != user.id and not user.is_owner:
+            raise HTTPException(status_code=403, detail="Only the owner or admin can delete this knowledge base")
 
         conn.execute("DELETE FROM knowledge_shares WHERE knowledge_base_id = ?", (kb_id,))
         cursor = conn.execute("SELECT id FROM documents WHERE knowledge_base_id = ?", (kb_id,))
@@ -366,8 +399,15 @@ async def upload_document(kb_id: str, request: Request, file: UploadFile = File(
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
 
-        if not row or row["user_id"] != user.id:
+        if not row:
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb["is_global"]:
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Only admin can upload documents to global knowledge base")
+        elif kb["user_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Only the owner can upload documents")
 
         doc_id = str(uuid.uuid4())
         now = time.time()
@@ -428,7 +468,9 @@ async def list_documents(kb_id: str, request: Request) -> list[DocumentResponse]
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
         kb = dict(row)
-        if kb["user_id"] != user.id:
+        if kb.get("is_global"):
+            pass
+        elif kb["user_id"] != user.id:
             if not (workspace_id and _is_kb_shared_to_workspace(kb_id, workspace_id)):
                 raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
@@ -466,8 +508,15 @@ async def delete_document(kb_id: str, doc_id: str, request: Request) -> dict:
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
 
-        if not row or row["user_id"] != user.id:
+        if not row:
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb.get("is_global"):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Only admin can delete documents from global knowledge base")
+        elif row["user_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Only the owner can delete documents")
 
         cursor = conn.execute("SELECT * FROM documents WHERE id = ? AND knowledge_base_id = ?", (doc_id, kb_id))
         doc = cursor.fetchone()
@@ -493,8 +542,15 @@ async def reindex_document(kb_id: str, doc_id: str, request: Request) -> Documen
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
 
-        if not row or row["user_id"] != user.id:
+        if not row:
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb.get("is_global"):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Only admin can reindex documents in global knowledge base")
+        elif row["user_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Only the owner can reindex documents")
 
         cursor = conn.execute("SELECT * FROM documents WHERE id = ? AND knowledge_base_id = ?", (doc_id, kb_id))
         doc = cursor.fetchone()
@@ -534,8 +590,15 @@ async def share_knowledge_base(kb_id: str, body: KnowledgeShareRequest, request:
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
 
-        if not row or row["user_id"] != user.id:
+        if not row:
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb.get("is_global"):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Global knowledge bases cannot be shared")
+        elif row["user_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Only the owner can share this knowledge base")
 
         cursor = conn.execute(
             "SELECT 1 FROM knowledge_shares WHERE knowledge_base_id = ? AND target_workspace_id = ?",
@@ -577,8 +640,15 @@ async def unshare_knowledge_base(kb_id: str, share_id: str, request: Request) ->
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
         row = cursor.fetchone()
 
-        if not row or row["user_id"] != user.id:
+        if not row:
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb.get("is_global"):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Global knowledge bases cannot be unshared")
+        elif row["user_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Only the owner can unshare this knowledge base")
 
         cursor = conn.execute(
             "SELECT * FROM knowledge_shares WHERE id = ? AND knowledge_base_id = ?",
@@ -611,7 +681,9 @@ async def semantic_search(kb_id: str, body: SearchRequest, request: Request) -> 
             raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
         kb = dict(row)
-        if kb["user_id"] != user.id:
+        if kb.get("is_global"):
+            pass
+        elif kb["user_id"] != user.id:
             if not (workspace_id and _is_kb_shared_to_workspace(kb_id, workspace_id)):
                 raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 

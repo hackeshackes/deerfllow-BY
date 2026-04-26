@@ -40,3 +40,7 @@ class ModelConfig(BaseModel):
             "This is a shortcut for `when_thinking_enabled` and will be merged with `when_thinking_enabled` if both are provided."
         ),
     )
+    capabilities: list[str] = Field(
+        default_factory=lambda: ["text"],
+        description="Supported capabilities: text, image-gen, video-gen, code-gen, vision, thinking",
+    )

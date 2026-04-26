@@ -341,6 +341,7 @@ export interface Translations {
       memory: string;
       tools: string;
       skills: string;
+      knowledge: string;
       notification: string;
       about: string;
     };
@@ -440,6 +441,24 @@ export interface Translations {
       emptyTitle: string;
       emptyDescription: string;
       emptyButton: string;
+    };
+    knowledge: {
+      title: string;
+      description: string;
+      allTab: string;
+      mineTab: string;
+      globalTab: string;
+      globalBadge: string;
+      readOnly: string;
+      emptyMine: string;
+      emptyGlobal: string;
+      createDescription: string;
+      editDescription: string;
+      deleteConfirm: string;
+      nameRequired: string;
+      workspaceRequired: string;
+      workspaceId: string;
+      workspaceIdPlaceholder: string;
     };
     notification: {
       title: string;

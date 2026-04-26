@@ -19,4 +19,5 @@ export interface Model {
   when_thinking_enabled?: Record<string, unknown> | null;
   enabled?: boolean;
   is_default?: boolean;
+  capabilities?: string[];
 }

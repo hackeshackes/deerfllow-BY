@@ -68,6 +68,27 @@ class ChannelConfigUpdateRequest(BaseModel):
     dingtalk: dict[str, Any] | None = None
 
 
+class ChannelThreadResponse(BaseModel):
+    channel: str
+    chat_id: str
+    topic_id: str | None = None
+    thread_id: str
+    user_id: str
+    micx_user_id: str | None = None
+    micx_workspace_id: str | None = None
+    created_at: float
+    updated_at: float
+
+
+class ChannelThreadsListResponse(BaseModel):
+    channels: list[ChannelThreadResponse]
+
+
+class ChannelThreadUpdateRequest(BaseModel):
+    micx_user_id: str | None = None
+    micx_workspace_id: str | None = None
+
+
 def _get_channels_yaml_path() -> Path:
     return AppConfig.resolve_config_path()
 
@@ -129,7 +150,6 @@ async def restart_channel(name: str) -> ChannelRestartResponse:
 
 @router.get("/config", response_model=ChannelConfigResponse)
 async def get_channel_config(request: Request) -> ChannelConfigResponse:
-    """Get channel configuration from config.yaml."""
     require_owner_user(request)
     from deerflow.config.app_config import get_app_config
 
@@ -144,6 +164,63 @@ async def get_channel_config(request: Request) -> ChannelConfigResponse:
         wecom=channels_config.get("wecom"),
         dingtalk=channels_config.get("dingtalk"),
     )
+
+
+@router.get("/feishu/messages", name="get_feishu_messages")
+async def get_feishu_messages(
+    chat_id: str,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    page_size: int = 20,
+    request: Request = None,
+) -> dict[str, Any]:
+    require_owner_user(request)
+
+    from deerflow.community.feishu_tools import feishu_get_messages
+
+    result = feishu_get_messages.invoke(
+        {
+            "chat_id": chat_id,
+            "start_time": start_time,
+            "end_time": end_time,
+            "page_size": page_size,
+        }
+    )
+    return {"messages": result}
+
+
+@router.get("/feishu/messages/{message_id}", name="get_feishu_message_by_id")
+async def get_feishu_message(
+    message_id: str,
+    request: Request = None,
+) -> dict[str, Any]:
+    require_owner_user(request)
+
+    from deerflow.community.feishu_tools import feishu_get_message_by_id
+
+    result = feishu_get_message_by_id.invoke({"message_id": message_id})
+    return {"message": result}
+
+
+@router.post("/feishu/messages/search", name="search_feishu_messages")
+async def search_feishu_messages(
+    query: str,
+    chat_id: str | None = None,
+    page_size: int = 20,
+    request: Request = None,
+) -> dict[str, Any]:
+    require_owner_user(request)
+
+    from deerflow.community.feishu_tools import feishu_search_messages
+
+    result = feishu_search_messages.invoke(
+        {
+            "query": query,
+            "chat_id": chat_id,
+            "page_size": page_size,
+        }
+    )
+    return {"results": result}
 
 
 @router.put("/{channel_type}", response_model=ChannelConfigResponse)
@@ -196,3 +273,70 @@ async def update_channel_config(
         wecom=channels_config.get("wecom"),
         dingtalk=channels_config.get("dingtalk"),
     )
+
+
+@router.get("/threads", response_model=ChannelThreadsListResponse)
+async def list_channel_threads(request: Request) -> ChannelThreadsListResponse:
+    require_owner_user(request)
+    from app.channels.store import ChannelStore
+
+    store = ChannelStore()
+    entries = store.list_entries()
+    channels = []
+    for entry in entries:
+        channels.append(
+            ChannelThreadResponse(
+                channel=entry.get("channel_name", ""),
+                chat_id=entry.get("chat_id", ""),
+                topic_id=entry.get("topic_id"),
+                thread_id=entry.get("thread_id", ""),
+                user_id=entry.get("user_id", ""),
+                micx_user_id=entry.get("micx_user_id"),
+                micx_workspace_id=entry.get("micx_workspace_id"),
+                created_at=entry.get("created_at", 0.0),
+                updated_at=entry.get("updated_at", 0.0),
+            )
+        )
+    return ChannelThreadsListResponse(channels=channels)
+
+
+@router.put("/threads/{thread_id}", response_model=ChannelThreadResponse)
+async def update_channel_thread(thread_id: str, body: ChannelThreadUpdateRequest, request: Request) -> ChannelThreadResponse:
+    require_owner_user(request)
+    from app.channels.store import ChannelStore
+
+    store = ChannelStore()
+    entries = store.list_entries()
+    updated = False
+    result = None
+    for entry in entries:
+        if entry.get("thread_id") == thread_id:
+            success = store.update_thread_mapping(
+                channel_name=entry.get("channel_name", ""),
+                chat_id=entry.get("chat_id", ""),
+                thread_id=thread_id,
+                topic_id=entry.get("topic_id"),
+                micx_user_id=body.micx_user_id,
+                micx_workspace_id=body.micx_workspace_id,
+            )
+            if success:
+                updated = True
+                result = ChannelThreadResponse(
+                    channel=entry.get("channel_name", ""),
+                    chat_id=entry.get("chat_id", ""),
+                    topic_id=entry.get("topic_id"),
+                    thread_id=thread_id,
+                    user_id=entry.get("user_id", ""),
+                    micx_user_id=body.micx_user_id if body.micx_user_id is not None else entry.get("micx_user_id"),
+                    micx_workspace_id=body.micx_workspace_id if body.micx_workspace_id is not None else entry.get("micx_workspace_id"),
+                    created_at=entry.get("created_at", 0.0),
+                    updated_at=entry.get("updated_at", 0.0),
+                )
+            break
+
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Thread mapping for {thread_id} not found")
+
+    logger.info(f"Channel thread {thread_id} updated: micx_user_id={body.micx_user_id}, micx_workspace_id={body.micx_workspace_id}")
+    assert result is not None
+    return result

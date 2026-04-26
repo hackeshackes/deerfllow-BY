@@ -245,13 +245,12 @@ def get_visible_skills_for_user(user_id: str, is_owner: bool, workspace_id: str 
     Rules:
     - Admin (is_owner=True): sees ALL skills
     - Regular user: sees skills where:
-      1. skill.owner_id == user_id (own skill)
-      2. skill.visibility == "public" (admin shared publicly)
-      3. skill.visibility == "workspace" AND user is in that workspace
-    Note: Skills without share records are NOT visible to regular users (treated as private).
+      1. No share record exists (default: visible to all)
+      2. skill.owner_id == user_id (own skill)
+      3. skill.visibility == "public" (admin shared publicly)
+      4. skill.visibility == "workspace" AND user is in that workspace
     """
     if is_owner:
-        # Admin sees all skills
         from deerflow.skills import load_skills
 
         return [s.name for s in load_skills(enabled_only=False)]
@@ -265,16 +264,12 @@ def get_visible_skills_for_user(user_id: str, is_owner: bool, workspace_id: str 
     for skill in all_skills:
         share = shares.get(skill.name)
         if share is None:
-            # No share record = private skill, not visible to regular users
-            continue
-        if share.owner_id == user_id:
-            # Own skill
+            visible_skill_names.append(skill.name)
+        elif share.owner_id == user_id:
             visible_skill_names.append(skill.name)
         elif share.visibility == "public":
-            # Admin shared publicly
             visible_skill_names.append(skill.name)
         elif share.visibility == "workspace" and user_is_in_workspace(user_id, share.workspace_id):
-            # User is in the same workspace
             visible_skill_names.append(skill.name)
 
     return visible_skill_names

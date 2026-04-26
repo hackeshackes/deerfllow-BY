@@ -92,6 +92,8 @@ class ChannelStore:
         *,
         topic_id: str | None = None,
         user_id: str = "",
+        micx_user_id: str | None = None,
+        micx_workspace_id: str | None = None,
     ) -> None:
         """Create or update the mapping for an IM conversation/topic."""
         with self._lock:
@@ -101,10 +103,40 @@ class ChannelStore:
             self._data[key] = {
                 "thread_id": thread_id,
                 "user_id": user_id,
+                "micx_user_id": micx_user_id if micx_user_id is not None else (existing.get("micx_user_id") if existing else None),
+                "micx_workspace_id": micx_workspace_id if micx_workspace_id is not None else (existing.get("micx_workspace_id") if existing else None),
                 "created_at": existing["created_at"] if existing else now,
                 "updated_at": now,
             }
             self._save()
+
+    def update_thread_mapping(
+        self,
+        channel_name: str,
+        chat_id: str,
+        thread_id: str,
+        *,
+        topic_id: str | None = None,
+        micx_user_id: str | None = None,
+        micx_workspace_id: str | None = None,
+    ) -> bool:
+        """Update the micx_user_id and micx_workspace_id for an existing mapping."""
+        with self._lock:
+            key = self._key(channel_name, chat_id, topic_id)
+            if key not in self._data:
+                return False
+            existing = self._data[key]
+            if existing.get("thread_id") != thread_id:
+                return False
+            now = time.time()
+            self._data[key] = {
+                **existing,
+                "micx_user_id": micx_user_id if micx_user_id is not None else existing.get("micx_user_id"),
+                "micx_workspace_id": micx_workspace_id if micx_workspace_id is not None else existing.get("micx_workspace_id"),
+                "updated_at": now,
+            }
+            self._save()
+            return True
 
     def remove(self, channel_name: str, chat_id: str, topic_id: str | None = None) -> bool:
         """Remove a mapping.

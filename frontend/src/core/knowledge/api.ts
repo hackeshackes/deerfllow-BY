@@ -12,6 +12,7 @@ export interface KnowledgeBase {
   created_at: string;
   updated_at: string;
   shared_to: string[];
+  is_global: boolean;
 }
 
 export interface Document {
@@ -53,12 +54,13 @@ export async function getKnowledgeBase(kbId: string): Promise<KnowledgeBase> {
 
 export async function createKnowledgeBase(
   name: string,
-  description?: string
+  description?: string,
+  visibility: string = "private"
 ): Promise<KnowledgeBase> {
   const response = await fetch(`${getBackendBaseURL()}/api/knowledge`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, visibility }),
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -70,12 +72,13 @@ export async function createKnowledgeBase(
 export async function updateKnowledgeBase(
   kbId: string,
   name?: string,
-  description?: string
+  description?: string,
+  visibility?: string
 ): Promise<KnowledgeBase> {
   const response = await fetch(`${getBackendBaseURL()}/api/knowledge/${kbId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, visibility }),
   });
   return response.json();
 }

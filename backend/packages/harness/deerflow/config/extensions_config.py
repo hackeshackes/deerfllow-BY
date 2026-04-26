@@ -49,9 +49,26 @@ class McpServerConfig(BaseModel):
 
 
 class SkillStateConfig(BaseModel):
-    """Configuration for a single skill's state."""
-
     enabled: bool = Field(default=True, description="Whether this skill is enabled")
+
+
+class SkillModelBinding(BaseModel):
+    model_name: str = Field(..., description="The model to bind to this skill")
+    is_override_allowed: bool = Field(
+        default=True,
+        description="Whether users can override this binding in conversations",
+    )
+    created_by: str | None = Field(default=None, description="User ID who created this binding")
+    created_at: str | None = Field(default=None, description="ISO8601 timestamp when created")
+
+
+class SkillMetadata(BaseModel):
+    source: Literal["system", "admin", "user"] = Field(
+        default="user",
+        description="Source of the skill: system (built-in), admin (installed by admin), user (installed by user)",
+    )
+    installed_by: str | None = Field(default=None, description="User ID who installed this skill")
+    created_at: str | None = Field(default=None, description="ISO8601 timestamp when created")
 
 
 class ExtensionsConfig(BaseModel):
@@ -65,6 +82,14 @@ class ExtensionsConfig(BaseModel):
     skills: dict[str, SkillStateConfig] = Field(
         default_factory=dict,
         description="Map of skill name to state configuration",
+    )
+    skill_model_bindings: dict[str, SkillModelBinding] = Field(
+        default_factory=dict,
+        description="Map of skill name to model binding configuration",
+    )
+    skills_metadata: dict[str, SkillMetadata] = Field(
+        default_factory=dict,
+        description="Map of skill name to metadata (source, installed_by, etc.)",
     )
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -199,6 +224,27 @@ class ExtensionsConfig(BaseModel):
             # Default to enable for public & custom skill
             return skill_category in ("public", "custom")
         return skill_config.enabled
+
+    def get_skill_model_binding(self, skill_name: str) -> SkillModelBinding | None:
+        return self.skill_model_bindings.get(skill_name)
+
+    def get_skill_metadata(self, skill_name: str) -> SkillMetadata | None:
+        return self.skills_metadata.get(skill_name)
+
+    def set_skill_model_binding(self, skill_name: str, binding: SkillModelBinding) -> None:
+        self.skill_model_bindings[skill_name] = binding
+
+    def set_skill_metadata(self, skill_name: str, metadata: SkillMetadata) -> None:
+        self.skills_metadata[skill_name] = metadata
+
+    def delete_skill_model_binding(self, skill_name: str) -> bool:
+        if skill_name in self.skill_model_bindings:
+            del self.skill_model_bindings[skill_name]
+            return True
+        return False
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump(exclude_none=True)
 
 
 _extensions_config: ExtensionsConfig | None = None

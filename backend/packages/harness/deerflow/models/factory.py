@@ -62,6 +62,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             "when_thinking_enabled",
             "thinking",
             "supports_vision",
+            "capabilities",
         },
     )
     # Pydantic extra fields such as admin-only flags may still be preserved in

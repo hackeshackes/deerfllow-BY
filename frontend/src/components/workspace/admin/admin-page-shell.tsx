@@ -1,6 +1,6 @@
 "use client";
 
-import { ActivityIcon, BlocksIcon, CoinsIcon, LayoutDashboardIcon, MessageCircleIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
+import { ActivityIcon, BlocksIcon, BookOpenIcon, CoinsIcon, LayoutDashboardIcon, MessageCircleIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -19,6 +19,8 @@ const adminLinks = [
   { href: "/workspace/admin/models", label: "模型管理", icon: ShieldCheckIcon },
   { href: "/workspace/admin/models/mcp", label: "MCP 配置", icon: BlocksIcon },
   { href: "/workspace/admin/models/mcp/channels", label: "IM 渠道", icon: MessageCircleIcon },
+  { href: "/workspace/admin/conversations", label: "会话管理", icon: MessageCircleIcon },
+  { href: "/workspace/admin/knowledge", label: "知识库管理", icon: BookOpenIcon },
 ] as const;
 
 export function AdminPageShell({
