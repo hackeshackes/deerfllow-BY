@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import pickle
 import sqlite3
 import threading
 import time
@@ -16,6 +17,8 @@ from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_user
 from app.gateway.auth_context import get_current_workspace_id
+from app.gateway.services.document_processor import process_document
+from app.gateway.services.embedding_service import _cosine_similarity, _generate_embedding
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
@@ -202,14 +205,6 @@ def _is_kb_shared_to_workspace(kb_id: str, workspace_id: str) -> bool:
         return cursor.fetchone() is not None
     finally:
         conn.close()
-
-
-def _calculate_embedding(text: str) -> list[float]:
-    return [0.0] * 384
-
-
-def _calculate_similarity(embedding1: list[float], embedding2: list[float]) -> float:
-    return 0.85
 
 
 def _kb_response_from_row(row: sqlite3.Row, conn: sqlite3.Connection) -> KnowledgeBaseResponse:
@@ -425,6 +420,7 @@ async def upload_document(kb_id: str, request: Request, file: UploadFile = File(
         content = await file.read()
         file_size = len(content)
 
+        storage_path = f"/mnt/user-data/knowledge/{kb_id}/{doc_id}/{file.filename}"
         conn.execute(
             """INSERT INTO documents
                 (id, knowledge_base_id, original_name, file_type, file_size, storage_path, status, uploaded_at)
@@ -435,23 +431,51 @@ async def upload_document(kb_id: str, request: Request, file: UploadFile = File(
                 file.filename or "unknown",
                 file_type,
                 file_size,
-                f"/mnt/user-data/knowledge/{kb_id}/{doc_id}/{file.filename}",
-                "ready",
+                storage_path,
+                "processing",
                 now,
             ),
         )
         conn.commit()
 
-        logger.info(f"Document uploaded: {doc_id} to knowledge base {kb_id}")
+        chunks = await process_document(storage_path, file_type)
+        chunk_count = len(chunks)
+        total_tokens = sum(len(c["content"]) // 4 for c in chunks)
+
+        for idx, chunk in enumerate(chunks):
+            embedding = _generate_embedding(chunk["content"])
+            embedding_blob = pickle.dumps(embedding)
+            metadata_json = json.dumps(chunk.get("metadata", {}))
+            conn.execute(
+                """INSERT INTO document_chunks
+                    (id, document_id, content, embedding, metadata, chunk_index)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    str(uuid.uuid4()),
+                    doc_id,
+                    chunk["content"],
+                    embedding_blob,
+                    metadata_json,
+                    idx,
+                ),
+            )
+
+        conn.execute(
+            "UPDATE documents SET status = ?, chunk_count = ?, token_count = ?, processed_at = ? WHERE id = ?",
+            ("embedded", chunk_count, total_tokens, now, doc_id),
+        )
+        conn.commit()
+
+        logger.info(f"Document uploaded and processed: {doc_id} to knowledge base {kb_id}, {chunk_count} chunks")
         return DocumentResponse(
             id=doc_id,
             knowledge_base_id=kb_id,
             original_name=file.filename or "unknown",
             file_type=file_type,
             file_size=file_size,
-            status="ready",
-            chunk_count=0,
-            token_count=0,
+            status="embedded",
+            chunk_count=chunk_count,
+            token_count=total_tokens,
             uploaded_at=str(now),
             processed_at=str(now),
         )
@@ -500,14 +524,18 @@ async def add_text_document(kb_id: str, body: TextDocumentRequest, request: Requ
             ),
         )
 
+        embedding = _generate_embedding(content)
+        embedding_blob = pickle.dumps(embedding)
+
         conn.execute(
             """INSERT INTO document_chunks
-                (id, document_id, content, chunk_index)
-            VALUES (?, ?, ?, ?)""",
+                (id, document_id, content, embedding, chunk_index)
+            VALUES (?, ?, ?, ?, ?)""",
             (
                 str(uuid.uuid4()),
                 doc_id,
                 content,
+                embedding_blob,
                 0,
             ),
         )
@@ -520,7 +548,7 @@ async def add_text_document(kb_id: str, body: TextDocumentRequest, request: Requ
             original_name=f"{title}.txt",
             file_type="txt",
             file_size=file_size,
-            status="ready",
+            status="embedded",
             chunk_count=1,
             token_count=0,
             uploaded_at=str(now),
@@ -633,26 +661,137 @@ async def reindex_document(kb_id: str, doc_id: str, request: Request) -> Documen
         if not doc:
             raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
 
+        doc = dict(doc)
         now = time.time()
+
+        cursor = conn.execute("SELECT content FROM document_chunks WHERE document_id = ?", (doc_id,))
+        existing_chunks = cursor.fetchall()
+
+        conn.execute("DELETE FROM document_chunks WHERE document_id = ?", (doc_id,))
+
+        if doc["file_type"] == "txt":
+            if existing_chunks:
+                for idx, chunk_row in enumerate(existing_chunks):
+                    embedding = _generate_embedding(chunk_row["content"])
+                    embedding_blob = pickle.dumps(embedding)
+                    conn.execute(
+                        """INSERT INTO document_chunks
+                            (id, document_id, content, embedding, chunk_index)
+                        VALUES (?, ?, ?, ?, ?)""",
+                        (str(uuid.uuid4()), doc_id, chunk_row["content"], embedding_blob, idx),
+                    )
+            chunk_count = len(existing_chunks) if existing_chunks else 0
+            total_tokens = 0
+        else:
+            chunks = await process_document(doc["storage_path"], doc["file_type"])
+            chunk_count = len(chunks)
+            for idx, chunk in enumerate(chunks):
+                embedding = _generate_embedding(chunk["content"])
+                embedding_blob = pickle.dumps(embedding)
+                metadata_json = json.dumps(chunk.get("metadata", {}))
+                conn.execute(
+                    """INSERT INTO document_chunks
+                        (id, document_id, content, embedding, metadata, chunk_index)
+                    VALUES (?, ?, ?, ?, ?, ?)""",
+                    (str(uuid.uuid4()), doc_id, chunk["content"], embedding_blob, metadata_json, idx),
+                )
+            total_tokens = sum(len(c["content"]) // 4 for c in chunks)
         conn.execute(
-            "UPDATE documents SET status = ?, processed_at = ? WHERE id = ?",
-            ("ready", now, doc_id),
+            "UPDATE documents SET status = ?, chunk_count = ?, token_count = ?, processed_at = ? WHERE id = ?",
+            ("embedded", chunk_count, total_tokens, now, doc_id),
         )
         conn.commit()
 
-        logger.info(f"Document reindex started: {doc_id}")
+        logger.info(f"Document reindexed: {doc_id}, {chunk_count} chunks with real embeddings")
         return DocumentResponse(
             id=doc["id"],
             knowledge_base_id=doc["knowledge_base_id"],
             original_name=doc["original_name"],
             file_type=doc["file_type"],
             file_size=doc["file_size"],
-            status="ready",
-            chunk_count=doc["chunk_count"],
-            token_count=doc["token_count"],
+            status="embedded",
+            chunk_count=chunk_count,
+            token_count=total_tokens,
             uploaded_at=str(doc["uploaded_at"]),
             processed_at=str(now),
         )
+    finally:
+        conn.close()
+
+
+@router.post("/{kb_id}/reindex-all")
+async def reindex_all_documents(kb_id: str, request: Request) -> dict:
+    user = require_user(request)
+
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb.get("is_global"):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Only admin can reindex global knowledge base")
+        elif row["user_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Only the owner can reindex documents")
+
+        cursor = conn.execute("SELECT id FROM documents WHERE knowledge_base_id = ?", (kb_id,))
+        doc_ids = [row["id"] for row in cursor.fetchall()]
+
+        reindexed = 0
+        for doc_id in doc_ids:
+            cursor = conn.execute("SELECT * FROM documents WHERE id = ? AND knowledge_base_id = ?", (doc_id, kb_id))
+            doc = cursor.fetchone()
+            if not doc:
+                continue
+            doc = dict(doc)
+            now = time.time()
+
+            cursor = conn.execute("SELECT content FROM document_chunks WHERE document_id = ?", (doc_id,))
+            existing_chunks = cursor.fetchall()
+
+            conn.execute("DELETE FROM document_chunks WHERE document_id = ?", (doc_id,))
+
+            if doc["file_type"] == "txt":
+                if existing_chunks:
+                    for idx, chunk_row in enumerate(existing_chunks):
+                        embedding = _generate_embedding(chunk_row["content"])
+                        embedding_blob = pickle.dumps(embedding)
+                        conn.execute(
+                            """INSERT INTO document_chunks
+                                (id, document_id, content, embedding, chunk_index)
+                            VALUES (?, ?, ?, ?, ?)""",
+                            (str(uuid.uuid4()), doc_id, chunk_row["content"], embedding_blob, idx),
+                        )
+                chunk_count = len(existing_chunks) if existing_chunks else 0
+                total_tokens = 0
+            else:
+                chunks = await process_document(doc["storage_path"], doc["file_type"])
+                chunk_count = len(chunks)
+                for idx, chunk in enumerate(chunks):
+                    embedding = _generate_embedding(chunk["content"])
+                    embedding_blob = pickle.dumps(embedding)
+                    metadata_json = json.dumps(chunk.get("metadata", {}))
+                    conn.execute(
+                        """INSERT INTO document_chunks
+                            (id, document_id, content, embedding, metadata, chunk_index)
+                        VALUES (?, ?, ?, ?, ?, ?)""",
+                        (str(uuid.uuid4()), doc_id, chunk["content"], embedding_blob, metadata_json, idx),
+                    )
+                total_tokens = sum(len(c["content"]) // 4 for c in chunks)
+
+            conn.execute(
+                "UPDATE documents SET status = ?, chunk_count = ?, token_count = ?, processed_at = ? WHERE id = ?",
+                ("embedded", chunk_count, total_tokens, now, doc_id),
+            )
+            reindexed += 1
+
+        conn.commit()
+        logger.info(f"Reindexed {reindexed} documents in knowledge base {kb_id}")
+        return {"success": True, "message": f"Reindexed {reindexed} documents"}
     finally:
         conn.close()
 
@@ -763,30 +902,34 @@ async def semantic_search(kb_id: str, body: SearchRequest, request: Request) -> 
             if not (workspace_id and _is_kb_shared_to_workspace(kb_id, workspace_id)):
                 raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
 
-        query_embedding = _calculate_embedding(body.query)
+        query_embedding = _generate_embedding(body.query)
 
         cursor = conn.execute(
             """SELECT dc.*, d.original_name FROM document_chunks dc
                 JOIN documents d ON dc.document_id = d.id
-                WHERE d.knowledge_base_id = ? AND d.status = 'ready'""",
+                WHERE d.knowledge_base_id = ? AND d.status = 'embedded' AND dc.embedding IS NOT NULL""",
             (kb_id,),
         )
 
         results = []
         for chunk_row in cursor.fetchall():
-            chunk_embedding = _calculate_embedding(chunk_row["content"])
-            similarity = _calculate_similarity(query_embedding, chunk_embedding)
+            try:
+                chunk_embedding = pickle.loads(chunk_row["embedding"])
+                similarity = _cosine_similarity(query_embedding, chunk_embedding)
 
-            if similarity >= body.similarity_threshold:
-                results.append(
-                    SearchResult(
-                        document_id=chunk_row["document_id"],
-                        document_name=chunk_row["original_name"],
-                        chunk_content=chunk_row["content"],
-                        similarity_score=similarity,
-                        metadata=json.loads(chunk_row["metadata"]) if chunk_row["metadata"] else {},
+                if similarity >= body.similarity_threshold:
+                    results.append(
+                        SearchResult(
+                            document_id=chunk_row["document_id"],
+                            document_name=chunk_row["original_name"],
+                            chunk_content=chunk_row["content"],
+                            similarity_score=similarity,
+                            metadata=json.loads(chunk_row["metadata"]) if chunk_row["metadata"] else {},
+                        )
                     )
-                )
+            except Exception as e:
+                logger.warning(f"Failed to decode embedding for chunk {chunk_row['id']}: {e}")
+                continue
 
         results.sort(key=lambda x: x.similarity_score, reverse=True)
         results = results[: body.top_k]
