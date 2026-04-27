@@ -37,6 +37,9 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 | **品牌定制** | DeerFlow | ✅ **MicX** |
 | **安全加固** | 基础 | ✅ **生产级** |
 | **Checkpoint 持久化** | Memory | ✅ **SQLite/PostgreSQL** |
+| **空间化工作台** | ❌ | ✅ **v1.4.4 新增** |
+| **自动化入口** | ❌ | ✅ **v1.4.4 新增** |
+| **工作流卡片** | ❌ | ✅ **v1.4.4 新增** |
 
 ---
 
@@ -323,6 +326,67 @@ MicX 提供了完整的系统监控能力：
 
 **Admin 管理:** `/workspace/admin/audit`
 
+### 12. 空间化用户工作台 (v1.4.4)
+
+MicX 在 v1.4.4 重新设计了用户工作台，实现以"空间"为核心的导航体系：
+
+| 功能 | 说明 |
+|------|------|
+| **空间切换器** | 顶部一级空间切换，支持个人空间与共享工作区快速切换 |
+| **侧边栏导航重组** | 新建对话 / 对话 / 资料库 / 自动化 / 工作流 / Agents 六大入口 |
+| **Recent Chat 分区** | 对话列表按来源分区显示：最近继续 / 自动化结果 / 外部渠道 |
+| **状态 Badge 横向排列** | 已共享 / 私有 / 自动化 / 团队状态与标题同行显示，不堆叠 |
+| **自动化入口** | 新增 `/workspace/automations` 列表页和 `/workspace/automations/new` 创建页 |
+| **工作流卡片页** | 新增 `/workspace/workflows` 页面展示可用工作流技能 |
+| **资料库三范围 Tab** | 当前空间资料 / 我的私人资料 / 全局资料，分层管理 |
+| **对话 URL 预填** | `?prompt=` 参数可预填新建对话输入框 |
+| **nginx upstream 动态解析** | 修复开发环境 gateway 重建后 502 问题 |
+| **provisioner 可选** | 沙箱提供器改为 Docker profile，kubeconfig 不再阻塞普通开发 |
+
+### 13. 工作流系统 (Workflows)
+
+用户可通过工作流技能执行特定任务流程：
+
+| 功能 | 说明 |
+|------|------|
+| **工作流列表页** | `/workspace/workflows` 展示所有可用的工作流技能 |
+| **快速启动** | 点击工作流卡片自动跳转新建对话并预填对应 prompt |
+| **工作流分类** | 自动聚合常用工作流，支持快速访问 |
+| **远程安装** | 管理员可从远程 URL 安装新工作流技能 |
+
+**工作流技能 API:**
+```bash
+GET    /api/user/skills              # 获取用户可用技能列表
+POST   /api/skills/{name}/enable     # 启用技能
+POST   /api/skills/{name}/disable    # 禁用技能
+GET    /api/skills                   # 列出所有内置技能
+```
+
+### 14. 自动化系统 (Automations)
+
+自动化功能帮助用户将重复性工作变为周期性 AI 自动执行：
+
+| 功能 | 说明 |
+|------|------|
+| **自动化列表** | `/workspace/automations` 查看所有自动化任务及状态 |
+| **创建自动化** | `/workspace/automations/new` 配置触发频率、输出位置等 |
+| **状态显示** | Badge 横向排列，运行中/已完成/已暂停一目了然 |
+| **自动化结果** | 自动生成对话记录，标记来源为"自动化" |
+| **定时触发** | 支持 Cron 表达式和 Interval 间隔两种触发方式 |
+
+**自动化 API:**
+```bash
+GET    /api/tasks                    # 列出所有自动化任务
+POST   /api/tasks                     # 创建自动化任务
+GET    /api/tasks/{id}                # 获取任务详情
+PUT    /api/tasks/{id}                # 更新任务配置
+DELETE /api/tasks/{id}                # 删除任务
+POST   /api/tasks/{id}/run            # 立即执行一次
+POST   /api/tasks/{id}/pause          # 暂停任务
+POST   /api/tasks/{id}/resume         # 恢复任务
+GET    /api/tasks/{id}/executions     # 获取执行历史
+```
+
 ---
 
 ## 快速开始
@@ -491,6 +555,8 @@ make dev          # 启动所有服务 (开发模式)
 
 ## 文档
 
+- [v1.4.4 PRD](./docs/plans/2026-04-26-micx-v1.4.4-prd-final.md)
+- [v1.4.4 执行计划](./docs/plans/2026-04-26-micx-v1.4.4-execution-plan.md)
 - [v1.4 PRD](./docs/plans/2026-04-19-micx-v1.4-prd.md)
 - [v1.4 执行计划](./docs/plans/2026-04-19-micx-v1.4-execution.md)
 - [v1.4 Bugfix 计划](./docs/plans/2026-04-19-micx-v1.4-bugfix-plan.md)
@@ -542,6 +608,9 @@ MicX is an enhanced version of [DeerFlow](https://github.com/HACKESHACKES/deerfl
 | **Brand Customization** | DeerFlow | ✅ **MicX** |
 | **Security Hardening** | Basic | ✅ **Production** |
 | **Checkpoint Persistence** | Memory | ✅ **SQLite/PostgreSQL** |
+| **Workspace-Centric UI** | ❌ | ✅ **v1.4.4 New** |
+| **Automation Portal** | ❌ | ✅ **v1.4.4 New** |
+| **Workflow Cards** | ❌ | ✅ **v1.4.4 New** |
 
 ---
 
@@ -783,6 +852,58 @@ Complete audit trail for compliance and troubleshooting:
 | **Timeline View** | Chronologically sorted operation records |
 
 **Admin:** `/workspace/admin/audit`
+
+### 10. Workspace-Centric UI (v1.4.4)
+
+MicX v1.4.4 redesigns the user workspace around "spaces" for better navigation:
+
+| Feature | Description |
+|---------|-------------|
+| **Workspace Switcher** | Top-level space switcher, fast toggle between personal and shared workspaces |
+| **Sidebar Navigation** | Reorganized: New Chat / Chats / Sources / Automations / Workflows / Agents |
+| **Recent Chat Sections** | Chat list grouped by source: Recent / Automation Results / External Channels |
+| **Horizontal Status Badges** | Shared/Private/Automation/Team status inline with title, no vertical stacking |
+| **Automation Portal** | New `/workspace/automations` list and `/workspace/automations/new` create page |
+| **Workflow Cards** | New `/workspace/workflows` page showcasing available workflow skills |
+| **Knowledge Triple Tabs** | Current Space / My Private / Global knowledge bases, layered access |
+| **URL Prompt Prefill** | `?prompt=` parameter pre-fills the new chat input box |
+| **nginx Dynamic Upstream** | Fixes 502 after gateway rebuild in dev environments |
+| **Provisioner Optional** | Sandbox provisioner moved to Docker profile, kubeconfig no longer blocks dev |
+
+### 11. Workflows
+
+Users execute specific task flows through workflow skills:
+
+| Feature | Description |
+|---------|-------------|
+| **Workflow List** | `/workspace/workflows` displays all available workflow skills |
+| **Quick Launch** | Click a workflow card → new chat with pre-filled prompt |
+| **Remote Install** | Admins install new workflow skills from remote URLs |
+
+### 12. Automations
+
+Automations convert repetitive work into scheduled AI executions:
+
+| Feature | Description |
+|---------|-------------|
+| **Automation List** | `/workspace/automations` view all automation tasks and status |
+| **Create Automation** | `/workspace/automations/new` configure trigger frequency, output location |
+| **Horizontal Status** | Badges displayed inline, running/completed/paused at a glance |
+| **Automation Results** | Auto-generated chat records tagged with "automation" source |
+| **Scheduled Triggers** | Supports both Cron expressions and Interval triggers |
+
+**Automation API:**
+```bash
+GET    /api/tasks                    # List all automation tasks
+POST   /api/tasks                     # Create automation task
+GET    /api/tasks/{id}                # Get task details
+PUT    /api/tasks/{id}                # Update task config
+DELETE /api/tasks/{id}                # Delete task
+POST   /api/tasks/{id}/run            # Run once immediately
+POST   /api/tasks/{id}/pause          # Pause task
+POST   /api/tasks/{id}/resume         # Resume task
+GET    /api/tasks/{id}/executions     # Get execution history
+```
 
 ---
 
