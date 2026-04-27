@@ -42,6 +42,22 @@ export interface Translations {
     exportAsExcel: string;
     exportAsPDF: string;
     exportSuccess: string;
+    capture: string;
+    captureHint: string;
+    captureDialogTitle: string;
+    captureGenerating: string;
+    captureGenerated: string;
+    captureSummaryLabel: string;
+    captureSummaryPlaceholder: string;
+    captureSaveToKnowledge: string;
+    captureCreateWorkflow: string;
+    captureCreateAutomation: string;
+    captureClose: string;
+    captureSaveSuccess: string;
+    captureWorkflowSuccess: string;
+    captureAutomationSuccess: string;
+    captureNoMessages: string;
+    captureError: string;
   };
 
   home: {

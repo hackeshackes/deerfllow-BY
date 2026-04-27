@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from sentence_transformers import SentenceTransformer
+
     _model: SentenceTransformer | None = None
 except ImportError:
     _model = None
@@ -18,6 +19,7 @@ except ImportError:
 try:
     import chromadb
     from chromadb.config import Settings
+
     _chroma_client: chromadb.ClientAPI | None = None
 except ImportError:
     _chroma_client = None
@@ -78,10 +80,7 @@ class EmbeddingService:
         if self._client is None:
             return None
         try:
-            self._collection = self._client.get_or_create_collection(
-                name=self.collection_name,
-                metadata={"kb_id": self.kb_id}
-            )
+            self._collection = self._client.get_or_create_collection(name=self.collection_name, metadata={"kb_id": self.kb_id})
             return self._collection
         except Exception as e:
             logger.error(f"Failed to get/create collection: {e}")
@@ -93,12 +92,7 @@ class EmbeddingService:
             return False
         try:
             embedding = _generate_embedding(content)
-            collection.add(
-                ids=[chunk_id],
-                embeddings=[embedding],
-                documents=[content],
-                metadatas=[metadata or {}]
-            )
+            collection.add(ids=[chunk_id], embeddings=[embedding], documents=[content], metadatas=[metadata or {}])
             logger.debug(f"Added chunk {chunk_id} to collection {self.collection_name}")
             return True
         except Exception as e:
@@ -111,22 +105,14 @@ class EmbeddingService:
             return []
         try:
             query_embedding = _generate_embedding(query)
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k
-            )
+            results = collection.query(query_embeddings=[query_embedding], n_results=top_k)
             search_results = []
             if results and results.get("ids") and results["ids"][0]:
                 for i, doc_id in enumerate(results["ids"][0]):
                     distance = results.get("distances", [[]])[0][i] if results.get("distances") else 0
                     similarity = 1.0 / (1.0 + distance) if distance else 0.85
                     if similarity >= threshold:
-                        search_results.append({
-                            "id": doc_id,
-                            "content": results["documents"][0][i] if results.get("documents") else "",
-                            "similarity": similarity,
-                            "metadata": results["metadatas"][0][i] if results.get("metadatas") else {}
-                        })
+                        search_results.append({"id": doc_id, "content": results["documents"][0][i] if results.get("documents") else "", "similarity": similarity, "metadata": results["metadatas"][0][i] if results.get("metadatas") else {}})
             return search_results
         except Exception as e:
             logger.error(f"Search failed: {e}")

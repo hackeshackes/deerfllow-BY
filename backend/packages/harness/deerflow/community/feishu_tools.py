@@ -78,9 +78,7 @@ def feishu_get_messages(
     try:
         from lark_oapi.api.im.v1 import ListMessageRequest
 
-        request = ListMessageRequest.builder().receive_id_type("chat_id").request_body(
-            {"receive_id": chat_id, "container": {"type": "chat", "chat_id": chat_id}, "page_size": page_size}
-        ).build()
+        request = ListMessageRequest.builder().receive_id_type("chat_id").request_body({"receive_id": chat_id, "container": {"type": "chat", "chat_id": chat_id}, "page_size": page_size}).build()
 
         if start_time:
             request.start_time = start_time

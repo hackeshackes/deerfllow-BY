@@ -224,9 +224,7 @@ async def search_feishu_messages(
 
 
 @router.put("/{channel_type}", response_model=ChannelConfigResponse)
-async def update_channel_config(
-    channel_type: str, body: ChannelUpdateRequest, request: Request
-) -> ChannelConfigResponse:
+async def update_channel_config(channel_type: str, body: ChannelUpdateRequest, request: Request) -> ChannelConfigResponse:
     require_owner_user(request)
 
     if channel_type not in SUPPORTED_CHANNEL_TYPES:

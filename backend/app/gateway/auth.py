@@ -143,14 +143,16 @@ def decode_session_token(token: str) -> dict[str, Any] | None:
 
 
 # Weak passwords that are forbidden in production
-_FORBIDDEN_PASSWORDS = frozenset({
-    "change-me-123",
-    "admin",
-    "password",
-    "12345678",
-    "changeme",
-    "default",
-})
+_FORBIDDEN_PASSWORDS = frozenset(
+    {
+        "change-me-123",
+        "admin",
+        "password",
+        "12345678",
+        "changeme",
+        "default",
+    }
+)
 
 
 def _is_strict_mode() -> bool:
@@ -165,29 +167,18 @@ def _validate_admin_password(password: str | None) -> None:
         ValueError: If password is missing, too weak, or is a known insecure default.
     """
     if not password:
-        raise ValueError(
-            "BY_ADMIN_PASSWORD environment variable is not set. "
-            "Please set a strong password before starting the server."
-        )
+        raise ValueError("BY_ADMIN_PASSWORD environment variable is not set. Please set a strong password before starting the server.")
 
     if password in _FORBIDDEN_PASSWORDS:
         if _is_strict_mode():
-            raise ValueError(
-                f"Password '{password}' is insecure and not allowed. "
-                "Please set a strong password via BY_ADMIN_PASSWORD environment variable. "
-                "To disable this check for development, set BY_ADMIN_PASSWORD_STRICT_MODE=false."
-            )
+            raise ValueError(f"Password '{password}' is insecure and not allowed. Please set a strong password via BY_ADMIN_PASSWORD environment variable. To disable this check for development, set BY_ADMIN_PASSWORD_STRICT_MODE=false.")
         else:
             import logging
-            logging.getLogger(__name__).warning(
-                "Using known insecure default password. "
-                "This is only allowed in development mode (BY_ADMIN_PASSWORD_STRICT_MODE=false)."
-            )
+
+            logging.getLogger(__name__).warning("Using known insecure default password. This is only allowed in development mode (BY_ADMIN_PASSWORD_STRICT_MODE=false).")
 
     if len(password) < 8:
-        raise ValueError(
-            "BY_ADMIN_PASSWORD must be at least 8 characters long."
-        )
+        raise ValueError("BY_ADMIN_PASSWORD must be at least 8 characters long.")
 
 
 def _seed_owner_user() -> dict[str, Any]:
@@ -665,11 +656,7 @@ def remove_workspace_member(workspace_id: str, user_id: str) -> WorkspaceMembers
     if removed.get("role") == "owner":
         raise HTTPException(status_code=403, detail="不能移除空间拥有者")
 
-    payload["memberships"] = [
-        membership
-        for membership in memberships
-        if not (membership.get("workspace_id") == workspace_id and membership.get("user_id") == user_id)
-    ]
+    payload["memberships"] = [membership for membership in memberships if not (membership.get("workspace_id") == workspace_id and membership.get("user_id") == user_id)]
     _write_workspaces_payload(payload)
     return _to_membership(removed)
 
@@ -705,9 +692,7 @@ def delete_user(user_id: str, *, actor_user_id: str | None = None) -> AuthUser:
         raise HTTPException(status_code=403, detail="不能删除当前登录账号")
 
     workspaces_payload = _read_workspaces_payload()
-    blocking_workspaces = [
-        workspace for workspace in workspaces_payload["workspaces"] if workspace.get("created_by_user_id") == user_id and not workspace.get("default_personal", False)
-    ]
+    blocking_workspaces = [workspace for workspace in workspaces_payload["workspaces"] if workspace.get("created_by_user_id") == user_id and not workspace.get("default_personal", False)]
     if blocking_workspaces:
         raise HTTPException(status_code=409, detail="该用户仍拥有共享空间，请先转移或删除其共享空间")
 
@@ -715,16 +700,8 @@ def delete_user(user_id: str, *, actor_user_id: str | None = None) -> AuthUser:
     _write_users_payload(users_payload)
 
     personal_workspace_id = f"ws-{user_id}"
-    workspaces_payload["memberships"] = [
-        membership
-        for membership in workspaces_payload["memberships"]
-        if membership.get("user_id") != user_id and membership.get("workspace_id") != personal_workspace_id
-    ]
-    workspaces_payload["workspaces"] = [
-        workspace
-        for workspace in workspaces_payload["workspaces"]
-        if workspace.get("id") != personal_workspace_id
-    ]
+    workspaces_payload["memberships"] = [membership for membership in workspaces_payload["memberships"] if membership.get("user_id") != user_id and membership.get("workspace_id") != personal_workspace_id]
+    workspaces_payload["workspaces"] = [workspace for workspace in workspaces_payload["workspaces"] if workspace.get("id") != personal_workspace_id]
     _write_workspaces_payload(workspaces_payload)
 
     invites_payload = _read_invites_payload()

@@ -17,12 +17,7 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     while start < text_len:
         end = start + chunk_size
         chunk_text_content = text[start:end]
-        chunks.append({
-            "content": chunk_text_content,
-            "start": start,
-            "end": end,
-            "index": len(chunks)
-        })
+        chunks.append({"content": chunk_text_content, "start": start, "end": end, "index": len(chunks)})
         if end >= text_len:
             break
         start = end - overlap
@@ -32,6 +27,7 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
 async def process_pdf(file_path: str) -> list[dict]:
     try:
         import fitz
+
         doc = fitz.open(file_path)
         full_text = ""
         for page_num in range(len(doc)):
@@ -54,6 +50,7 @@ async def process_pdf(file_path: str) -> list[dict]:
 async def process_docx(file_path: str) -> list[dict]:
     try:
         from docx import Document
+
         doc = Document(file_path)
         full_text = "\n".join([p.text for p in doc.paragraphs])
         chunks = chunk_text(full_text)
@@ -84,6 +81,7 @@ async def process_txt(file_path: str) -> list[dict]:
 async def process_csv(file_path: str) -> list[dict]:
     try:
         import pandas as pd
+
         df = pd.read_csv(file_path)
         content = df.to_string()
         chunks = chunk_text(content)
@@ -157,10 +155,5 @@ class DocumentProcessor:
     def get_chunk_with_id(self, index: int) -> dict | None:
         if 0 <= index < len(self.chunks):
             chunk = self.chunks[index]
-            return {
-                "id": f"{self.doc_id}_chunk_{index}",
-                "content": chunk["content"],
-                "metadata": chunk.get("metadata", {}),
-                "token_count": estimate_tokens(chunk["content"])
-            }
+            return {"id": f"{self.doc_id}_chunk_{index}", "content": chunk["content"], "metadata": chunk.get("metadata", {}), "token_count": estimate_tokens(chunk["content"])}
         return None

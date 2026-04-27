@@ -156,16 +156,18 @@ def feishu_message_get(message_id: str) -> str:
             return _error_response(f"Failed to get message: code={response.code}, msg={response.msg}")
 
         data = getattr(response, "data", None)
-        return _ok_response({
-            "message_id": message_id,
-            "msg_type": getattr(data, "msg_type", ""),
-            "content": getattr(data, "body", {}).get("content", "") if hasattr(getattr(data, "body", None), "get") else getattr(data, "content", ""),
-            "create_time": getattr(data, "create_time", ""),
-            "sender": {
-                "id": getattr(data, "sender", {}).get("id", "") if isinstance(getattr(data, "sender", None), dict) else getattr(getattr(data, "sender", None), "id", ""),
-                "type": getattr(data, "sender", {}).get("type", "") if isinstance(getattr(data, "sender", None), dict) else getattr(getattr(data, "sender", None), "type", ""),
-            },
-        })
+        return _ok_response(
+            {
+                "message_id": message_id,
+                "msg_type": getattr(data, "msg_type", ""),
+                "content": getattr(data, "body", {}).get("content", "") if hasattr(getattr(data, "body", None), "get") else getattr(data, "content", ""),
+                "create_time": getattr(data, "create_time", ""),
+                "sender": {
+                    "id": getattr(data, "sender", {}).get("id", "") if isinstance(getattr(data, "sender", None), dict) else getattr(getattr(data, "sender", None), "id", ""),
+                    "type": getattr(data, "sender", {}).get("type", "") if isinstance(getattr(data, "sender", None), dict) else getattr(getattr(data, "sender", None), "type", ""),
+                },
+            }
+        )
     except Exception as e:
         logger.error("[Feishu tools] failed to get message message_id=%s: %s", message_id, e)
         return _error_response(f"Failed to get message: {e}")

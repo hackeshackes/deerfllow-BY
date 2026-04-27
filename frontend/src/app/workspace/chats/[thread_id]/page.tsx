@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
+import { CaptureTrigger } from "@/components/workspace/capture";
 import {
   ChatBox,
   useSpecificChatMode,
@@ -139,6 +140,7 @@ export default function ChatPage() {
               <TokenUsageIndicator messages={thread.messages} />
               <ExportTrigger threadId={threadId} />
               <ArtifactTrigger />
+              <CaptureTrigger threadId={threadId} />
             </div>
           </header>
           <main className="flex min-h-0 max-w-full grow flex-col">

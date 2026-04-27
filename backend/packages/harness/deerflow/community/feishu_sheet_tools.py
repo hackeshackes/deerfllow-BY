@@ -36,6 +36,7 @@ def _normalize_range(sheet_id: str, range_value: str) -> str:
 def _get_tenant_token(client) -> str | None:
     try:
         from lark_oapi.core.token.manager import TokenManager
+
         return TokenManager.get_self_tenant_token(client._config)
     except Exception as e:
         logger.error("[Feishu sheet] failed to get tenant token: %s", e)
@@ -223,19 +224,13 @@ def feishu_sheet_create(folder_token: str, title: str) -> str:
         import lark_oapi as lark
 
         payload = {"title": title, "type": "sheet"}
-        request = (
-            lark.BaseRequest.builder()
-            .http_method(lark.HttpMethod.POST)
-            .uri(f"/open-apis/drive/explorer/v2/file/{folder_token}")
-            .body(payload)
-            .token_types({lark.AccessTokenType.TENANT})
-            .build()
-        )
+        request = lark.BaseRequest.builder().http_method(lark.HttpMethod.POST).uri(f"/open-apis/drive/explorer/v2/file/{folder_token}").body(payload).token_types({lark.AccessTokenType.TENANT}).build()
         resp = client.request(request)
         if not resp.success():
             return _error_response(f"Failed to create spreadsheet: code={resp.code}, msg={resp.msg}")
 
         import json
+
         raw_data = json.loads(resp.raw.content)
         data = raw_data.get("data", {})
         spreadsheet_token = data.get("token", "")

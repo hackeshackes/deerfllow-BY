@@ -173,9 +173,7 @@ async def get_custom_skill(skill_name: str, request: Request) -> CustomSkillResp
 
 
 @router.put("/{skill_name}", response_model=CustomSkillResponse)
-async def update_custom_skill(
-    skill_name: str, body: CustomSkillUpdateRequest, request: Request
-) -> CustomSkillResponse:
+async def update_custom_skill(skill_name: str, body: CustomSkillUpdateRequest, request: Request) -> CustomSkillResponse:
     user = require_user(request)
     workspace_id = get_current_workspace_id()
 
@@ -246,6 +244,7 @@ async def delete_custom_skill(skill_name: str, request: Request) -> dict:
 
     skill_dir = get_custom_skill_dir(normalized_name)
     import shutil
+
     shutil.rmtree(skill_dir)
 
     for meta_id, m in list(_custom_skills_meta.items()):
@@ -274,9 +273,7 @@ _skill_shares: dict[str, dict] = {}
 
 
 @router.post("/{skill_name}/share", response_model=SkillShareResponse)
-async def share_custom_skill(
-    skill_name: str, body: SkillShareRequest, request: Request
-) -> SkillShareResponse:
+async def share_custom_skill(skill_name: str, body: SkillShareRequest, request: Request) -> SkillShareResponse:
     user = require_user(request)
 
     try:

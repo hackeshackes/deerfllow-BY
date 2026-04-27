@@ -175,12 +175,14 @@ def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership
         member_user = get_user_by_id(workspace_membership.user_id)
         if member_user is None:
             continue
-        members.append({
-            "id": member_user.id,
-            "name": member_user.name,
-            "email": member_user.email,
-            "role": workspace_membership.role,
-        })
+        members.append(
+            {
+                "id": member_user.id,
+                "name": member_user.name,
+                "email": member_user.email,
+                "role": workspace_membership.role,
+            }
+        )
     return WorkspaceResponse(
         id=workspace.id,
         name=workspace.name,

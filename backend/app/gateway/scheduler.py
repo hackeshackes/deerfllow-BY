@@ -50,13 +50,7 @@ def _create_trigger(trigger_type: str, trigger_config: dict) -> Any:
             timezone=trigger_config.get("timezone", "Asia/Shanghai"),
         )
     elif trigger_type == "interval":
-        interval_seconds = (
-            trigger_config.get("interval_seconds")
-            or ((trigger_config.get("interval_minutes") or 0) * 60)
-            or ((trigger_config.get("interval_hours") or 0) * 3600)
-            or ((trigger_config.get("interval_days") or 0) * 86400)
-            or 60
-        )
+        interval_seconds = trigger_config.get("interval_seconds") or ((trigger_config.get("interval_minutes") or 0) * 60) or ((trigger_config.get("interval_hours") or 0) * 3600) or ((trigger_config.get("interval_days") or 0) * 86400) or 60
         return IntervalTrigger(seconds=interval_seconds, timezone=trigger_config.get("timezone", "Asia/Shanghai"))
     elif trigger_type == "one_time":
         start_date = trigger_config.get("start_date")
@@ -146,9 +140,11 @@ def trigger_job_now(task_id: str) -> bool:
 
 _SCHEDULER_INTERNAL_KEY = "scheduler-internal-key-2026"
 
+
 async def _execute_scheduled_task(task_id: str) -> None:
     try:
         import httpx
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"http://gateway:8001/api/tasks/{task_id}/run",
@@ -179,9 +175,7 @@ async def load_scheduled_tasks_from_db() -> None:
         return
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    cursor = conn.execute(
-        "SELECT id, name, trigger_type, trigger_config FROM tasks WHERE status = 'active'"
-    )
+    cursor = conn.execute("SELECT id, name, trigger_type, trigger_config FROM tasks WHERE status = 'active'")
     for row in cursor.fetchall():
         task_id = row["id"]
         name = row["name"]
