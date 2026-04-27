@@ -1,5 +1,3 @@
-"""Embedding service for RAG knowledge base using sentence-transformers."""
-
 from __future__ import annotations
 
 import hashlib
@@ -137,7 +135,7 @@ class EmbeddingService:
             collection.delete()
             return True
         except Exception as e:
-            logger.error(f"Failed to delete all chunks: {e}")
+            logger.error(f"Failed to delete all: {e}")
             return False
 
 
