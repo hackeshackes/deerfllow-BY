@@ -17,8 +17,8 @@ from pydantic import BaseModel, Field
 
 from app.gateway.auth import require_user
 from app.gateway.auth_context import get_current_workspace_id
-from app.gateway.services.document_processor import process_document
-from app.gateway.services.embedding_service import _cosine_similarity, _generate_embedding
+from app.gateway.document_processor import process_document
+from app.gateway.embedding_service import _cosine_similarity, _generate_embedding
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])

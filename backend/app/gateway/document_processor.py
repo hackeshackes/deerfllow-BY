@@ -1,5 +1,3 @@
-"""Document processor for parsing and chunking files for RAG."""
-
 from __future__ import annotations
 
 import logging
@@ -109,10 +107,7 @@ async def process_markdown(file_path: str) -> list[dict]:
         return []
 
 
-async def process_document(
-    file_path: str,
-    file_type: str,
-) -> list[dict]:
+async def process_document(file_path: str, file_type: str) -> list[dict]:
     if file_type == "pdf":
         return await process_pdf(file_path)
     elif file_type == "docx":
