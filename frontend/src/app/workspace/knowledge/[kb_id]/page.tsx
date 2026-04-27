@@ -17,6 +17,7 @@ import {
   deleteKnowledgeBase,
   getKnowledgeBase,
   listDocuments,
+  reindexDocument,
   searchKnowledgeBase,
   uploadDocument,
   type Document,
@@ -211,38 +212,81 @@ export default function KnowledgeDetailPage() {
                     {documents.map((doc) => (
                       <div
                         key={doc.id}
-                        className="flex items-center justify-between rounded-lg border p-4"
+                        className="flex flex-col gap-2 rounded-lg border p-4"
                       >
-                        <div className="flex items-center gap-3">
-                          <FileIcon className="size-5 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium">{doc.original_name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {doc.file_type.toUpperCase()} - {doc.file_size} bytes
-                              {doc.status === "ready" && ` - ${doc.chunk_count} chunks`}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <FileIcon className="size-5 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{doc.original_name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {doc.file_type.toUpperCase()} - {doc.file_size} bytes
+                              </div>
                             </div>
                           </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs ${
+                                doc.status === "ready"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                                  : doc.status === "processing"
+                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+                                    : doc.status === "failed"
+                                      ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                                      : doc.status === "stale"
+                                        ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100"
+                                        : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {t.knowledge.status[doc.status as keyof typeof t.knowledge.status] ??
+                                doc.status}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteDoc(doc.id)}
+                            >
+                              <TrashIcon className="size-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs ${
-                              doc.status === "ready"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                                : doc.status === "processing"
-                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
-                                  : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-                            }`}
-                          >
-                            {t.knowledge.status[doc.status as keyof typeof t.knowledge.status]}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDeleteDoc(doc.id)}
-                          >
-                            <TrashIcon className="size-4" />
-                          </Button>
-                        </div>
+                        {doc.status === "ready" && (
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pl-8">
+                            <span>
+                              {doc.chunk_count} {t.knowledge.docMetadata.chunks}
+                            </span>
+                            <span>
+                              {doc.token_count} {t.knowledge.docMetadata.tokens}
+                            </span>
+                            {doc.processed_at && (
+                              <span>
+                                {t.knowledge.docMetadata.processedAt}:{" "}
+                                {new Date(doc.processed_at).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {(doc.status === "failed" || doc.status === "stale") && (
+                          <div className="flex gap-2 pl-8">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7"
+                              onClick={async () => {
+                                try {
+                                  const updated = await reindexDocument(kbId, doc.id);
+                                  setDocuments((prev) =>
+                                    prev.map((d) => (d.id === doc.id ? updated : d))
+                                  );
+                                } catch (err) {
+                                  console.error("Failed to reindex:", err);
+                                }
+                              }}
+                            >
+                              {t.knowledge.reindex}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

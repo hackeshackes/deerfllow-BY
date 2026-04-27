@@ -69,6 +69,18 @@ export const zhCN: Translations = {
     captureAutomationSuccess: "已创建自动化草稿",
     captureNoMessages: "对话还没有消息，无法生成总结",
     captureError: "生成总结时出错",
+    captureWorkflowName: "工作流名称",
+    captureWorkflowDescription: "工作流描述",
+    captureWorkflowPrompt: "Prompt 模板",
+    captureWorkflowVisibility: "可见范围",
+    captureWorkflowSave: "保存工作流",
+    captureWorkflowCopy: "复制到剪贴板",
+    captureWorkflowSaveSuccess: "工作流草稿已保存",
+    captureWorkflowSaveError: "保存工作流失败",
+    captureWorkflowNamePlaceholder: "输入工作流名称",
+    captureWorkflowDescriptionPlaceholder: "描述这个工作流做什么",
+    private: "私有",
+    workspace: "当前工作区",
   },
 
   // Home
@@ -392,6 +404,13 @@ export const zhCN: Translations = {
       processing: "处理中",
       ready: "就绪",
       error: "错误",
+      failed: "失败",
+      stale: "可能过期",
+    },
+    docMetadata: {
+      chunks: "块",
+      tokens: "Token",
+      processedAt: "处理时间",
     },
   },
 

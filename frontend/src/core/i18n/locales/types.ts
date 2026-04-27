@@ -58,6 +58,18 @@ export interface Translations {
     captureAutomationSuccess: string;
     captureNoMessages: string;
     captureError: string;
+    captureWorkflowName: string;
+    captureWorkflowDescription: string;
+    captureWorkflowPrompt: string;
+    captureWorkflowVisibility: string;
+    captureWorkflowSave: string;
+    captureWorkflowCopy: string;
+    captureWorkflowSaveSuccess: string;
+    captureWorkflowSaveError: string;
+    captureWorkflowNamePlaceholder: string;
+    captureWorkflowDescriptionPlaceholder: string;
+    private: string;
+    workspace: string;
   };
 
   home: {
@@ -329,6 +341,13 @@ export interface Translations {
       processing: string;
       ready: string;
       error: string;
+      failed: string;
+      stale: string;
+    };
+    docMetadata: {
+      chunks: string;
+      tokens: string;
+      processedAt: string;
     };
   };
 
