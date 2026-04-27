@@ -31,6 +31,8 @@ function isExternalUrl(href: string | undefined): boolean {
 }
 
 export function ArtifactLink(props: AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const context = useContext(ArtifactLinkContext);
+
   if (typeof props.children === "string") {
     const match = /^citation:(.+)$/.exec(props.children);
     if (match) {
@@ -40,7 +42,6 @@ export function ArtifactLink(props: AnchorHTMLAttributes<HTMLAnchorElement>) {
   }
   const { className, target, rel, href, ...rest } = props;
   const external = isExternalUrl(href);
-  const context = useContext(ArtifactLinkContext);
 
   let resolvedHref = href;
   if (href && href.startsWith("/mnt/") && context) {

@@ -1,15 +1,15 @@
 "use client";
 
-import { MessageCircleIcon, TrashIcon, UserIcon, UsersIcon } from "lucide-react";
+import { MessageCircleIcon, UserIcon, UsersIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
 
 type ChannelThread = {
   channel: string;

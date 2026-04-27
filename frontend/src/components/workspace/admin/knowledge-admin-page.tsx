@@ -2,15 +2,15 @@
 
 import { BookOpenIcon, GlobeIcon, PencilIcon, TrashIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
 
 type KnowledgeBase = {
   id: string;
@@ -159,7 +159,6 @@ export function KnowledgeAdminPage() {
   }
 
   const globalKbs = knowledgeBases.filter((kb) => kb.is_global);
-  const regularKbs = knowledgeBases.filter((kb) => !kb.is_global);
 
   return (
     <AdminPageShell title="知识库管理" description="管理全局知识库，查看所有用户知识库。">
@@ -371,7 +370,7 @@ export function KnowledgeAdminPage() {
           <DialogHeader>
             <DialogTitle>删除知识库</DialogTitle>
             <DialogDescription>
-              确定要删除知识库 "{deleteTarget?.name}" 吗？此操作不可撤销。
+              确定要删除知识库 &quot;{deleteTarget?.name}&quot; 吗？此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

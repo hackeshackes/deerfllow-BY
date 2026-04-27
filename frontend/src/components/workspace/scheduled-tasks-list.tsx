@@ -186,7 +186,7 @@ export function ScheduledTasksList() {
       <SidebarGroupLabel>
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          {t.sidebar.scheduledTasks}
+          {t.sidebar.automations}
         </div>
       </SidebarGroupLabel>
       <SidebarGroupContent className="group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0">

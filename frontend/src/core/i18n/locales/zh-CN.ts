@@ -171,6 +171,9 @@ export const zhCN: Translations = {
     demoChats: "演示对话",
     agents: "智能体",
     scheduledTasks: "定时任务",
+    sources: "资料库",
+    automations: "自动化",
+    workflows: "工作流",
   },
 
   // Agents

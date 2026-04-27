@@ -177,6 +177,9 @@ export const enUS: Translations = {
     demoChats: "Demo chats",
     agents: "Agents",
     scheduledTasks: "Scheduled Tasks",
+    sources: "Sources",
+    automations: "Automations",
+    workflows: "Workflows",
   },
 
   // Agents

@@ -55,7 +55,7 @@ export async function getKnowledgeBase(kbId: string): Promise<KnowledgeBase> {
 export async function createKnowledgeBase(
   name: string,
   description?: string,
-  visibility: string = "private"
+  visibility = "private"
 ): Promise<KnowledgeBase> {
   const response = await fetch(`${getBackendBaseURL()}/api/knowledge`, {
     method: "POST",

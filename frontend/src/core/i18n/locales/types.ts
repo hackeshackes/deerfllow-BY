@@ -121,6 +121,9 @@ export interface Translations {
     demoChats: string;
     agents: string;
     scheduledTasks: string;
+    sources: string;
+    automations: string;
+    workflows: string;
   };
 
   // Agents

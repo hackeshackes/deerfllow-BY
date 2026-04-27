@@ -1,10 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
+import { ChatStartPanel } from "@/components/workspace/chat-start-panel";
 import {
   ChatBox,
   useSpecificChatMode,
@@ -33,11 +34,13 @@ import { cn } from "@/lib/utils";
 export default function ChatPage() {
   const { t } = useI18n();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showFollowups, setShowFollowups] = useState(false);
   const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
     useThreadChat();
   const [settings, setSettings] = useThreadSettings(threadId);
   const [mounted, setMounted] = useState(false);
+  const initialPrompt = searchParams.get("prompt") ?? undefined;
   useSpecificChatMode();
 
   useEffect(() => {
@@ -171,11 +174,13 @@ export default function ChatPage() {
                 </div>
                 {mounted ? (
                   <InputBox
+                    key={isNewThread ? (initialPrompt ?? "new-thread") : threadId}
                     className={cn(
                       "bg-background/90 w-full -translate-y-4 rounded-[1.75rem] border shadow-xl",
                     )}
                     isNewThread={isNewThread}
                     threadId={threadId}
+                    initialValue={isNewThread ? initialPrompt : undefined}
                     autoFocus={isNewThread}
                     status={
                       thread.error
@@ -186,7 +191,12 @@ export default function ChatPage() {
                     }
                     context={settings.context}
                     extraHeader={
-                      isNewThread && <Welcome mode={settings.context.mode} />
+                      isNewThread && (
+                        <>
+                          <Welcome mode={settings.context.mode} />
+                          <ChatStartPanel />
+                        </>
+                      )
                     }
                     disabled={
                       env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
