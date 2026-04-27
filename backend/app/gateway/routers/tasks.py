@@ -222,13 +222,7 @@ def _calculate_next_run(trigger_type: str, trigger_config: dict) -> str | None:
         if trigger_type == "cron" and trigger_config.get("cron"):
             return None
         elif trigger_type == "interval":
-            interval_seconds = (
-                trigger_config.get("interval_seconds")
-                or (trigger_config.get("interval_minutes", 0) * 60)
-                or (trigger_config.get("interval_hours", 0) * 3600)
-                or (trigger_config.get("interval_days", 0) * 86400)
-                or 0
-            )
+            interval_seconds = trigger_config.get("interval_seconds") or (trigger_config.get("interval_minutes", 0) * 60) or (trigger_config.get("interval_hours", 0) * 3600) or (trigger_config.get("interval_days", 0) * 86400) or 0
             if interval_seconds > 0:
                 next_run = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=interval_seconds)
                 return next_run.isoformat()
@@ -245,12 +239,7 @@ def _validate_trigger_config(trigger_type: str, trigger_config: TriggerConfig) -
         if len(parts) != 5:
             raise HTTPException(status_code=422, detail="Invalid cron expression: must have 5 fields")
     elif trigger_type == "interval":
-        has_interval = (
-            trigger_config.interval_seconds
-            or trigger_config.interval_minutes
-            or trigger_config.interval_hours
-            or trigger_config.interval_days
-        )
+        has_interval = trigger_config.interval_seconds or trigger_config.interval_minutes or trigger_config.interval_hours or trigger_config.interval_days
         if not has_interval:
             raise HTTPException(status_code=422, detail="At least one interval parameter required for interval trigger")
     elif trigger_type == "one_time":
@@ -344,6 +333,7 @@ async def _create_thread_for_task(request: Request, task_id: str, user) -> str |
 
         try:
             from langgraph_sdk.client import get_client
+
             lg_client = get_client(url="http://langgraph:2024")
             await lg_client.threads.create(thread_id=thread_id, metadata=metadata, if_exists=None)
         except Exception:
@@ -398,6 +388,7 @@ async def create_task(body: TaskCreateRequest, request: Request) -> TaskResponse
 
         try:
             from app.gateway.scheduler import _run_scheduled_task_sync, add_scheduled_job
+
             add_scheduled_job(
                 task_id=task_id,
                 trigger_type=body.trigger_type,
@@ -525,6 +516,7 @@ async def update_task(task_id: str, body: TaskUpdateRequest, request: Request) -
             import json as json_module
 
             from app.gateway.scheduler import _run_scheduled_task_sync, add_scheduled_job, remove_scheduled_job
+
             remove_scheduled_job(task_id)
             if row["status"] == "active":
                 trigger_config = body.trigger_config or TriggerConfig(**json_module.loads(row["trigger_config"]))
@@ -559,6 +551,7 @@ async def delete_task(task_id: str, request: Request) -> dict:
 
         try:
             from app.gateway.scheduler import remove_scheduled_job
+
             remove_scheduled_job(task_id)
         except Exception:
             logger.exception("Failed to remove scheduled job (non-critical)")
@@ -823,6 +816,7 @@ async def _execute_task_in_thread(
                 try:
                     from app.gateway.deps import get_store
                     from app.gateway.routers.threads import _store_upsert
+
                     store = get_store(request)
                     logger.info(f"Store for thread {thread_id}: {store}")
                     if store:
@@ -869,6 +863,7 @@ async def pause_task(task_id: str, request: Request) -> TaskResponse:
 
         try:
             from app.gateway.scheduler import pause_scheduled_job
+
             pause_scheduled_job(task_id)
         except Exception:
             logger.exception("Failed to pause scheduled job (non-critical)")
@@ -899,6 +894,7 @@ async def resume_task(task_id: str, request: Request) -> TaskResponse:
 
         try:
             from app.gateway.scheduler import resume_scheduled_job
+
             resume_scheduled_job(task_id)
         except Exception:
             logger.exception("Failed to resume scheduled job (non-critical)")

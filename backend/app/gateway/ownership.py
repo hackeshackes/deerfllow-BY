@@ -108,6 +108,7 @@ async def _get_thread_record(request: Request, thread_id: str, user: AuthUser) -
     if item is None:
         try:
             from langgraph_sdk.client import get_client
+
             lg_client = get_client()
             lg_thread = await lg_client.threads.get(thread_id)
             if lg_thread is not None:

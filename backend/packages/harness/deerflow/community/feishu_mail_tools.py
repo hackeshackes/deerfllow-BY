@@ -25,11 +25,7 @@ def _serialize_value(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _serialize_value(item) for key, item in value.items()}
     if hasattr(value, "__dict__"):
-        return {
-            key: _serialize_value(item)
-            for key, item in vars(value).items()
-            if not key.startswith("_") and not callable(item)
-        }
+        return {key: _serialize_value(item) for key, item in vars(value).items() if not key.startswith("_") and not callable(item)}
     return str(value)
 
 
@@ -218,13 +214,15 @@ def feishu_mail_create_draft(user_mailbox_id: str, to: list[str], subject: str, 
             return _error_response(f"Failed to create draft: code={resp.code}, msg={resp.msg}")
 
         data = getattr(resp, "data", None) or {}
-        return _ok_response({
-            "user_mailbox_id": user_mailbox_id,
-            "draft_id": _get_attr(data, "draft_id") or _get_attr(data, "id"),
-            "subject": subject.strip(),
-            "to": recipients,
-            "cc": cc_recipients,
-        })
+        return _ok_response(
+            {
+                "user_mailbox_id": user_mailbox_id,
+                "draft_id": _get_attr(data, "draft_id") or _get_attr(data, "id"),
+                "subject": subject.strip(),
+                "to": recipients,
+                "cc": cc_recipients,
+            }
+        )
     except Exception as e:
         logger.error("[feishu_mail_create_draft] error user_mailbox_id=%s: %s", user_mailbox_id, e)
         return _error_response(f"Failed to create draft: {e}")

@@ -115,16 +115,7 @@ def feishu_drive_file_meta(file_token: str) -> str:
         BatchQueryMetaRequest = _load_drive_model("batch_query_meta_request", "BatchQueryMetaRequest")
         MetaRequest = _load_drive_model("meta_request", "MetaRequest")
         RequestDoc = _load_drive_model("request_doc", "RequestDoc")
-        request = (
-            BatchQueryMetaRequest.builder()
-            .request_body(
-                MetaRequest.builder()
-                .request_docs([RequestDoc.builder().doc_token(file_token).doc_type("file").build()])
-                .with_url(True)
-                .build()
-            )
-            .build()
-        )
+        request = BatchQueryMetaRequest.builder().request_body(MetaRequest.builder().request_docs([RequestDoc.builder().doc_token(file_token).doc_type("file").build()]).with_url(True).build()).build()
         response = client.drive.v1.meta.batch_query(request)
         if not response.success():
             return _error_response(f"Failed to get drive file metadata: code={response.code}, msg={response.msg}")
@@ -250,15 +241,7 @@ def feishu_drive_file_upload(folder_token: str, file_name: str, content_base64: 
         UploadAllFileRequest = _load_drive_model("upload_all_file_request", "UploadAllFileRequest")
         UploadAllFileRequestBody = _load_drive_model("upload_all_file_request_body", "UploadAllFileRequestBody")
 
-        body = (
-            UploadAllFileRequestBody.builder()
-            .file_name(file_name)
-            .parent_type("file")
-            .parent_node(folder_token)
-            .size(file_size)
-            .file(file_io)
-            .build()
-        )
+        body = UploadAllFileRequestBody.builder().file_name(file_name).parent_type("file").parent_node(folder_token).size(file_size).file(file_io).build()
         request = UploadAllFileRequest.builder().request_body(body).build()
         response = client.drive.v1.file.upload_all(request)
         if not response.success():
@@ -383,13 +366,15 @@ def feishu_drive_file_copy(file_token: str, folder_token: str, name: str | None 
 
         data = getattr(response, "data", None)
         new_file = _get_attr(data, "file") or data
-        return _ok_response({
-            "file_token": file_token,
-            "folder_token": folder_token,
-            "file_type": file_type,
-            "copied": True,
-            "new_file": _to_jsonable(new_file) if new_file else None,
-        })
+        return _ok_response(
+            {
+                "file_token": file_token,
+                "folder_token": folder_token,
+                "file_type": file_type,
+                "copied": True,
+                "new_file": _to_jsonable(new_file) if new_file else None,
+            }
+        )
     except Exception as e:
         logger.error("[feishu_drive_file_copy] error: %s", e)
         return _error_response(f"Failed to copy file: {str(e)}")

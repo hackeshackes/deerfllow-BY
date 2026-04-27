@@ -155,6 +155,11 @@ class DocumentResponse(BaseModel):
     processed_at: str | None = None
 
 
+class TextDocumentRequest(BaseModel):
+    content: str = Field(min_length=1, description="Text content to save")
+    title: str | None = Field(default=None, description="Optional title for the document")
+
+
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=20)
@@ -446,6 +451,77 @@ async def upload_document(kb_id: str, request: Request, file: UploadFile = File(
             file_size=file_size,
             status="ready",
             chunk_count=0,
+            token_count=0,
+            uploaded_at=str(now),
+            processed_at=str(now),
+        )
+    finally:
+        conn.close()
+
+
+@router.post("/{kb_id}/text", response_model=DocumentResponse)
+async def add_text_document(kb_id: str, body: TextDocumentRequest, request: Request) -> DocumentResponse:
+    user = require_user(request)
+
+    conn = _get_db()
+    try:
+        cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Knowledge base {kb_id} not found")
+
+        kb = dict(row)
+        if kb.get("is_global"):
+            if not user.is_owner:
+                raise HTTPException(status_code=403, detail="Only admin can add documents to global knowledge base")
+        elif kb["user_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Only the owner can add documents")
+
+        doc_id = str(uuid.uuid4())
+        now = time.time()
+        title = body.title or "Captured Summary"
+        content = body.content
+        file_size = len(content.encode("utf-8"))
+
+        conn.execute(
+            """INSERT INTO documents
+                (id, knowledge_base_id, original_name, file_type, file_size, storage_path, status, uploaded_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                doc_id,
+                kb_id,
+                f"{title}.txt",
+                "txt",
+                file_size,
+                f"/mnt/user-data/knowledge/{kb_id}/{doc_id}/{title}.txt",
+                "ready",
+                now,
+            ),
+        )
+
+        conn.execute(
+            """INSERT INTO document_chunks
+                (id, document_id, content, chunk_index)
+            VALUES (?, ?, ?, ?)""",
+            (
+                str(uuid.uuid4()),
+                doc_id,
+                content,
+                0,
+            ),
+        )
+        conn.commit()
+
+        logger.info(f"Text document added: {doc_id} to knowledge base {kb_id}")
+        return DocumentResponse(
+            id=doc_id,
+            knowledge_base_id=kb_id,
+            original_name=f"{title}.txt",
+            file_type="txt",
+            file_size=file_size,
+            status="ready",
+            chunk_count=1,
             token_count=0,
             uploaded_at=str(now),
             processed_at=str(now),

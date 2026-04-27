@@ -89,9 +89,7 @@ def feishu_bitable_read(bitable_id: str, table_id: str | None = None, record_cou
         if table_id and not any(table.get("table_id") == table_id for table in tables):
             return _error_response(f"Table not found in bitable: {table_id}")
 
-        records_resp = client.bitable.v1.app_table_record.list(
-            ListAppTableRecordRequest.builder().app_token(bitable_id).table_id(selected_table_id).page_size(record_count).build()
-        )
+        records_resp = client.bitable.v1.app_table_record.list(ListAppTableRecordRequest.builder().app_token(bitable_id).table_id(selected_table_id).page_size(record_count).build())
         records_error = _response_error(records_resp, f"list bitable records for {bitable_id}/{selected_table_id}")
         if records_error:
             return _error_response(records_error)
@@ -141,40 +139,22 @@ def feishu_bitable_write(bitable_id: str, table_id: str, action: str, records: l
         return _error_response("records must be a non-empty list.")
 
     try:
-        BatchCreateAppTableRecordRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.batch_create_app_table_record_request", "BatchCreateAppTableRecordRequest"
-        )
-        BatchCreateAppTableRecordRequestBody = _load_attr(
-            "lark_oapi.api.bitable.v1.model.batch_create_app_table_record_request_body", "BatchCreateAppTableRecordRequestBody"
-        )
-        BatchDeleteAppTableRecordRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.batch_delete_app_table_record_request", "BatchDeleteAppTableRecordRequest"
-        )
-        BatchDeleteAppTableRecordRequestBody = _load_attr(
-            "lark_oapi.api.bitable.v1.model.batch_delete_app_table_record_request_body", "BatchDeleteAppTableRecordRequestBody"
-        )
-        BatchUpdateAppTableRecordRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.batch_update_app_table_record_request", "BatchUpdateAppTableRecordRequest"
-        )
-        BatchUpdateAppTableRecordRequestBody = _load_attr(
-            "lark_oapi.api.bitable.v1.model.batch_update_app_table_record_request_body", "BatchUpdateAppTableRecordRequestBody"
-        )
+        BatchCreateAppTableRecordRequest = _load_attr("lark_oapi.api.bitable.v1.model.batch_create_app_table_record_request", "BatchCreateAppTableRecordRequest")
+        BatchCreateAppTableRecordRequestBody = _load_attr("lark_oapi.api.bitable.v1.model.batch_create_app_table_record_request_body", "BatchCreateAppTableRecordRequestBody")
+        BatchDeleteAppTableRecordRequest = _load_attr("lark_oapi.api.bitable.v1.model.batch_delete_app_table_record_request", "BatchDeleteAppTableRecordRequest")
+        BatchDeleteAppTableRecordRequestBody = _load_attr("lark_oapi.api.bitable.v1.model.batch_delete_app_table_record_request_body", "BatchDeleteAppTableRecordRequestBody")
+        BatchUpdateAppTableRecordRequest = _load_attr("lark_oapi.api.bitable.v1.model.batch_update_app_table_record_request", "BatchUpdateAppTableRecordRequest")
+        BatchUpdateAppTableRecordRequestBody = _load_attr("lark_oapi.api.bitable.v1.model.batch_update_app_table_record_request_body", "BatchUpdateAppTableRecordRequestBody")
 
         if normalized_action == "create":
             body = BatchCreateAppTableRecordRequestBody.builder().records(records).build()
-            response = client.bitable.v1.app_table_record.batch_create(
-                BatchCreateAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).request_body(body).build()
-            )
+            response = client.bitable.v1.app_table_record.batch_create(BatchCreateAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).request_body(body).build())
         elif normalized_action == "update":
             body = BatchUpdateAppTableRecordRequestBody.builder().records(records).build()
-            response = client.bitable.v1.app_table_record.batch_update(
-                BatchUpdateAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).request_body(body).build()
-            )
+            response = client.bitable.v1.app_table_record.batch_update(BatchUpdateAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).request_body(body).build())
         else:
             body = BatchDeleteAppTableRecordRequestBody.builder().records(records).build()
-            response = client.bitable.v1.app_table_record.batch_delete(
-                BatchDeleteAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).request_body(body).build()
-            )
+            response = client.bitable.v1.app_table_record.batch_delete(BatchDeleteAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).request_body(body).build())
 
         response_error = _response_error(response, f"{normalized_action} bitable records for {bitable_id}/{table_id}")
         if response_error:
@@ -215,12 +195,8 @@ def feishu_bitable_record_create(bitable_id: str, table_id: str, fields: dict) -
         return _error_response("fields is required and must not be empty.")
 
     try:
-        CreateAppTableRecordRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.create_app_table_record_request", "CreateAppTableRecordRequest"
-        )
-        CreateAppTableRecordRequestBody = _load_attr(
-            "lark_oapi.api.bitable.v1.model.create_app_table_record_request_body", "CreateAppTableRecordRequestBody"
-        )
+        CreateAppTableRecordRequest = _load_attr("lark_oapi.api.bitable.v1.model.create_app_table_record_request", "CreateAppTableRecordRequest")
+        CreateAppTableRecordRequestBody = _load_attr("lark_oapi.api.bitable.v1.model.create_app_table_record_request_body", "CreateAppTableRecordRequestBody")
         body = CreateAppTableRecordRequestBody.builder().fields(fields).build()
         request = CreateAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).request_body(body).build()
         response = client.bitable.v1.app_table_record.create(request)
@@ -230,12 +206,14 @@ def feishu_bitable_record_create(bitable_id: str, table_id: str, fields: dict) -
             return _error_response(response_error)
 
         data = getattr(response, "data", None)
-        return _ok_response({
-            "bitable_id": bitable_id,
-            "table_id": table_id,
-            "record_id": _get_attr(data, "record_id"),
-            "fields": fields,
-        })
+        return _ok_response(
+            {
+                "bitable_id": bitable_id,
+                "table_id": table_id,
+                "record_id": _get_attr(data, "record_id"),
+                "fields": fields,
+            }
+        )
     except Exception as e:
         logger.error("[Feishu bitable tools] failed to create record bitable_id=%s table_id=%s: %s", bitable_id, table_id, e)
         return _error_response(f"Failed to create record: {str(e)}")
@@ -265,12 +243,8 @@ def feishu_bitable_record_update(bitable_id: str, table_id: str, record_id: str,
         return _error_response("fields is required and must not be empty.")
 
     try:
-        UpdateAppTableRecordRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.update_app_table_record_request", "UpdateAppTableRecordRequest"
-        )
-        UpdateAppTableRecordRequestBody = _load_attr(
-            "lark_oapi.api.bitable.v1.model.update_app_table_record_request_body", "UpdateAppTableRecordRequestBody"
-        )
+        UpdateAppTableRecordRequest = _load_attr("lark_oapi.api.bitable.v1.model.update_app_table_record_request", "UpdateAppTableRecordRequest")
+        UpdateAppTableRecordRequestBody = _load_attr("lark_oapi.api.bitable.v1.model.update_app_table_record_request_body", "UpdateAppTableRecordRequestBody")
         body = UpdateAppTableRecordRequestBody.builder().fields(fields).build()
         request = UpdateAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).record_id(record_id).request_body(body).build()
         response = client.bitable.v1.app_table_record.update(request)
@@ -279,13 +253,15 @@ def feishu_bitable_record_update(bitable_id: str, table_id: str, record_id: str,
         if response_error:
             return _error_response(response_error)
 
-        return _ok_response({
-            "bitable_id": bitable_id,
-            "table_id": table_id,
-            "record_id": record_id,
-            "fields": fields,
-            "updated": True,
-        })
+        return _ok_response(
+            {
+                "bitable_id": bitable_id,
+                "table_id": table_id,
+                "record_id": record_id,
+                "fields": fields,
+                "updated": True,
+            }
+        )
     except Exception as e:
         logger.error("[Feishu bitable tools] failed to update record bitable_id=%s table_id=%s record_id=%s: %s", bitable_id, table_id, record_id, e)
         return _error_response(f"Failed to update record: {str(e)}")
@@ -312,9 +288,7 @@ def feishu_bitable_record_delete(bitable_id: str, table_id: str, record_id: str)
         return _error_response("record_id is required.")
 
     try:
-        DeleteAppTableRecordRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.delete_app_table_record_request", "DeleteAppTableRecordRequest"
-        )
+        DeleteAppTableRecordRequest = _load_attr("lark_oapi.api.bitable.v1.model.delete_app_table_record_request", "DeleteAppTableRecordRequest")
         request = DeleteAppTableRecordRequest.builder().app_token(bitable_id).table_id(table_id).record_id(record_id).build()
         response = client.bitable.v1.app_table_record.delete(request)
 
@@ -322,12 +296,14 @@ def feishu_bitable_record_delete(bitable_id: str, table_id: str, record_id: str)
         if response_error:
             return _error_response(response_error)
 
-        return _ok_response({
-            "bitable_id": bitable_id,
-            "table_id": table_id,
-            "record_id": record_id,
-            "deleted": True,
-        })
+        return _ok_response(
+            {
+                "bitable_id": bitable_id,
+                "table_id": table_id,
+                "record_id": record_id,
+                "deleted": True,
+            }
+        )
     except Exception as e:
         logger.error("[Feishu bitable tools] failed to delete record bitable_id=%s table_id=%s record_id=%s: %s", bitable_id, table_id, record_id, e)
         return _error_response(f"Failed to delete record: {str(e)}")
@@ -348,9 +324,7 @@ def feishu_bitable_table_list(bitable_id: str) -> str:
         return _error_response("bitable_id is required.")
 
     try:
-        ListAppTableRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.list_app_table_request", "ListAppTableRequest"
-        )
+        ListAppTableRequest = _load_attr("lark_oapi.api.bitable.v1.model.list_app_table_request", "ListAppTableRequest")
         request = ListAppTableRequest.builder().app_token(bitable_id).build()
         response = client.bitable.v1.app_table.list(request)
 
@@ -360,10 +334,12 @@ def feishu_bitable_table_list(bitable_id: str) -> str:
 
         items = _get_attr(getattr(response, "data", None), "items") or []
         tables = [_normalize_table(item) for item in items]
-        return _ok_response({
-            "bitable_id": bitable_id,
-            "tables": tables,
-        })
+        return _ok_response(
+            {
+                "bitable_id": bitable_id,
+                "tables": tables,
+            }
+        )
     except Exception as e:
         logger.error("[Feishu bitable tools] failed to list tables bitable_id=%s: %s", bitable_id, e)
         return _error_response(f"Failed to list tables: {str(e)}")
@@ -387,9 +363,7 @@ def feishu_bitable_field_list(bitable_id: str, table_id: str) -> str:
         return _error_response("table_id is required.")
 
     try:
-        ListAppTableFieldRequest = _load_attr(
-            "lark_oapi.api.bitable.v1.model.list_app_table_field_request", "ListAppTableFieldRequest"
-        )
+        ListAppTableFieldRequest = _load_attr("lark_oapi.api.bitable.v1.model.list_app_table_field_request", "ListAppTableFieldRequest")
         request = ListAppTableFieldRequest.builder().app_token(bitable_id).table_id(table_id).build()
         response = client.bitable.v1.app_table_field.list(request)
 
@@ -399,11 +373,13 @@ def feishu_bitable_field_list(bitable_id: str, table_id: str) -> str:
 
         items = _get_attr(getattr(response, "data", None), "items") or []
         fields = [{"field_id": _get_attr(item, "field_id", "id"), "field_name": _get_attr(item, "field_name", "name"), "type": _get_attr(item, "type")} for item in items]
-        return _ok_response({
-            "bitable_id": bitable_id,
-            "table_id": table_id,
-            "fields": fields,
-        })
+        return _ok_response(
+            {
+                "bitable_id": bitable_id,
+                "table_id": table_id,
+                "fields": fields,
+            }
+        )
     except Exception as e:
         logger.error("[Feishu bitable tools] failed to list fields bitable_id=%s table_id=%s: %s", bitable_id, table_id, e)
         return _error_response(f"Failed to list fields: {str(e)}")

@@ -521,11 +521,7 @@ async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Reques
 
     now = time.time()
     updated = dict(record)
-    allowed_metadata = {
-        key: value
-        for key, value in body.metadata.items()
-        if key not in {THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, "created_by_user_id", THREAD_VISIBILITY_KEY, THREAD_SHARED_BY_KEY, THREAD_SHARED_AT_KEY}
-    }
+    allowed_metadata = {key: value for key, value in body.metadata.items() if key not in {THREAD_OWNER_KEY, THREAD_WORKSPACE_KEY, "created_by_user_id", THREAD_VISIBILITY_KEY, THREAD_SHARED_BY_KEY, THREAD_SHARED_AT_KEY}}
     updated.setdefault("metadata", {}).update(allowed_metadata)
     updated["updated_at"] = now
 
@@ -929,3 +925,105 @@ async def update_thread_visibility(thread_id: str, body: ThreadVisibilityUpdateR
         metadata=updated.get("metadata", {}),
         values=updated.get("values", {}),
     )
+
+
+class ThreadSummarizeRequest(BaseModel):
+    max_messages: int = Field(default=50, ge=1, le=200, description="Maximum number of messages to include")
+
+
+class ThreadSummarizeResponse(BaseModel):
+    summary: str = Field(description="Generated summary of the conversation")
+    key_points: list[str] = Field(default_factory=list, description="Key points extracted from the conversation")
+    suggested_name: str = Field(default="", description="Suggested name for the conversation")
+
+
+@router.post("/{thread_id}/summarize", response_model=ThreadSummarizeResponse)
+async def summarize_thread(thread_id: str, body: ThreadSummarizeRequest, request: Request) -> ThreadSummarizeResponse:
+    await require_thread_read_access(request, thread_id)
+    checkpointer = get_checkpointer(request)
+
+    config: dict[str, Any] = {
+        "configurable": {
+            "thread_id": thread_id,
+            "checkpoint_ns": "",
+        }
+    }
+
+    try:
+        checkpoint_tuple = await checkpointer.aget_tuple(config)
+    except Exception:
+        logger.exception("Failed to get checkpoint for thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to get thread state")
+
+    if checkpoint_tuple is None:
+        raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
+
+    checkpoint: dict[str, Any] = dict(getattr(checkpoint_tuple, "checkpoint", {}) or {})
+    channel_values: dict[str, Any] = checkpoint.get("channel_values", {})
+
+    raw_messages = channel_values.get("messages", [])
+    if not isinstance(raw_messages, list):
+        raw_messages = []
+
+    messages_to_summarize = raw_messages[-body.max_messages :]
+
+    if not messages_to_summarize:
+        raise HTTPException(status_code=400, detail="No messages found in thread")
+
+    from deerflow.models.factory import create_chat_model
+
+    try:
+        model = create_chat_model()
+    except Exception as exc:
+        logger.exception("Failed to create chat model for summarization")
+        raise HTTPException(status_code=500, detail="Failed to create AI model") from exc
+
+    messages_text = ""
+    for msg in messages_to_summarize:
+        if isinstance(msg, dict):
+            msg_type = msg.get("type", "unknown")
+            if msg_type == "human":
+                content = msg.get("content", "")
+                messages_text += f"User: {content}\n\n"
+            elif msg_type == "ai":
+                content = msg.get("content", "")
+                messages_text += f"Assistant: {content}\n\n"
+
+    summarize_prompt = f"""Please summarize the following conversation concisely. Then extract the key points and suggest a short name for this conversation.
+
+Conversation:
+{messages_text[:8000]}
+
+Respond in the following JSON format:
+{{
+  "summary": "A concise 2-3 sentence summary of the entire conversation",
+  "key_points": ["Key point 1", "Key point 2", "Key point 3"],
+  "suggested_name": "A short descriptive name (max 50 characters)"
+}}
+
+Only respond with valid JSON, no other text."""
+
+    try:
+        response = await model.ainvoke(summarize_prompt)
+        response_text = response.content if hasattr(response, "content") else str(response)
+
+        import json as json_module
+
+        try:
+            result_data = json_module.loads(response_text)
+            summary = result_data.get("summary", response_text)
+            key_points = result_data.get("key_points", [])
+            suggested_name = result_data.get("suggested_name", "")
+        except Exception:
+            summary = response_text
+            key_points = []
+            suggested_name = ""
+
+        return ThreadSummarizeResponse(
+            summary=summary,
+            key_points=key_points,
+            suggested_name=suggested_name,
+        )
+    except Exception as exc:
+        logger.exception("Failed to generate summary for thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to generate summary") from exc

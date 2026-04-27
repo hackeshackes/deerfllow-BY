@@ -113,11 +113,7 @@ def feishu_okr_get(user_id: str, period_id: str) -> str:
         data = getattr(response, "data", None)
         okr_list = _get_attr(data, "okr_list", "items", "data") or []
         matched_okr = next(
-            (
-                item
-                for item in okr_list
-                if str(_get_attr(item, "period_id")) == period_id or str(_get_attr(item, "id", "okr_id")) == period_id
-            ),
+            (item for item in okr_list if str(_get_attr(item, "period_id")) == period_id or str(_get_attr(item, "id", "okr_id")) == period_id),
             None,
         )
         return _ok_response(

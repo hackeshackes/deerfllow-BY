@@ -33,13 +33,7 @@ def feishu_attendance_record(user_id: str, start_date: str, end_date: str) -> st
         request = (
             QueryUserStatsDataRequest.builder()
             .employee_type("employee_id")
-            .request_body(
-                QueryUserStatsDataRequestBody.builder()
-                .user_id(user_id)
-                .start_date(_normalize_attendance_date(start_date))
-                .end_date(_normalize_attendance_date(end_date))
-                .build()
-            )
+            .request_body(QueryUserStatsDataRequestBody.builder().user_id(user_id).start_date(_normalize_attendance_date(start_date)).end_date(_normalize_attendance_date(end_date)).build())
             .build()
         )
         user_stats_service = getattr(client.attendance.v1, "user_stats_data", None)

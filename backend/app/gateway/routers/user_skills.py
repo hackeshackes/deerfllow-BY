@@ -99,9 +99,7 @@ async def list_user_skills(request: Request) -> UserSkillConfigListResponse:
 
 
 @router.put("/{skill_name}/config", response_model=UserSkillConfigResponse)
-async def update_skill_config(
-    skill_name: str, body: UserSkillConfigUpdateRequest, request: Request
-) -> UserSkillConfigResponse:
+async def update_skill_config(skill_name: str, body: UserSkillConfigUpdateRequest, request: Request) -> UserSkillConfigResponse:
     user = require_user(request)
     store = get_user_skill_config()
 

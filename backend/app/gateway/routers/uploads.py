@@ -88,6 +88,7 @@ async def _auto_create_thread(request: Request, thread_id: str) -> None:
         logger.exception("Failed to auto-create thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to create thread")
 
+
 router = APIRouter(prefix="/api/threads/{thread_id}/uploads", tags=["uploads"])
 
 # Max upload size in bytes (default 10MB)

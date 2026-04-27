@@ -91,12 +91,7 @@ def feishu_calendar_list(user_id: str | None = None) -> str:
 
     try:
         if user_id:
-            request = (
-                PrimarysCalendarRequest.builder()
-                .user_id_type("open_id")
-                .request_body(PrimarysCalendarRequestBody.builder().user_ids([user_id]).build())
-                .build()
-            )
+            request = PrimarysCalendarRequest.builder().user_id_type("open_id").request_body(PrimarysCalendarRequestBody.builder().user_ids([user_id]).build()).build()
             resp = client.calendar.v4.calendar.primarys(request)
             if not resp.success():
                 return _error_response(f"Failed to get calendar: code={resp.code}, msg={resp.msg}")
@@ -230,12 +225,7 @@ def feishu_calendar_freebusy(user_ids: list[str], start_time: str, end_time: str
     try:
         results: list[dict[str, Any]] = []
         for user_id in user_ids:
-            request = (
-                ListFreebusyRequest.builder()
-                .user_id_type("open_id")
-                .request_body(ListFreebusyRequestBody.builder().time_min(start_time).time_max(end_time).user_id(user_id).build())
-                .build()
-            )
+            request = ListFreebusyRequest.builder().user_id_type("open_id").request_body(ListFreebusyRequestBody.builder().time_min(start_time).time_max(end_time).user_id(user_id).build()).build()
             resp = client.calendar.v4.freebusy.list(request)
             if not resp.success():
                 return _error_response(f"Failed to query freebusy for {user_id}: code={resp.code}, msg={resp.msg}")

@@ -415,10 +415,7 @@ async def list_my_custom_skills(request: Request) -> SkillsListResponse:
     user = require_user(request)
     try:
         all_custom_skills = [skill for skill in load_skills(enabled_only=False) if skill.category == "custom"]
-        my_skills = [
-            s for s in all_custom_skills
-            if (share := get_skill_share(s.name)) and share.owner_id == user.id
-        ]
+        my_skills = [s for s in all_custom_skills if (share := get_skill_share(s.name)) and share.owner_id == user.id]
         return SkillsListResponse(skills=[_skill_to_response(skill) for skill in my_skills])
     except Exception as e:
         logger.error("Failed to list my custom skills: %s", e, exc_info=True)
@@ -543,6 +540,7 @@ async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest
 async def delete_custom_skill(skill_name: str, request: Request) -> dict[str, bool]:
     user = require_user(request)
     from deerflow.admin import get_skill_share
+
     try:
         all_metadata = read_skill_metadata()
         skill_metadata = all_metadata.get(skill_name, {})
@@ -836,9 +834,7 @@ async def list_skill_model_bindings(request: Request) -> SkillModelBindingsListR
 
 
 @router.put("/skills/model-bindings/{skill_name}", response_model=SkillModelBindingResponse)
-async def create_or_update_skill_model_binding(
-    skill_name: str, body: SkillModelBindingRequest, request: Request
-) -> SkillModelBindingResponse:
+async def create_or_update_skill_model_binding(skill_name: str, body: SkillModelBindingRequest, request: Request) -> SkillModelBindingResponse:
     require_owner_user(request)
 
     from datetime import UTC, datetime
@@ -893,12 +889,8 @@ def _save_extensions_config(config: ExtensionsConfig) -> None:
     config_data = {
         "mcpServers": {name: server.model_dump() for name, server in config.mcp_servers.items()},
         "skills": {name: {"enabled": skill.enabled} for name, skill in config.skills.items()},
-        "skillModelBindings": {
-            name: binding.model_dump() for name, binding in config.skill_model_bindings.items()
-        },
-        "skillsMetadata": {
-            name: metadata.model_dump() for name, metadata in config.skills_metadata.items()
-        },
+        "skillModelBindings": {name: binding.model_dump() for name, binding in config.skill_model_bindings.items()},
+        "skillsMetadata": {name: metadata.model_dump() for name, metadata in config.skills_metadata.items()},
     }
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False), encoding="utf-8")

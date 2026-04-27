@@ -49,9 +49,7 @@ def _build_list_task_request(user_id: str | None, status: str | None) -> Any:
 
 def _build_create_task_request(title: str, due: str | None, user_id: str | None) -> Any:
     create_request_cls = _import_sdk_attr("lark_oapi.api.task.v1.model.create_task_request", "CreateTaskRequest")
-    create_body_cls = _import_sdk_attr_optional("lark_oapi.api.task.v1.model.create_task_request_body", "CreateTaskRequestBody") or _import_sdk_attr(
-        "lark_oapi.api.task.v1.model.task", "Task"
-    )
+    create_body_cls = _import_sdk_attr_optional("lark_oapi.api.task.v1.model.create_task_request_body", "CreateTaskRequestBody") or _import_sdk_attr("lark_oapi.api.task.v1.model.task", "Task")
 
     body_data: dict[str, Any] = {
         "summary": title.strip(),
@@ -80,9 +78,7 @@ def _build_create_task_request(title: str, due: str | None, user_id: str | None)
 
 def _build_patch_task_request(task_guid: str) -> Any:
     patch_request_cls = _import_sdk_attr("lark_oapi.api.task.v1.model.patch_task_request", "PatchTaskRequest")
-    patch_body_cls = _import_sdk_attr_optional("lark_oapi.api.task.v1.model.patch_task_request_body", "PatchTaskRequestBody") or _import_sdk_attr(
-        "lark_oapi.api.task.v1.model.patch_task_request", "PatchTaskRequestBody"
-    )
+    patch_body_cls = _import_sdk_attr_optional("lark_oapi.api.task.v1.model.patch_task_request_body", "PatchTaskRequestBody") or _import_sdk_attr("lark_oapi.api.task.v1.model.patch_task_request", "PatchTaskRequestBody")
 
     request_body = _build_sdk_model(
         patch_body_cls,
@@ -130,8 +126,7 @@ def _normalize_task(task: Any) -> dict[str, Any]:
         }
         if due
         else None,
-        "user_ids": _get_attr(task, "user_ids", "collaborator_ids")
-        or [_get_attr(item, "id") for item in collaborators if _get_attr(item, "id")],
+        "user_ids": _get_attr(task, "user_ids", "collaborator_ids") or [_get_attr(item, "id") for item in collaborators if _get_attr(item, "id")],
         "follower_ids": _get_attr(task, "follower_ids") or [_get_attr(item, "id") for item in followers if _get_attr(item, "id")],
         "created_at": _get_attr(task, "created_at", "create_time"),
         "updated_at": _get_attr(task, "updated_at", "update_time"),

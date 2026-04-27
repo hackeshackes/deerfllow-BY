@@ -85,14 +85,8 @@ def _sanitize_server_for_read(config: McpServerConfigResponse) -> McpServerConfi
 
 def _persist_secret_map(server_name: str, payload: McpServerConfigResponse) -> McpServerConfigResponse:
     data = payload.model_dump()
-    data["env"] = {
-        key: upsert_secret(f"mcp/{server_name}/env/{key}", value) if value and not value.startswith("$") and not is_secret_ref(value) else value
-        for key, value in data["env"].items()
-    }
-    data["headers"] = {
-        key: upsert_secret(f"mcp/{server_name}/headers/{key}", value) if value and not value.startswith("$") and not is_secret_ref(value) else value
-        for key, value in data["headers"].items()
-    }
+    data["env"] = {key: upsert_secret(f"mcp/{server_name}/env/{key}", value) if value and not value.startswith("$") and not is_secret_ref(value) else value for key, value in data["env"].items()}
+    data["headers"] = {key: upsert_secret(f"mcp/{server_name}/headers/{key}", value) if value and not value.startswith("$") and not is_secret_ref(value) else value for key, value in data["headers"].items()}
     oauth = data.get("oauth")
     if oauth:
         for field_name in ("client_secret", "refresh_token"):
