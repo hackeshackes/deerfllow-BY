@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
-import { ChatStartPanel } from "@/components/workspace/chat-start-panel";
 import {
   ChatBox,
   useSpecificChatMode,
@@ -191,12 +190,7 @@ export default function ChatPage() {
                     }
                     context={settings.context}
                     extraHeader={
-                      isNewThread && (
-                        <>
-                          <Welcome mode={settings.context.mode} />
-                          <ChatStartPanel />
-                        </>
-                      )
+                      isNewThread && <Welcome mode={settings.context.mode} />
                     }
                     disabled={
                       env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
