@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import pickle
 import sqlite3
 import threading
@@ -421,6 +422,9 @@ async def upload_document(kb_id: str, request: Request, file: UploadFile = File(
         file_size = len(content)
 
         storage_path = f"/mnt/user-data/knowledge/{kb_id}/{doc_id}/{file.filename}"
+        os.makedirs(os.path.dirname(storage_path), exist_ok=True)
+        with open(storage_path, "wb") as f:
+            f.write(content)
         conn.execute(
             """INSERT INTO documents
                 (id, knowledge_base_id, original_name, file_type, file_size, storage_path, status, uploaded_at)
