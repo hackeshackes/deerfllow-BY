@@ -44,6 +44,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useI18n } from "@/core/i18n/hooks";
+import { ShareToWorkspaceDialog } from "@/components/workspace/capture/share-to-workspace-dialog";
 import {
   exportThreadAsJSON,
   exportThreadAsMarkdown,
@@ -102,10 +103,14 @@ export function RecentChatList() {
   const { mutateAsync: updateThreadVisibility } = useUpdateThreadVisibility();
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
 
-  // Rename dialog state
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameThreadId, setRenameThreadId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareThreadId, setShareThreadId] = useState<string | null>(null);
+  const [shareThreadTitle, setShareThreadTitle] = useState<string>("");
+  const [shareCurrentWorkspaceId, setShareCurrentWorkspaceId] = useState<string | undefined>();
 
   useEffect(() => {
     async function loadSession() {
@@ -158,26 +163,19 @@ export function RecentChatList() {
     }
   }, [renameThread, renameThreadId, renameValue]);
 
-  const handleShare = useCallback(
-    async (threadId: string) => {
-      await updateThreadVisibility({ threadId, visibility: "workspace" });
-      // Always use Vercel URL for sharing so others can access
-      const VERCEL_URL = "https://deer-flow-v2.vercel.app";
-      const isLocalhost =
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1";
-      // On localhost: use Vercel URL; On production: use current origin
-      const baseUrl = isLocalhost ? VERCEL_URL : window.location.origin;
-      const shareUrl = `${baseUrl}/workspace/chats/${threadId}`;
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success("已共享到工作区，并复制链接");
-      } catch {
-        toast.error(t.clipboard.failedToCopyToClipboard);
-      }
+  const handleShareClick = useCallback(
+    (threadId: string, threadTitle: string, currentWorkspaceId?: string) => {
+      setShareThreadId(threadId);
+      setShareThreadTitle(threadTitle);
+      setShareCurrentWorkspaceId(currentWorkspaceId);
+      setShareDialogOpen(true);
     },
-    [t, updateThreadVisibility],
+    []
   );
+
+  const handleShareSuccess = useCallback(() => {
+    toast.success("已分享到工作区");
+  }, []);
 
   const handleMakePrivate = useCallback(
     async (threadId: string) => {
@@ -258,9 +256,7 @@ export function RecentChatList() {
                 const isActive = pathOfThread(thread.thread_id) === pathname;
                 const visibility = (thread.metadata?.visibility as string | undefined) === "private" ? "private" : "workspace";
                 const isThreadOwner = thread.metadata?.owner_user_id === sessionUserId;
-                const ownerUserId = typeof thread.metadata?.owner_user_id === "string" ? thread.metadata.owner_user_id : "";
                 const workspaceId = typeof thread.metadata?.workspace_id === "string" ? thread.metadata.workspace_id : "";
-                const isPersonalWorkspace = workspaceId === `ws-${ownerUserId}`;
                 const sourceLabel = sourceLabelOfThread(thread);
                 return (
                   <SidebarMenuItem
@@ -320,8 +316,7 @@ export function RecentChatList() {
                                 <span>{t.common.rename}</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onSelect={() => handleShare(thread.thread_id)}
-                                disabled={visibility === "workspace" || isPersonalWorkspace}
+                                onSelect={() => handleShareClick(thread.thread_id, titleOfThread(thread), workspaceId)}
                               >
                                 <Share2 className="text-muted-foreground" />
                                 <span>共享到工作区</span>
@@ -410,6 +405,15 @@ export function RecentChatList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ShareToWorkspaceDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        threadId={shareThreadId ?? ""}
+        threadTitle={shareThreadTitle}
+        currentWorkspaceId={shareCurrentWorkspaceId}
+        onShareSuccess={handleShareSuccess}
+      />
     </>
   );
 }

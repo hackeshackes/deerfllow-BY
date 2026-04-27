@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app.gateway.auth import require_user
+from app.gateway.auth import get_workspace_membership, require_user
 from app.gateway.auth_context import get_current_workspace_id
 from app.gateway.deps import get_checkpointer, get_store
 from app.gateway.ownership import (
@@ -115,6 +115,7 @@ class ThreadTitleUpdateRequest(BaseModel):
 
 class ThreadVisibilityUpdateRequest(BaseModel):
     visibility: str = Field(description="private or workspace")
+    workspace_id: str | None = Field(default=None, description="Target workspace ID to share to (required when visibility=workspace)")
 
 
 class ThreadSyncRequest(BaseModel):
@@ -898,15 +899,21 @@ async def update_thread_visibility(thread_id: str, body: ThreadVisibilityUpdateR
     visibility = normalize_thread_visibility(body.visibility)
     updated = dict(record)
     metadata = dict(updated.get("metadata", {}) or {})
-    if visibility == THREAD_VISIBILITY_WORKSPACE and metadata.get(THREAD_WORKSPACE_KEY) == f"ws-{metadata.get(THREAD_OWNER_KEY)}":
-        raise HTTPException(status_code=422, detail="Personal workspace threads cannot be shared")
-    metadata[THREAD_VISIBILITY_KEY] = visibility
+
     if visibility == THREAD_VISIBILITY_WORKSPACE:
+        if not body.workspace_id:
+            raise HTTPException(status_code=422, detail="workspace_id is required when sharing to workspace")
+        membership = get_workspace_membership(user.id, body.workspace_id)
+        if membership is None:
+            raise HTTPException(status_code=403, detail="You are not a member of the target workspace")
+        metadata[THREAD_WORKSPACE_KEY] = body.workspace_id
         metadata[THREAD_SHARED_BY_KEY] = user.id
         metadata[THREAD_SHARED_AT_KEY] = time.time()
     else:
         metadata.pop(THREAD_SHARED_BY_KEY, None)
         metadata.pop(THREAD_SHARED_AT_KEY, None)
+
+    metadata[THREAD_VISIBILITY_KEY] = visibility
     updated["metadata"] = metadata
     updated["updated_at"] = time.time()
 

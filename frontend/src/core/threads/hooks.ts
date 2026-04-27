@@ -694,9 +694,11 @@ export function useUpdateThreadVisibility() {
     mutationFn: async ({
       threadId,
       visibility,
+      workspaceId,
     }: {
       threadId: string;
       visibility: "private" | "workspace";
+      workspaceId?: string;
     }) => {
       const response = await fetch(
         `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}/visibility`,
@@ -705,7 +707,7 @@ export function useUpdateThreadVisibility() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ visibility }),
+          body: JSON.stringify({ visibility, workspace_id: workspaceId }),
         },
       );
 
