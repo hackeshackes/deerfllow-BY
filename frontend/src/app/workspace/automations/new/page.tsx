@@ -33,14 +33,18 @@ export default function NewAutomationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const workflow = searchParams.get("workflow");
-  const [name, setName] = useState(workflow ? `${workflow} 自动化` : "");
+  const titleParam = searchParams.get("title");
+  const promptParam = searchParams.get("prompt");
+  const [name, setName] = useState(
+    titleParam ?? (workflow ? `${workflow} 自动化` : ""),
+  );
   const [description, setDescription] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("daily");
   const [time, setTime] = useState("09:00");
   const [weekday, setWeekday] = useState("1");
   const [customCron, setCustomCron] = useState("0 9 * * *");
   const [promptTemplate, setPromptTemplate] = useState(
-    workflow ? `请使用 ${workflow} 工作流完成这项周期性任务。` : "",
+    promptParam ?? (workflow ? `请使用 ${workflow} 工作流完成这项周期性任务。` : ""),
   );
   const [outputTarget, setOutputTarget] = useState("thread");
   const [saving, setSaving] = useState(false);

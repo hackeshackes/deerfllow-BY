@@ -69,6 +69,18 @@ export const enUS: Translations = {
     captureAutomationSuccess: "Automation draft created",
     captureNoMessages: "No messages in this conversation, cannot generate summary",
     captureError: "Error generating summary",
+    captureWorkflowName: "Workflow Name",
+    captureWorkflowDescription: "Description",
+    captureWorkflowPrompt: "Prompt Template",
+    captureWorkflowVisibility: "Visibility",
+    captureWorkflowSave: "Save Workflow",
+    captureWorkflowCopy: "Copy to Clipboard",
+    captureWorkflowSaveSuccess: "Workflow draft saved",
+    captureWorkflowSaveError: "Failed to save workflow",
+    captureWorkflowNamePlaceholder: "Enter workflow name",
+    captureWorkflowDescriptionPlaceholder: "Describe what this workflow does",
+    private: "Private",
+    workspace: "Workspace",
   },
 
   // Home
@@ -406,6 +418,13 @@ export const enUS: Translations = {
       processing: "Processing",
       ready: "Ready",
       error: "Error",
+      failed: "Failed",
+      stale: "Stale",
+    },
+    docMetadata: {
+      chunks: "chunks",
+      tokens: "tokens",
+      processedAt: "Processed at",
     },
   },
 
