@@ -59,6 +59,38 @@ import { pathOfThread, titleOfThread } from "@/core/threads/utils";
 import { env } from "@/env";
 import { isIMEComposing } from "@/lib/ime";
 
+type ThreadSource = "manual" | "automation" | "channel";
+
+function readMetadataString(
+  thread: AgentThread,
+  key: string,
+): string | undefined {
+  const value = thread.metadata?.[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function sourceOfThread(thread: AgentThread): ThreadSource {
+  const source = readMetadataString(thread, "source");
+  if (source === "automation" || readMetadataString(thread, "task_id")) {
+    return "automation";
+  }
+  if (source === "channel" || readMetadataString(thread, "channel")) {
+    return "channel";
+  }
+  return "manual";
+}
+
+function sourceLabelOfThread(thread: AgentThread): string | null {
+  const source = sourceOfThread(thread);
+  if (source === "automation") return "自动化";
+  if (source === "channel") return readMetadataString(thread, "channel") ?? "外部渠道";
+  return null;
+}
+
+function isWorkspaceThread(thread: AgentThread): boolean {
+  return readMetadataString(thread, "visibility") === "workspace";
+}
+
 export function RecentChatList() {
   const { t } = useI18n();
   const router = useRouter();
@@ -190,6 +222,21 @@ export function RecentChatList() {
   if (threads.length === 0) {
     return null;
   }
+  const manualThreads = threads.filter(
+    (thread) => sourceOfThread(thread) === "manual",
+  );
+  const automationThreads = threads.filter(
+    (thread) => sourceOfThread(thread) === "automation",
+  );
+  const channelThreads = threads.filter(
+    (thread) => sourceOfThread(thread) === "channel",
+  );
+  const sections = [
+    { title: "最近继续", threads: manualThreads },
+    { title: "自动化结果", threads: automationThreads },
+    { title: "外部渠道", threads: channelThreads },
+  ].filter((section) => section.threads.length > 0);
+
   return (
     <>
       <SidebarGroup>
@@ -200,14 +247,21 @@ export function RecentChatList() {
         </SidebarGroupLabel>
         <SidebarGroupContent className="group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0">
           <SidebarMenu>
-            <div className="flex w-full flex-col gap-1">
-              {threads.map((thread) => {
+            <div className="flex w-full flex-col gap-3">
+              {sections.map((section) => (
+                <div key={section.title} className="space-y-1">
+                  <div className="text-muted-foreground px-2 text-[11px] font-medium tracking-wide">
+                    {section.title}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {section.threads.map((thread) => {
                 const isActive = pathOfThread(thread.thread_id) === pathname;
                 const visibility = (thread.metadata?.visibility as string | undefined) === "private" ? "private" : "workspace";
                 const isThreadOwner = thread.metadata?.owner_user_id === sessionUserId;
                 const ownerUserId = typeof thread.metadata?.owner_user_id === "string" ? thread.metadata.owner_user_id : "";
                 const workspaceId = typeof thread.metadata?.workspace_id === "string" ? thread.metadata.workspace_id : "";
                 const isPersonalWorkspace = workspaceId === `ws-${ownerUserId}`;
+                const sourceLabel = sourceLabelOfThread(thread);
                 return (
                   <SidebarMenuItem
                     key={thread.thread_id}
@@ -215,17 +269,29 @@ export function RecentChatList() {
                   >
                     <SidebarMenuButton isActive={isActive} asChild>
                       <div>
+                      <div className="flex w-full items-center gap-1.5">
                         <Link
-                          className="text-muted-foreground block w-full whitespace-nowrap group-hover/side-menu-item:overflow-hidden"
+                          className="text-muted-foreground min-w-0 flex-1 truncate group-hover/side-menu-item:overflow-hidden"
                           href={pathOfThread(thread.thread_id)}
                         >
                           {titleOfThread(thread)}
                         </Link>
-                        <div className="mt-1 pl-0.5">
+                        <span className="inline-flex shrink-0 items-center gap-1">
                           <Badge variant={visibility === "private" ? "outline" : "default"} className="text-[10px]">
                             {visibility === "private" ? "私有" : "已共享"}
                           </Badge>
-                        </div>
+                          {sourceLabel && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {sourceLabel}
+                            </Badge>
+                          )}
+                          {!sourceLabel && isWorkspaceThread(thread) && !isThreadOwner && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              团队
+                            </Badge>
+                          )}
+                        </span>
+                      </div>
                         {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" && isThreadOwner && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -305,7 +371,10 @@ export function RecentChatList() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
-              })}
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </SidebarMenu>
         </SidebarGroupContent>

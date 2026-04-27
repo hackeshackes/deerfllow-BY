@@ -560,7 +560,7 @@ function EditKnowledgeDialog({
   useEffect(() => {
     if (kb) {
       setName(kb.name);
-      setDescription(kb.description || "");
+      setDescription(kb.description ?? "");
     }
   }, [kb]);
 

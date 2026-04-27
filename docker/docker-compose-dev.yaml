@@ -19,6 +19,7 @@ services:
   # cluster via the K8s API.
   # Backend accesses sandboxes directly via host.docker.internal:{NodePort}.
   provisioner:
+    profiles: ["provisioner"]
     build:
       context: ./provisioner
       dockerfile: Dockerfile

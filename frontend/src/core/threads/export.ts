@@ -211,11 +211,11 @@ export function exportThreadAsExcel(thread: AgentThread, messages: Message[]) {
       const content = formatMessageContent(message);
       const toolCalls = message.tool_calls
         ?.map((call) => `${call.name}(${JSON.stringify(call.args)})`)
-        .join("; ") || "";
+        .join("; ") ?? "";
 
       if (!content && !toolCalls && !reasoning) continue;
 
-      rows.push(["Assistant", content || "", toolCalls, reasoning || "", new Date().toISOString()]);
+      rows.push(["Assistant", content ?? "", toolCalls, reasoning ?? "", new Date().toISOString()]);
     }
   }
 

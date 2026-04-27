@@ -23,7 +23,6 @@ import {
   type KnowledgeBase,
   type SearchResult,
 } from "@/core/knowledge";
-import { formatTimeAgo } from "@/core/utils/datetime";
 
 export default function KnowledgeDetailPage() {
   const { t } = useI18n();

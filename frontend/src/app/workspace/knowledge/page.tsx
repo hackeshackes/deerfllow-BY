@@ -43,14 +43,14 @@ export default function KnowledgePage() {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState("mine");
+  const [activeTab, setActiveTab] = useState("workspace");
   const [sharingKb, setSharingKb] = useState<KnowledgeBase | null>(null);
   const [shareWorkspaceId, setShareWorkspaceId] = useState("");
   const [sharing, setSharing] = useState(false);
   const [newVisibility, setNewVisibility] = useState<string>("private");
 
   useEffect(() => {
-    document.title = `${t.knowledge.pageTitle} - ${t.pages.appName}`;
+    document.title = `资料库 - ${t.pages.appName}`;
     Promise.all([
       loadKnowledgeBases(),
       fetch("/api/users/me").then((r) => r.json()),
@@ -63,19 +63,28 @@ export default function KnowledgePage() {
       .finally(() => setLoading(false));
   }, [t.knowledge.pageTitle, t.pages.appName]);
 
-  const myKnowledge = useMemo(
-    () => knowledgeBases.filter((kb) => kb.user_id === currentUser?.id),
+  const privateKnowledge = useMemo(
+    () =>
+      knowledgeBases.filter(
+        (kb) => kb.user_id === currentUser?.id && kb.visibility === "private",
+      ),
     [knowledgeBases, currentUser],
   );
 
-  const workspaceKnowledge = useMemo(
+  const currentWorkspaceKnowledge = useMemo(
     () =>
       knowledgeBases.filter(
         (kb) =>
-          kb.user_id !== currentUser?.id &&
-          kb.shared_to.includes(currentUser?.active_workspace_id ?? ""),
+          !kb.is_global &&
+          (kb.workspace_id === currentUser?.active_workspace_id ||
+            kb.shared_to.includes(currentUser?.active_workspace_id ?? "")),
       ),
     [knowledgeBases, currentUser],
+  );
+
+  const globalKnowledge = useMemo(
+    () => knowledgeBases.filter((kb) => kb.is_global),
+    [knowledgeBases],
   );
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -121,7 +130,7 @@ export default function KnowledgePage() {
     if (kbs.length === 0) {
       return (
         <div className="text-center text-muted-foreground py-8">
-          {activeTab === "mine" ? t.knowledge.empty : t.knowledge.noSharedWorkspaces}
+          {activeTab === "private" ? t.knowledge.empty : "当前范围暂无资料库"}
         </div>
       );
     }
@@ -146,6 +155,9 @@ export default function KnowledgePage() {
                       {t.knowledge.sharedWorkspaces}: {kb.shared_to.length}
                     </p>
                   )}
+                  <p className="text-muted-foreground text-xs mt-1">
+                    可见范围：{kb.is_global ? "全局" : kb.visibility === "workspace" ? "共享空间" : "个人私有"}
+                  </p>
                 </div>
                 <div className="text-right text-sm text-muted-foreground">
                   <div>{kb.document_count} documents</div>
@@ -211,7 +223,7 @@ export default function KnowledgePage() {
         ) : (
           <Button size="sm" onClick={() => setShowCreate(true)}>
             <PlusIcon className="size-4 mr-1" />
-            {t.knowledge.createKnowledgeBase}
+            添加资料库
           </Button>
         )}
       </WorkspaceHeader>
@@ -226,18 +238,24 @@ export default function KnowledgePage() {
               ) : (
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList>
-                    <TabsTrigger value="mine">
-                      {t.knowledge.myKnowledge}
-                    </TabsTrigger>
-                    <TabsTrigger value="workspace">
-                      {t.knowledge.workspaceKnowledge}
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="mine" className="mt-4">
-                    {renderKnowledgeList(myKnowledge)}
-                  </TabsContent>
+                      <TabsTrigger value="workspace">
+                        当前空间资料
+                      </TabsTrigger>
+                      <TabsTrigger value="private">
+                        我的私人资料
+                      </TabsTrigger>
+                      <TabsTrigger value="global">
+                        全局资料
+                      </TabsTrigger>
+                    </TabsList>
                   <TabsContent value="workspace" className="mt-4">
-                    {renderKnowledgeList(workspaceKnowledge)}
+                    {renderKnowledgeList(currentWorkspaceKnowledge)}
+                  </TabsContent>
+                  <TabsContent value="private" className="mt-4">
+                    {renderKnowledgeList(privateKnowledge)}
+                  </TabsContent>
+                  <TabsContent value="global" className="mt-4">
+                    {renderKnowledgeList(globalKnowledge)}
                   </TabsContent>
                 </Tabs>
               )}

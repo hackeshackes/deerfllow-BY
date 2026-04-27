@@ -549,7 +549,7 @@ export function ConfigAdminPage() {
                     <div className="space-y-2">
                       <div className="text-sm font-medium">URL ({server.type})</div>
                       <Input
-                        value={server.url || ""}
+                        value={server.url ?? ""}
                         onChange={(event) => {
                           const updated = [...form.mcp];
                           const item = updated[index];

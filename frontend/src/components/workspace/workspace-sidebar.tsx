@@ -14,6 +14,7 @@ import { ScheduledTasksList } from "./scheduled-tasks-list";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceNavChatList } from "./workspace-nav-chat-list";
 import { WorkspaceNavMenu } from "./workspace-nav-menu";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 
 export function WorkspaceSidebar({
   sessionEmail,
@@ -31,6 +32,11 @@ export function WorkspaceSidebar({
       <Sidebar variant="sidebar" collapsible="icon" {...props}>
         <SidebarHeader className="py-0">
           <WorkspaceHeader />
+          {isSidebarOpen && (
+            <div className="px-2 pb-2">
+              <WorkspaceSwitcher activeWorkspaceName={activeWorkspaceName} />
+            </div>
+          )}
         </SidebarHeader>
         <SidebarContent>
           <WorkspaceNavChatList />
