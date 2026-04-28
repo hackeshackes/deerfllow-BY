@@ -237,7 +237,12 @@ def _assemble_from_features(
 
             chain.append(TitleMiddleware())
 
-    # --- [9] Memory ---
+    # --- [9] KnowledgeBase (always, controlled by knowledge_search.enabled config) ---
+    from deerflow.agents.middlewares.knowledge_base_middleware import KnowledgeBaseMiddleware
+
+    chain.append(KnowledgeBaseMiddleware())
+
+    # --- [10] Memory ---
     if feat.memory is not False:
         if isinstance(feat.memory, AgentMiddleware):
             chain.append(feat.memory)
