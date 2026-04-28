@@ -674,6 +674,21 @@ checkpointer:
 #   connection_string: postgresql://user:password@localhost:5432/deerflow
 
 # ============================================================================
+# Knowledge Base Search Configuration
+# ============================================================================
+# Automatic KB search injected into agent context on every user message.
+# Requires: knowledge_search.enabled: true
+
+knowledge_search:
+  enabled: false
+  top_k: 5
+  similarity_threshold: 0.5
+  max_kbs: 20
+  max_results_per_kb: 3
+  timeout_seconds: 2.0
+  max_context_chars: 6000
+
+# ============================================================================
 # IM Channels Configuration
 # ============================================================================
 # Connect DeerFlow to external messaging platforms.

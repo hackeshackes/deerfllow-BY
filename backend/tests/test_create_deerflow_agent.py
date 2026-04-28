@@ -743,6 +743,7 @@ def test_full_chain_order(mock_create_agent):
         "MySummarization",
         "TodoMiddleware",
         "TitleMiddleware",
+        "KnowledgeBaseMiddleware",
         "MemoryMiddleware",
         "ViewImageMiddleware",
         "SubagentLimitMiddleware",
