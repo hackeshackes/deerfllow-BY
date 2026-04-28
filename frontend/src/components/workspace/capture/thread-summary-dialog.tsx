@@ -56,7 +56,11 @@ export function ThreadSummaryDialog({
     try {
       const response = await fetch(
         `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}/summarize`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ max_messages: 50 }),
+        },
       );
 
       if (!response.ok) {
@@ -68,7 +72,7 @@ export function ThreadSummaryDialog({
       setSummary(result.summary || t.common.captureSummaryPlaceholder);
       setShowActions(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : t.common.captureError;
+      const message = err instanceof Error ? err.message : typeof err === "object" && err !== null ? JSON.stringify(err) : t.common.captureError;
       setError(message);
       toast.error(message);
     } finally {

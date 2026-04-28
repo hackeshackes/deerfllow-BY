@@ -35,6 +35,7 @@ dependencies = [
     "langgraph-checkpoint-sqlite>=3.0.3",
     "langgraph-sdk>=0.1.51",
     "cryptography>=45.0.0",
+    "pymupdf>=1.27.0",
 ]
 
 [project.optional-dependencies]

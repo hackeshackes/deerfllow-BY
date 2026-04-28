@@ -966,7 +966,8 @@ async def summarize_thread(thread_id: str, body: ThreadSummarizeRequest, request
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
 
     checkpoint: dict[str, Any] = dict(getattr(checkpoint_tuple, "checkpoint", {}) or {})
-    channel_values: dict[str, Any] = checkpoint.get("channel_values", {})
+    raw_channel_values: dict[str, Any] = checkpoint.get("channel_values", {})
+    channel_values: dict[str, Any] = serialize_channel_values(raw_channel_values)
 
     raw_messages = channel_values.get("messages", [])
     if not isinstance(raw_messages, list):
