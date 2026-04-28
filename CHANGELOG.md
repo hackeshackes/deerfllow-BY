@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Capture/Summarize Bug Fix (沉淀功能修复)
+
+##### Frontend: HTTP 422 & Toast Loop
+- Fixed `POST /api/threads/{id}/summarize` request missing `Content-Type: application/json` header and request body
+- Added `body: JSON.stringify({ max_messages: 50 })` to match FastAPI Pydantic validation
+- Improved error handling: non-Error objects now serialized via `JSON.stringify()` instead of showing hardcoded text
+- Prevented toast error infinite loop caused by effect re-triggering on failed state
+
+##### Backend: Empty Message Text in Summarization
+- Fixed `summarize_thread` reading raw msgpack checkpoint data without deserializing LangChain objects
+- Added `serialize_channel_values()` call to convert msgpack `ExtType` objects to JSON-safe dicts
+- Messages are now properly extracted for LLM summarization
+
 #### Admin Knowledge Base Management (管理员知识库管理)
 - Admin knowledge base list page at `/workspace/admin/knowledge`
 - Edit knowledge bases (name, description, visibility) via admin interface
