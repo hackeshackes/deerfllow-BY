@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2026-04-29
+
+### Fixed
+
+#### Per-User Memory Path (记忆功能用户私有路径)
+
+- Fixed memory saving to global `memory.json` instead of per-user file
+- Root cause: `MemoryMiddleware` queues updates in a background `threading.Timer` callback where FastAPI's `ContextVar` is not propagated
+- Fix: Capture `user_id` at middleware time and pass explicitly through queue → updater → storage
+- Memory now correctly saves to `.deer-flow/users/{user_id}/memory.json`
+
+### Added
+
+#### Brand Text Customization (品牌文字定制)
+
+- Admin can now configure all login page and homepage text from `/workspace/admin/config`
+- **Login page**: Badge text, title, subtitle, 2 feature card titles/descriptions
+- **Homepage**: 3 capability cards, 4 use-case items, "Why choose" block, team edition block
+- Supports `{name}` and `{support_email}` placeholders in text
+- Changes take effect immediately (hot-reload via `micx-brand-updated` event)
+
 ## [1.4.3] - 2026-04-26
 
 ### Added
