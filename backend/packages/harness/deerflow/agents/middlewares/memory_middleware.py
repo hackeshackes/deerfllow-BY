@@ -10,6 +10,7 @@ from langgraph.config import get_config
 from langgraph.runtime import Runtime
 
 from deerflow.agents.memory.queue import get_memory_queue
+from deerflow.auth_context import get_current_user_id
 from deerflow.config.memory_config import get_memory_config
 
 logger = logging.getLogger(__name__)
@@ -236,11 +237,13 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
         # Queue the filtered conversation for memory update
         correction_detected = detect_correction(filtered_messages)
         reinforcement_detected = not correction_detected and detect_reinforcement(filtered_messages)
+        user_id = get_current_user_id()
         queue = get_memory_queue()
         queue.add(
             thread_id=thread_id,
             messages=filtered_messages,
             agent_name=self._agent_name,
+            user_id=user_id,
             correction_detected=correction_detected,
             reinforcement_detected=reinforcement_detected,
         )
