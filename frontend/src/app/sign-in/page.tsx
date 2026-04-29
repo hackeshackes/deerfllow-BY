@@ -65,26 +65,26 @@ export default function SignInPage() {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white backdrop-blur-sm">
               <LockKeyholeIcon className="size-4" />
-              中文优先 · 邀请制团队工作台
+              {brand.loginBadge}
             </div>
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
-              登录 {brand.name}
+              {brand.loginTitle.replace("{name}", brand.name)}
             </h1>
             <p className="max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              {brand.name} 是一个面向个人与团队协作的中文智能服务工作台，适合研究、写作、文件分析和长任务执行。目前仅支持受邀账号登录使用。
+              {brand.loginSubtitle.replace("{name}", brand.name)}
             </p>
           </div>
           <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-              <div className="font-medium text-white">专注执行</div>
+              <div className="font-medium text-white">{brand.featureTitle1}</div>
               <p className="mt-1 text-sm text-slate-300">
-                在一个空间里完成复杂任务、查看进度并沉淀结果。
+                {brand.featureDesc1}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-              <div className="font-medium text-white">协作有边界</div>
+              <div className="font-medium text-white">{brand.featureTitle2}</div>
               <p className="mt-1 text-sm text-slate-300">
-                支持个人空间与共享空间，适合私有部署和团队协作。
+                {brand.featureDesc2}
               </p>
             </div>
           </div>
