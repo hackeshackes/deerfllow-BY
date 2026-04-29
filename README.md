@@ -95,7 +95,7 @@ MicX 提供了完整的 Admin 控制台：
 | 功能 | 路径 | 说明 |
 |------|------|------|
 | **监控中心** | `/workspace/admin/monitoring` | 健康状态、指标概览、追踪配置、最近问题 |
-| **配置中心** | `/workspace/admin/config` | 系统配置、Tracing 配置、品牌定制 |
+| **配置中心** | `/workspace/admin/config` | 系统配置、Tracing 配置、**登录页/首页品牌文字定制** |
 | **模型管理** | `/workspace/admin/models` | 模型配置 CRUD、API Key 管理 |
 | **用户管理** | `/workspace/admin/users` | 用户 CRUD、邀请、禁用、角色 |
 | **工作区管理** | `/workspace/admin/workspaces` | 创建/重命名/删除、成员管理 |
@@ -103,6 +103,15 @@ MicX 提供了完整的 Admin 控制台：
 | **MCP 配置** | `/workspace/admin/models/mcp` | MCP 服务器管理 |
 | **IM 渠道** | `/workspace/admin/models/mcp/channels` | 飞书/Slack/Telegram/钉钉/企微配置 |
 | **审计日志** | `/workspace/admin/audit` | 配置变更、敏感操作历史 |
+
+**品牌配置** - 管理员可在配置中心自定义所有品牌文字：
+
+| 页面 | 可配置内容 |
+|------|-----------|
+| **登录页** | Badge 文字、标题、副标题、2个功能卡片标题/描述 |
+| **首页** | 3个能力卡片、4个使用场景、"为什么选择"区块、团队版区块 |
+
+支持 `{name}` 和 `{support_email}` 占位符。
 
 ### 4. 安全加固
 
@@ -642,7 +651,7 @@ DeerFlow is single-user. MicX implements a complete multi-user system:
 | Feature | Path | Description |
 |---------|------|-------------|
 | **Monitoring Center** | `/workspace/admin/monitoring` | Health, metrics, tracing config |
-| **Configuration Center** | `/workspace/admin/config` | System, tracing, brand config |
+| **Configuration Center** | `/workspace/admin/config` | System, tracing, **login page & homepage brand text** |
 | **Model Management** | `/workspace/admin/models` | Model CRUD, API Key management |
 | **User Management** | `/workspace/admin/users` | User CRUD, invitation, roles |
 | **Workspace Management** | `/workspace/admin/workspaces` | Create/rename/delete, members |
@@ -650,6 +659,15 @@ DeerFlow is single-user. MicX implements a complete multi-user system:
 | **MCP Configuration** | `/workspace/admin/models/mcp` | MCP server management |
 | **IM Channels** | `/workspace/admin/models/mcp/channels` | Feishu/Slack/Telegram/DingTalk/WeCom |
 | **Audit Logs** | `/workspace/admin/audit` | Config changes, sensitive actions |
+
+**Brand Customization** - Admin can configure all brand text from the Configuration Center:
+
+| Page | Configurable Content |
+|------|---------------------|
+| **Login Page** | Badge text, title, subtitle, 2 feature card titles/descriptions |
+| **Homepage** | 3 capability cards, 4 use-case items, "Why choose" block, team edition block |
+
+Supports `{name}` and `{support_email}` placeholders.
 
 ### 4. IM Channels
 
