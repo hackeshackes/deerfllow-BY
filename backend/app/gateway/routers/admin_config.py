@@ -45,6 +45,31 @@ class AdminBrandingResponse(BaseModel):
     support_email: str
     website_path: str
     docs_path: str
+    login_badge: str
+    login_title: str
+    login_subtitle: str
+    feature_title_1: str
+    feature_desc_1: str
+    feature_title_2: str
+    feature_desc_2: str
+    homepage_capabilities_title: str
+    homepage_capabilities_desc: str
+    homepage_capabilities_title_2: str
+    homepage_capabilities_desc_2: str
+    homepage_capabilities_title_3: str
+    homepage_capabilities_desc_3: str
+    homepage_workflow_1: str
+    homepage_workflow_2: str
+    homepage_workflow_3: str
+    homepage_workflow_4: str
+    homepage_why_title: str
+    homepage_why_subtitle: str
+    homepage_why_description: str
+    homepage_scenarios_title: str
+    homepage_team_title: str
+    homepage_team_subtitle: str
+    homepage_team_description: str
+    homepage_team_button: str
 
 
 class AdminSystemResponse(BaseModel):

@@ -24,6 +24,31 @@ function emitBrandUpdate(branding: AdminConfig["branding"]) {
         supportEmail: branding.support_email,
         websitePath: branding.website_path,
         docsPath: branding.docs_path,
+        loginBadge: branding.login_badge,
+        loginTitle: branding.login_title,
+        loginSubtitle: branding.login_subtitle,
+        featureTitle1: branding.feature_title_1,
+        featureDesc1: branding.feature_desc_1,
+        featureTitle2: branding.feature_title_2,
+        featureDesc2: branding.feature_desc_2,
+        homepageCapabilitiesTitle: branding.homepage_capabilities_title,
+        homepageCapabilitiesDesc: branding.homepage_capabilities_desc,
+        homepageCapabilitiesTitle2: branding.homepage_capabilities_title_2,
+        homepageCapabilitiesDesc2: branding.homepage_capabilities_desc_2,
+        homepageCapabilitiesTitle3: branding.homepage_capabilities_title_3,
+        homepageCapabilitiesDesc3: branding.homepage_capabilities_desc_3,
+        homepageWorkflow1: branding.homepage_workflow_1,
+        homepageWorkflow2: branding.homepage_workflow_2,
+        homepageWorkflow3: branding.homepage_workflow_3,
+        homepageWorkflow4: branding.homepage_workflow_4,
+        homepageWhyTitle: branding.homepage_why_title,
+        homepageWhySubtitle: branding.homepage_why_subtitle,
+        homepageWhyDescription: branding.homepage_why_description,
+        homepageScenariosTitle: branding.homepage_scenarios_title,
+        homepageTeamTitle: branding.homepage_team_title,
+        homepageTeamSubtitle: branding.homepage_team_subtitle,
+        homepageTeamDescription: branding.homepage_team_description,
+        homepageTeamButton: branding.homepage_team_button,
       },
     }),
   );
@@ -104,6 +129,31 @@ type AdminConfig = {
     support_email: string;
     website_path: string;
     docs_path: string;
+    login_badge: string;
+    login_title: string;
+    login_subtitle: string;
+    feature_title_1: string;
+    feature_desc_1: string;
+    feature_title_2: string;
+    feature_desc_2: string;
+    homepage_capabilities_title: string;
+    homepage_capabilities_desc: string;
+    homepage_capabilities_title_2: string;
+    homepage_capabilities_desc_2: string;
+    homepage_capabilities_title_3: string;
+    homepage_capabilities_desc_3: string;
+    homepage_workflow_1: string;
+    homepage_workflow_2: string;
+    homepage_workflow_3: string;
+    homepage_workflow_4: string;
+    homepage_why_title: string;
+    homepage_why_subtitle: string;
+    homepage_why_description: string;
+    homepage_scenarios_title: string;
+    homepage_team_title: string;
+    homepage_team_subtitle: string;
+    homepage_team_description: string;
+    homepage_team_button: string;
   };
   upload: AdminUploadConfig;
   sandbox: AdminSandboxConfig;
@@ -194,34 +244,161 @@ export function ConfigAdminPage() {
             <CardTitle>MicX 品牌配置</CardTitle>
             <CardDescription>配置产品名称、简介和联系信息。</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <div className="text-sm font-medium">产品名称</div>
-              <Input value={form.branding.name} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, name: event.target.value } } : current)} />
+          <CardContent className="space-y-6">
+            <div>
+              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">基础信息</div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">产品名称</div>
+                  <Input value={form.branding.name} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, name: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">短名称</div>
+                  <Input value={form.branding.short_name} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, short_name: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Tagline</div>
+                  <Input value={form.branding.tagline} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, tagline: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">支持邮箱</div>
+                  <Input value={form.branding.support_email} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, support_email: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">官网路径</div>
+                  <Input value={form.branding.website_path} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, website_path: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">文档路径</div>
+                  <Input value={form.branding.docs_path} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, docs_path: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">产品描述</div>
+                  <Textarea value={form.branding.description} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, description: event.target.value } } : current)} />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <div className="text-sm font-medium">短名称</div>
-              <Input value={form.branding.short_name} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, short_name: event.target.value } } : current)} />
+
+            <div className="border-t border-slate-700 pt-6">
+              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">登录页配置</div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">顶部 Badge 文字</div>
+                  <Input value={form.branding.login_badge} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, login_badge: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">登录标题</div>
+                  <Input value={form.branding.login_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, login_title: event.target.value } } : current)} />
+                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">登录副标题</div>
+                  <Textarea value={form.branding.login_subtitle} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, login_subtitle: event.target.value } } : current)} />
+                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">功能卡片 1 标题</div>
+                  <Input value={form.branding.feature_title_1} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_title_1: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">功能卡片 1 描述</div>
+                  <Input value={form.branding.feature_desc_1} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_desc_1: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">功能卡片 2 标题</div>
+                  <Input value={form.branding.feature_title_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_title_2: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">功能卡片 2 描述</div>
+                  <Input value={form.branding.feature_desc_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_desc_2: event.target.value } } : current)} />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2 md:col-span-2">
-              <div className="text-sm font-medium">Tagline</div>
-              <Input value={form.branding.tagline} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, tagline: event.target.value } } : current)} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <div className="text-sm font-medium">产品描述</div>
-              <Textarea value={form.branding.description} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, description: event.target.value } } : current)} />
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm font-medium">支持邮箱</div>
-              <Input value={form.branding.support_email} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, support_email: event.target.value } } : current)} />
-            </div>
-            <div className="space-y-2">
-              <div className="text-sm font-medium">官网路径</div>
-              <Input value={form.branding.website_path} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, website_path: event.target.value } } : current)} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <div className="text-sm font-medium">文档路径</div>
-              <Input value={form.branding.docs_path} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, docs_path: event.target.value } } : current)} />
+
+            <div className="border-t border-slate-700 pt-6">
+              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">首页配置</div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">能力卡片 1 标题</div>
+                  <Input value={form.branding.homepage_capabilities_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_title: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">能力卡片 1 描述</div>
+                  <Input value={form.branding.homepage_capabilities_desc} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_desc: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">能力卡片 2 标题</div>
+                  <Input value={form.branding.homepage_capabilities_title_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_title_2: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">能力卡片 2 描述</div>
+                  <Input value={form.branding.homepage_capabilities_desc_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_desc_2: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">能力卡片 3 标题</div>
+                  <Input value={form.branding.homepage_capabilities_title_3} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_title_3: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">能力卡片 3 描述</div>
+                  <Input value={form.branding.homepage_capabilities_desc_3} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_desc_3: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">适用场景（4 行，用换行分隔）</div>
+                  <Textarea
+                    value={[form.branding.homepage_workflow_1, form.branding.homepage_workflow_2, form.branding.homepage_workflow_3, form.branding.homepage_workflow_4].join("\n")}
+                    onChange={(event) => {
+                      const lines = event.target.value.split("\n");
+                      setForm((current) => current ? {
+                        ...current,
+                        branding: {
+                          ...current.branding,
+                          homepage_workflow_1: lines[0] ?? "",
+                          homepage_workflow_2: lines[1] ?? "",
+                          homepage_workflow_3: lines[2] ?? "",
+                          homepage_workflow_4: lines[3] ?? "",
+                        },
+                      } : current);
+                    }}
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">为什么选择标题</div>
+                  <Input value={form.branding.homepage_why_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_why_title: event.target.value } } : current)} />
+                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">为什么选择副标题</div>
+                  <Input value={form.branding.homepage_why_subtitle} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_why_subtitle: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">为什么选择正文</div>
+                  <Textarea value={form.branding.homepage_why_description} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_why_description: event.target.value } } : current)} />
+                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">适用场景小标题</div>
+                  <Input value={form.branding.homepage_scenarios_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_scenarios_title: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">团队版标题</div>
+                  <Input value={form.branding.homepage_team_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_title: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">团队版副标题</div>
+                  <Input value={form.branding.homepage_team_subtitle} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_subtitle: event.target.value } } : current)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">团队版正文</div>
+                  <Textarea value={form.branding.homepage_team_description} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_description: event.target.value } } : current)} />
+                  <div className="text-xs text-slate-500">可用 {"{name}"} 和 {"{support_email}"} 引用产品名称和支持邮箱</div>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">团队版按钮文字</div>
+                  <Input value={form.branding.homepage_team_button} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_button: event.target.value } } : current)} />
+                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
