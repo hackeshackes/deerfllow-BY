@@ -1,6 +1,7 @@
 __all__ = [
     "admin_config",
     "admin_knowledge",
+    "admin_memory",
     "admin_monitoring",
     "admin_token_usage",
     "artifacts",

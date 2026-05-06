@@ -460,10 +460,33 @@ export function MemorySettingsPage() {
   async function handleDeleteFact() {
     if (!factToDelete) return;
 
+    const factId = factToDelete.id;
+    const factContent = factToDelete.content;
+    const factCategory = factToDelete.category;
+    const factConfidence = factToDelete.confidence;
+
+    setFactToDelete(null);
+
     try {
-      await deleteMemoryFact.mutateAsync(factToDelete.id);
-      toast.success(factDeleteSuccess);
-      setFactToDelete(null);
+      await deleteMemoryFact.mutateAsync(factId);
+      toast.success(
+        factDeleteSuccess,
+        {
+          action: {
+            label: "撤销",
+            onClick: async () => {
+              try {
+                await createMemoryFact.mutateAsync({
+                  content: factContent,
+                  category: factCategory,
+                  confidence: factConfidence,
+                });
+              } catch {
+              }
+            },
+          },
+        }
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     }
