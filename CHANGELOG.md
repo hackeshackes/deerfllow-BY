@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] - 2026-05-06
+
+### Added
+
+#### AI Message Citation Badges (AI消息引用来源badge)
+- Frontend `MarkdownContent` component now automatically detects `[citation:xxx](url)` format
+- Renders citation badges via `CitationLink` component with hover preview
+- Supports web search citations and knowledge base citations in AI messages
+
+#### Memory Settings Enhancement (记忆设置增强)
+- Added undo toast for fact deletion in memory settings page
+- Shows fact content before deletion, allows undo within 5 seconds
+- Improved delete confirmation dialog
+- Displays source thread link for non-manual facts
+
+#### Admin Memory View (Admin记忆查看)
+- New admin page at `/workspace/admin/memory`
+- Admin can query any user's memory data by user ID
+- Displays: context, facts with confidence levels, system prompt context, last updated time
+- Backend API: `GET /api/admin/memory/users/{user_id}`
+
+#### Knowledge Base Document Retry (知识库文档重试)
+- Knowledge base detail page at `/workspace/knowledge/{kb_id}` already includes reindex/retry functionality
+- Failed documents can be re-indexed via the retry button
+
 ## [1.4.4] - 2026-04-29
 
 ### Fixed
