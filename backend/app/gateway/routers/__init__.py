@@ -10,10 +10,12 @@ __all__ = [
     "knowledge",
     "mcp",
     "models",
+    "ppt",
     "skills",
     "suggestions",
     "threads",
     "thread_runs",
     "tasks",
     "uploads",
+    "user_skills",
 ]
