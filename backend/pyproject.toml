@@ -20,6 +20,22 @@ dependencies = [
     "markdown-to-mrkdwn>=0.3.1",
     "wecom-aibot-python-sdk>=0.1.6",
     "apscheduler>=3.10.0",
+    "edge-tts>=7.2.8",
+    "svglib>=1.5.0",
+    "reportlab>=4.0.0",
+    "PyMuPDF>=1.23.0",
+    "mammoth>=1.6.0",
+    "markdownify>=0.11.6",
+    "ebooklib>=0.18",
+    "nbconvert>=7.0.0",
+    "openpyxl>=3.1.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "curl_cffi>=0.7.0",
+    "google-genai>=1.0.0",
+    "openai>=1.0.0",
+    "flask>=3.0.0",
+    "matplotlib>=3.0.0",
 ]
 
 [dependency-groups]

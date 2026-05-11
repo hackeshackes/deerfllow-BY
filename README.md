@@ -43,6 +43,8 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 | **AI消息引用来源** | ❌ | ✅ **v1.4.6 新增** |
 | **Admin记忆查看** | ❌ | ✅ **v1.4.6 新增** |
 | **记忆增强管理** | ❌ | ✅ **v1.4.6 新增** |
+| **PPT Master 服务** | ❌ | ✅ **v1.4.7 新增** |
+| **深度研究技能增强** | ❌ | ✅ **v1.4.7 新增** |
 
 ---
 
@@ -567,6 +569,7 @@ make dev          # 启动所有服务 (开发模式)
 
 ## 文档
 
+- [v1.4.7 PRD](./docs/plans/2026-05-11-ppt-master-improvements-prd.md) - PPT Master 服务改进
 - [v1.4.6 PRD](./docs/plans/2026-05-06-micx-v1.4.6-prd.md) - 可信知识与记忆
 - [v1.4.6 执行计划](./docs/plans/2026-05-06-micx-v1.4.6-execution-plan.md)
 - [v1.4.4 PRD](./docs/plans/2026-04-26-micx-v1.4.4-prd-final.md)
@@ -628,6 +631,8 @@ MicX is an enhanced version of [DeerFlow](https://github.com/HACKESHACKES/deerfl
 | **AI Message Citations** | ❌ | ✅ **v1.4.6 New** |
 | **Admin Memory View** | ❌ | ✅ **v1.4.6 New** |
 | **Enhanced Memory Management** | ❌ | ✅ **v1.4.6 New** |
+| **PPT Master Service** | ❌ | ✅ **v1.4.7 New** |
+| **Deep-Research Skill Enhancement** | ❌ | ✅ **v1.4.7 New** |
 
 ---
 

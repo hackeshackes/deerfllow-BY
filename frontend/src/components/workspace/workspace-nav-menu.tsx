@@ -264,12 +264,7 @@ export function WorkspaceNavMenu({
                       知识库
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/workspace/ppt">
-                      <ShieldCheckIcon />
-                      演示生成
-                    </Link>
-                  </DropdownMenuItem>
+                  
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

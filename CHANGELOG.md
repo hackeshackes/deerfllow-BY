@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2026-05-11
+
+### Added
+
+#### PPT Master Service (PPT Master 服务)
+- 超时控制 (默认 120s)
+- 重试机制 (指数退避, 最多3次)
+- 错误分类 (可重试 vs 不可重试错误)
+- 任务状态持久化 (JSON 文件, TTL 24h)
+- 进度跟踪 API (`GET /api/ppt/task/{id}/status`)
+- 降级警告 (`is_fallback`, `warning` 字段)
+- 中文字体支持 (matplotlib + WenQuanYi 字体)
+- API 端点:
+  - `POST /api/ppt/generate` - 生成 PPT
+  - `GET /api/ppt/task/{task_id}/status` - 获取任务状态
+  - `POST /api/ppt/task/{task_id}/cancel` - 取消任务
+  - `GET /api/ppt/download/{task_id}` - 下载 PPT
+  - `GET /api/ppt/templates` - 获取模板列表
+
+#### Deep-Research Skill Enhancement (深度研究技能增强)
+- 添加中文触发词 (深度研究、深度搜索、深入研究)
+- Agent prompt 添加复合任务优先级规则
+- 修复 Skill 路由问题
+
+### Removed
+
+#### UI Cleanup (界面清理)
+- 移除"设置和更多"菜单中的"演示生成"入口
+
 ## [1.4.6] - 2026-05-06
 
 ### Added
