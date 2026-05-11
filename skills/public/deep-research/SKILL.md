@@ -1,6 +1,15 @@
 ---
 name: deep-research
-description: Use this skill instead of WebSearch for ANY question requiring web research. Trigger on queries like "what is X", "explain X", "compare X and Y", "research X", or before content generation tasks. Provides systematic multi-angle research methodology instead of single superficial searches. Use this proactively when the user's question needs online information.
+description: >
+  Use this skill instead of WebSearch for ANY question requiring web research.
+  Trigger on queries like "what is X", "explain X", "compare X and Y", "research X",
+  "了解X", "调研X", "研究X", "分析X", "背景资料", "行业信息", or BEFORE content generation tasks.
+  When user asks to generate PPT, report, article, or any content that needs real-world data,
+  ALWAYS load this skill FIRST, then proceed to generation skill.
+  Provides systematic multi-angle research methodology instead of single superficial searches.
+  Use this proactively when the user's question needs online information.
+  CRITICAL: This skill must be loaded BEFORE any PPT generation, presentation creation,
+  or content production task. The research phase must complete before starting generation.
 ---
 
 # Deep Research Skill
