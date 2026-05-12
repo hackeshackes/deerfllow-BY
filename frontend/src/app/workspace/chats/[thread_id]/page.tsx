@@ -175,7 +175,7 @@ export default function ChatPage() {
                 </div>
                 {mounted ? (
                   <InputBox
-                    key={isNewThread ? (initialPrompt ?? "new-thread") : threadId}
+                    key={threadId}
                     className={cn(
                       "bg-background/90 w-full -translate-y-4 rounded-[1.75rem] border shadow-xl",
                     )}

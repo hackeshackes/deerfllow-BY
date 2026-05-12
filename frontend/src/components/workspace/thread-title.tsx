@@ -56,6 +56,7 @@ export function ThreadTitle({
     overrideTitle,
     thread.isThreadLoading,
     thread.values,
+    thread.values.title,
   ]);
 
   const displayTitle = overrideTitle ?? thread.values?.title;
