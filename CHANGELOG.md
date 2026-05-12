@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8] - 2026-05-12
+
+### Fixed
+
+#### PPT Master 误触发问题 (PPT Master False Trigger)
+- 修复 Lead Agent 在普通对话中误触发 PPT Master 技能的问题
+- 根因: prompt.py 中技能加载指令过于激进
+- 修复: 修改技能加载规则, 仅在用户明确要求或任务直接匹配技能核心用例时加载技能
+
+#### UI Bug 修复 (Frontend Bug Fixes)
+- Bug 4: 修复模式切换下拉菜单不显示已选模式的问题
+- Bug 6: 修复引用消息时 AI 回复异常的问题
+- Bug 8: 修复特定 UI 状态下输入框宽度异常的问题
+
 ## [1.4.7] - 2026-05-11
 
 ### Added
