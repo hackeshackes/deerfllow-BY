@@ -58,7 +58,7 @@ export function ExportTrigger({ threadId }: { threadId: string }) {
           break;
         case "pdf":
           exportThreadAsPDF(agentThread, messages);
-          break;
+          return;
       }
       toast.success(t.common.exportSuccess);
     },

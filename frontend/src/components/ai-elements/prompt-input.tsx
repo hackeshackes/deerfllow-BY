@@ -787,6 +787,10 @@ export const PromptInput = ({
     )
       .then((convertedFiles: PromptInputFilePart[]) => {
         try {
+          // Guard against submitting whitespace-only content
+          if (!text || text.trim().length === 0) {
+            return;
+          }
           const result = onSubmit({ text, files: convertedFiles }, event);
 
           // Handle both sync and async onSubmit

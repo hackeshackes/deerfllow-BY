@@ -160,10 +160,19 @@ export function InputBox({
     null,
   );
 
+  // Track if user is actively selecting a mode to prevent auto-effect from overriding
+  const isSelectingModeRef = useRef(false);
+
   useEffect(() => {
     if (models.length === 0) {
       return;
     }
+
+    // Skip auto-selection if user is actively selecting a mode
+    if (isSelectingModeRef.current) {
+      return;
+    }
+
     const currentModel = models.find((m) => m.name === context.model_name);
     const fallbackModel = currentModel ?? models[0]!;
     const supportsThinking = fallbackModel.supports_thinking ?? false;
@@ -219,6 +228,7 @@ export function InputBox({
 
   const handleModeSelect = useCallback(
     (mode: InputMode) => {
+      isSelectingModeRef.current = true;
       onContextChange?.({
         ...context,
         mode: getResolvedMode(mode, supportThinking),
@@ -231,16 +241,23 @@ export function InputBox({
                 ? "low"
                 : "minimal",
       });
+      setTimeout(() => {
+        isSelectingModeRef.current = false;
+      }, 0);
     },
     [onContextChange, context, supportThinking],
   );
 
   const handleReasoningEffortSelect = useCallback(
     (effort: "minimal" | "low" | "medium" | "high") => {
+      isSelectingModeRef.current = true;
       onContextChange?.({
         ...context,
         reasoning_effort: effort,
       });
+      setTimeout(() => {
+        isSelectingModeRef.current = false;
+      }, 0);
     },
     [onContextChange, context],
   );
