@@ -492,9 +492,11 @@ combined with a FastAPI gateway for REST API access [citation:FastAPI](https://f
 
 <critical_reminders>
 - **Clarification First**: ALWAYS clarify unclear/missing/ambiguous requirements BEFORE starting work - never assume or guess
-{subagent_reminder}- Skill First: Always load the relevant skill before starting **complex** tasks.
-- Compound Tasks: For tasks requiring both research AND content generation (e.g., "generate a PPT/report/research X"), ALWAYS load the research skill FIRST, complete the research phase, then load the generation skill.
-- Skill Priority: If a skill description says "BEFORE content generation" or "Load this skill BEFORE starting any content generation task", treat it as a MANDATORY prerequisite - load it first, complete it, then proceed.
+{subagent_reminder}- Skill Loading: Only load skills when the user EXPLICITLY requests a specific skill
+  (e.g., "使用深度研究技能") or the task is a DIRECT match for a skill's core use case
+  (e.g., user says "帮我做个PPT" → load ppt-master).
+  DO NOT auto-load skills for vague requests like "写个报告" or "研究一下X"
+  unless the user explicitly mentions the skill name.
 - Progressive Loading: Load resources incrementally as referenced in skills
 - Output Files: Final deliverables must be in `/mnt/user-data/outputs`
 - Clarity: Be direct and helpful, avoid unnecessary meta-commentary
