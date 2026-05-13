@@ -474,15 +474,16 @@ export function MemorySettingsPage() {
         {
           action: {
             label: "撤销",
-            onClick: async () => {
-              try {
-                await createMemoryFact.mutateAsync({
+            onClick: () => {
+              void createMemoryFact
+                .mutateAsync({
                   content: factContent,
                   category: factCategory,
                   confidence: factConfidence,
+                })
+                .catch(() => {
+                  // Undo failed, ignore
                 });
-              } catch {
-              }
             },
           },
         }

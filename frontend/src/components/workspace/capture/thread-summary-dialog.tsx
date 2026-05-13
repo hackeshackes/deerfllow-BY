@@ -1,6 +1,7 @@
 "use client";
 
 import { BookmarkPlusIcon, CheckIcon, CopyIcon, LoaderIcon, SparklesIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -11,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -18,11 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { getBackendBaseURL } from "@/core/config";
 import { useI18n } from "@/core/i18n/hooks";
-import { useRouter } from "next/navigation";
 
 interface KnowledgeBase {
   id: string;
@@ -148,7 +148,7 @@ export function ThreadSummaryDialog({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             content: currentSummaryForSave,
-            title: threadTitle || t.pages.untitled,
+            title: threadTitle ?? t.pages.untitled,
           }),
         }
       );

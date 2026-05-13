@@ -15,7 +15,7 @@ import time
 from typing import Any
 
 from fastapi import HTTPException, Request
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.gateway.auth import require_user
 from app.gateway.deps import get_checkpointer, get_run_manager, get_store, get_stream_bridge
@@ -87,8 +87,17 @@ def normalize_input(raw_input: dict[str, Any] | None) -> dict[str, Any]:
                 content = msg.get("content", "")
                 if role in ("user", "human"):
                     converted.append(HumanMessage(content=content))
+                elif role in ("system",):
+                    converted.append(SystemMessage(content=content))
+                elif role in ("assistant", "ai"):
+                    converted.append(AIMessage(content=content))
+                elif role == "tool":
+                    tool_call_id = msg.get("tool_call_id", msg.get("toolId", ""))
+                    name = msg.get("name", "")
+                    converted.append(ToolMessage(content=str(content), tool_call_id=tool_call_id, name=name))
                 else:
-                    # TODO: handle other message types (system, ai, tool)
+                    # Unknown role - log and treat as user to avoid dropping messages
+                    logger.warning("normalize_input: unknown message role %r, treating as user", role)
                     converted.append(HumanMessage(content=content))
             else:
                 converted.append(msg)
