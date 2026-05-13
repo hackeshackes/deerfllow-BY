@@ -61,12 +61,14 @@ export function ThreadTitle({
 
   const displayTitle = overrideTitle ?? thread.values?.title;
 
-  if (!displayTitle) {
+  const finalTitle = displayTitle ?? (isNewThread ? t.pages.newChat : null);
+
+  if (!finalTitle) {
     return null;
   }
   return (
     <FlipDisplay uniqueKey={threadId}>
-      {displayTitle ?? "Untitled"}
+      {finalTitle}
     </FlipDisplay>
   );
 }

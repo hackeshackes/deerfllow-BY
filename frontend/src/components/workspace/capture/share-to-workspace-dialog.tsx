@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Building2Icon, Loader2Icon, UserIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import {
   Dialog,
@@ -18,8 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useI18n } from "@/core/i18n/hooks";
 import { getBackendBaseURL } from "@/core/config";
+import { useI18n } from "@/core/i18n/hooks";
 
 interface Workspace {
   id: string;
@@ -99,7 +99,7 @@ export function ShareToWorkspaceDialog({
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || "Failed to share thread");
+        throw new Error(data.detail ?? "Failed to share thread");
       }
 
       onOpenChange(false);
