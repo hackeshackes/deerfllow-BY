@@ -54,17 +54,29 @@ export default function ChatPage() {
 
     let cancelled = false;
     async function ensureThreadAccessible() {
+      // Wait for thread to be fully created/synced before checking
+      // Small delay to allow onCreated callback to complete sync
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      if (cancelled) return;
+
+      const currentThreadId = threadId;
+      // Skip if threadId is still invalid (e.g., "new" or empty)
+      if (!currentThreadId || currentThreadId === "new") {
+        return;
+      }
+
       try {
-        const response = await fetch(`/api/threads/${encodeURIComponent(threadId)}`);
+        const response = await fetch(`/api/threads/${encodeURIComponent(currentThreadId)}`);
         if (!response.ok) {
           if (!cancelled) {
-            window.sessionStorage.removeItem(`lg:stream:${threadId}`);
+            window.sessionStorage.removeItem(`lg:stream:${currentThreadId}`);
             router.replace("/workspace/chats/new");
           }
         }
       } catch {
         if (!cancelled) {
-          window.sessionStorage.removeItem(`lg:stream:${threadId}`);
+          window.sessionStorage.removeItem(`lg:stream:${currentThreadId}`);
           router.replace("/workspace/chats/new");
         }
       }
