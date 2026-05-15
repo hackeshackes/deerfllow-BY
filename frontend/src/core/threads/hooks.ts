@@ -311,6 +311,40 @@ export function useThreadStream({
     onFinish(state) {
       listeners.current.onFinish?.(state.values);
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
+
+      // Auto-generate title for new threads that don't have one yet
+      const currentThreadId = threadIdRef.current;
+      if (currentThreadId && !state.values?.title) {
+        const messageCount = state.messages?.length ?? 0;
+        if (messageCount >= 2) {
+          void fetch(
+            `${getBackendBaseURL()}/api/threads/${encodeURIComponent(currentThreadId)}/summarize`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ max_messages: 10 }),
+            },
+          )
+.then((res) => res.json())
+            .then((data) => {
+              if (data.suggested_name) {
+                void fetch(
+                  `${getBackendBaseURL()}/api/threads/${encodeURIComponent(currentThreadId)}/title`,
+                  {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: data.suggested_name }),
+                  },
+                ).catch(function (_e) {
+                  // ignore
+                });
+              }
+            })
+            .catch(function (_err) {
+              // ignore
+            });
+        }
+      }
     },
   });
 
