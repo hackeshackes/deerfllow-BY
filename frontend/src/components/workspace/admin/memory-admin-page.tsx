@@ -3,12 +3,12 @@
 import { BrainIcon, ChevronRightIcon, Loader2Icon, SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
 
 type MemoryData = {
   user_id: string;

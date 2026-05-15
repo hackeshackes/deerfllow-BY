@@ -110,6 +110,8 @@ services:
     working_dir: /app
     environment:
       - NODE_ENV=development
+      - NEXT_DISABLE_TURBOPACK=1
+      - SKIP_ENV_VALIDATION=1
       - WATCHPACK_POLLING=true
       - CI=true
       - DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://gateway:8001

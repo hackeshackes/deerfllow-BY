@@ -10,16 +10,11 @@ function getInternalServiceURL(envKey, fallbackURL) {
     ? configured.replace(/\/+$/, "")
     : fallbackURL;
 }
-import nextra from "nextra";
-
-const withNextra = nextra({});
+// import nextra from "nextra";
+// const withNextra = nextra({});
 
 /** @type {import("next").NextConfig} */
 const config = {
-  i18n: {
-    locales: ["en", "zh"],
-    defaultLocale: "en",
-  },
   devIndicators: false,
   async rewrites() {
     const rewrites = [];
@@ -58,4 +53,5 @@ const config = {
   },
 };
 
-export default withNextra(config);
+// export default withNextra(config);
+export default config;

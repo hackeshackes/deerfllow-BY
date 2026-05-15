@@ -43,8 +43,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useI18n } from "@/core/i18n/hooks";
 import { ShareToWorkspaceDialog } from "@/components/workspace/capture/share-to-workspace-dialog";
+import { useI18n } from "@/core/i18n/hooks";
 import {
   exportThreadAsJSON,
   exportThreadAsMarkdown,
