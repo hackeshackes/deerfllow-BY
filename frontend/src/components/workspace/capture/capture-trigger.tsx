@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { BookmarkPlusIcon, LoaderIcon, SparklesIcon, WorkflowIcon, Share2Icon, MoreHorizontalIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -12,14 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ShareToWorkspaceDialog } from "@/components/workspace/capture/share-to-workspace-dialog";
 import { ThreadSummaryDialog } from "@/components/workspace/capture/thread-summary-dialog";
 import { WorkflowDraftDialog } from "@/components/workspace/capture/workflow-draft-dialog";
-import { ShareToWorkspaceDialog } from "@/components/workspace/capture/share-to-workspace-dialog";
 import { useThread } from "@/components/workspace/messages/context";
 import { Tooltip } from "@/components/workspace/tooltip";
-import { useI18n } from "@/core/i18n/hooks";
 import { getBackendBaseURL } from "@/core/config";
-import { useRouter } from "next/navigation";
+import { useI18n } from "@/core/i18n/hooks";
 
 interface CaptureTriggerProps {
   threadId: string;

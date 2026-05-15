@@ -315,7 +315,7 @@ export function useThreadStream({
       // Auto-generate title for new threads that don't have one yet
       const currentThreadId = threadIdRef.current;
       if (currentThreadId && !state.values?.title) {
-        const messageCount = state.messages?.length ?? 0;
+        const messageCount = (state.values as AgentThreadState | undefined)?.messages?.length ?? 0;
         if (messageCount >= 2) {
           void fetch(
             `${getBackendBaseURL()}/api/threads/${encodeURIComponent(currentThreadId)}/summarize`,
