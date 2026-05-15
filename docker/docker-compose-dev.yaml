@@ -86,7 +86,7 @@ services:
     build:
       context: ../
       dockerfile: frontend/Dockerfile
-      target: dev
+      target: builder
       args:
         PNPM_STORE_PATH: ${PNPM_STORE_PATH:-/root/.local/share/pnpm/store}
         NPM_REGISTRY: ${NPM_REGISTRY:-}
@@ -99,7 +99,7 @@ services:
         reservations:
           cpus: "0.25"
           memory: 256M
-    command: sh -c "cd frontend && pnpm run dev > /app/logs/frontend.log 2>&1"
+    command: sh -c "cd frontend && node_modules/.bin/next start > /app/logs/frontend.log 2>&1"
     volumes:
       - ../frontend/src:/app/frontend/src
       - ../frontend/public:/app/frontend/public
