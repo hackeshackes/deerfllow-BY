@@ -571,9 +571,14 @@ make dev          # 启动所有服务 (开发模式)
 
 ## 文档
 
+- [v1.4.9 PRD](./docs/plans/2026-05-12-micx-v1.4.9-prd.md) - v1.4.9 知识库搜索增强
+- [v1.4.9 执行计划](./docs/plans/2026-05-12-micx-v1.4.9-execution-plan.md) - v1.4.9 执行计划
+- [v1.4.9.1 PRD](./docs/plans/2026-05-16-micx-v1.5-prd.md) - 登录 Session 修复
+- [v1.4.9.1 执行计划](./docs/plans/2026-05-16-micx-v1.5-execution-plan.md) - v1.4.9.1 执行计划
 - [v1.4.8 PRD](./docs/plans/2026-05-12-micx-v1.4.8-prd.md) - Bug 修复版本
 - [v1.4.8 执行计划](./docs/plans/2026-05-12-micx-v1.4.8-execution-plan.md) - Bug 修复执行计划
-- [v1.4.7 PRD](./docs/plans/2026-05-08-micx-v1.5-prd.md) - PPT Master 服务改进
+- [v1.4.7 PRD](./docs/plans/2026-05-07-micx-v1.4.7-prd.md) - PPT Master 服务
+- [v1.4.7 执行计划](./docs/plans/2026-05-07-micx-v1.4.7-execution-plan.md) - PPT Master 执行计划
 - [v1.4.6 PRD](./docs/plans/2026-05-06-micx-v1.4.6-prd.md) - 可信知识与记忆
 - [v1.4.6 执行计划](./docs/plans/2026-05-06-micx-v1.4.6-execution-plan.md)
 - [v1.4.4 PRD](./docs/plans/2026-04-26-micx-v1.4.4-prd-final.md)
@@ -1043,9 +1048,16 @@ make dev          # Start all services (dev mode)
 
 ## Documentation
 
+- [v1.4.9 PRD](./docs/plans/2026-05-12-micx-v1.4.9-prd.md) - Knowledge Base Search Enhancement
+- [v1.4.9 Execution Plan](./docs/plans/2026-05-12-micx-v1.4.9-execution-plan.md) - v1.4.9 Execution Plan
 - [v1.4.8 PRD](./docs/plans/2026-05-12-micx-v1.4.8-prd.md) - Bug Fix Release
 - [v1.4.8 Execution Plan](./docs/plans/2026-05-12-micx-v1.4.8-execution-plan.md) - Bug Fix Execution
-- [v1.4.7 PRD](./docs/plans/2026-05-08-micx-v1.5-prd.md) - PPT Master Service
+- [v1.4.7 PRD](./docs/plans/2026-05-07-micx-v1.4.7-prd.md) - PPT Master Service
+- [v1.4.7 Execution Plan](./docs/plans/2026-05-07-micx-v1.4.7-execution-plan.md) - PPT Master Execution
+- [v1.4.6 PRD](./docs/plans/2026-05-06-micx-v1.4.6-prd.md) - Trusted Knowledge & Memory
+- [v1.4.6 Execution](./docs/plans/2026-05-06-micx-v1.4.6-execution-plan.md)
+- [v1.4.4 PRD](./docs/plans/2026-04-26-micx-v1.4.4-prd-final.md)
+- [v1.4.4 Execution](./docs/plans/2026-04-26-micx-v1.4.4-execution-plan.md)
 - [v1.4 Execution](./docs/plans/2026-04-19-micx-v1.4-execution.md)
 - [v1.4 Bugfix Plan](./docs/plans/2026-04-19-micx-v1.4-bugfix-plan.md)
 - [v1.3 PRD](./docs/plans/2026-04-17-micx-v1.3-prd.md)
