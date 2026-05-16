@@ -205,10 +205,10 @@ export async function loadCustomSkills(): Promise<Skill[]> {
   return json.skills as Skill[];
 }
 
-export async function loadMyCustomSkills(): Promise<Skill[]> {
+export async function loadMyCustomSkills(): Promise<CustomSkillResponse[]> {
   const response = await fetch(`${getBackendBaseURL()}/api/skills/custom/mine`);
   const json = await response.json();
-  return json.skills as Skill[];
+  return json.skills as CustomSkillResponse[];
 }
 
 export async function deleteCustomSkill(skillName: string): Promise<void> {
@@ -219,4 +219,26 @@ export async function deleteCustomSkill(skillName: string): Promise<void> {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail ?? `HTTP ${response.status}: ${response.statusText}`);
   }
+}
+
+export interface UpdateCustomSkillRequest {
+  display_name?: string;
+  description?: string;
+  content?: string;
+}
+
+export async function updateCustomSkill(
+  skillName: string,
+  request: UpdateCustomSkillRequest,
+): Promise<CustomSkillResponse> {
+  const response = await fetch(`${getBackendBaseURL()}/api/skills/custom/${skillName}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail ?? `HTTP ${response.status}: ${response.statusText}`);
+  }
+  return response.json();
 }

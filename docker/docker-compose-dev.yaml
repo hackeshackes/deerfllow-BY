@@ -3,10 +3,15 @@
 #
 # Services:
 #   - nginx: Reverse proxy (port 2026)
-#   - frontend: Frontend Next.js dev server (port 3000)
+#   - frontend: Frontend Next.js production server (port 3000)
 #   - gateway: Backend Gateway API (port 8001)
 #   - langgraph: LangGraph server (port 2024)
 #   - provisioner (optional): Sandbox provisioner (creates Pods in host Kubernetes)
+#
+# Development workflow:
+#   - Code changes: edit files in frontend/src/
+#   - Rebuild: docker compose -f docker/docker-compose-dev.yaml build frontend
+#   - Restart: docker compose -f docker/docker-compose-dev.yaml up -d frontend
 #
 # Prerequisites:
 #   - Kubernetes cluster + kubeconfig are only required when using provisioner mode.
@@ -86,7 +91,7 @@ services:
     build:
       context: ../
       dockerfile: frontend/Dockerfile
-      target: builder
+      target: prod
       args:
         PNPM_STORE_PATH: ${PNPM_STORE_PATH:-/root/.local/share/pnpm/store}
         NPM_REGISTRY: ${NPM_REGISTRY:-}
@@ -99,7 +104,7 @@ services:
         reservations:
           cpus: "0.25"
           memory: 256M
-    command: sh -c "cd frontend && node_modules/.bin/next start > /app/logs/frontend.log 2>&1"
+    command: sh -c "cd /app/frontend && pnpm start"
     volumes:
       - ../frontend/src:/app/frontend/src
       - ../frontend/public:/app/frontend/public
@@ -109,10 +114,8 @@ services:
       - ${PNPM_STORE_PATH:-~/.local/share/pnpm/store}:/root/.local/share/pnpm/store
     working_dir: /app
     environment:
-      - NODE_ENV=development
-      - NEXT_DISABLE_TURBOPACK=1
+      - NODE_ENV=production
       - SKIP_ENV_VALIDATION=1
-      - WATCHPACK_POLLING=true
       - CI=true
       - DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://gateway:8001
       - DEER_FLOW_INTERNAL_LANGGRAPH_BASE_URL=http://langgraph:2024

@@ -1,7 +1,7 @@
 "use client";
 
-import { BlocksIcon, PlusIcon, Share2Icon, StarIcon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { BlocksIcon, PlusIcon, Share2Icon, StarIcon, Trash2Icon, EditIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,9 +32,10 @@ import {
   useRateSkill,
   useShareSkill,
   useUnshareSkill,
+  useUpdateCustomSkill,
   useUserSkills,
 } from "@/core/skills/hooks";
-import type { UserSkillConfig } from "@/core/skills/type";
+import type { CustomSkill, UserSkillConfig } from "@/core/skills/type";
 
 const DEFAULT_SKILL_TEMPLATE = `---
 name: my-custom-skill
@@ -157,6 +158,10 @@ function CustomSkillsList() {
     open: false,
     skillName: null,
   });
+  const [editDialog, setEditDialog] = useState<{ open: boolean; skill: CustomSkill | null }>({
+    open: false,
+    skill: null,
+  });
 
   const handleDelete = async () => {
     if (!deleteConfirm.skillName) return;
@@ -206,14 +211,23 @@ function CustomSkillsList() {
                     <span className="text-muted-foreground">v{skill.version}</span>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setDeleteConfirm({ open: true, skillName: skill.name })}
-                >
-                  <Trash2Icon className="size-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditDialog({ open: true, skill })}
+                  >
+                    <EditIcon className="size-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeleteConfirm({ open: true, skillName: skill.name })}
+                  >
+                    <Trash2Icon className="size-4" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -238,6 +252,16 @@ function CustomSkillsList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditSkillDialog
+        open={editDialog.open}
+        skill={editDialog.skill}
+        onClose={() => setEditDialog({ open: false, skill: null })}
+        onSuccess={async () => {
+          await refetch();
+          setEditDialog({ open: false, skill: null });
+        }}
+      />
     </>
   );
 }
@@ -435,6 +459,115 @@ function RateSkillDialog({
             取消
           </Button>
           <Button onClick={() => onRate(skill, rating, comment)}>提交评分</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditSkillDialog({
+  open,
+  skill,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  skill: CustomSkill | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [displayName, setDisplayName] = useState("");
+  const [description, setDescription] = useState("");
+  const [content, setContent] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const { mutate: updateSkill, isPending } = useUpdateCustomSkill();
+
+  useEffect(() => {
+    if (skill) {
+      setDisplayName(skill.display_name_zh ?? skill.name);
+      setDescription(skill.description);
+      setContent(skill.content);
+    }
+  }, [skill]);
+
+  const handleUpdate = () => {
+    if (!skill || !displayName.trim()) {
+      setError("显示名称不能为空");
+      return;
+    }
+    setError(null);
+    updateSkill(
+      { skillName: skill.name, request: { display_name: displayName.trim(), description: description.trim(), content: content.trim() } },
+      {
+        onSuccess: () => {
+          onSuccess();
+        },
+        onError: (err: Error) => {
+          setError(err.message);
+        },
+      },
+    );
+  };
+
+  const handleClose = (isOpen: boolean) => {
+    if (!isOpen) {
+      setDisplayName("");
+      setDescription("");
+      setContent("");
+      setError(null);
+    }
+    onClose();
+  };
+
+  if (!skill) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>编辑技能: {skill.name}</DialogTitle>
+          <DialogDescription>
+            修改技能的显示名称、描述和内容。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">显示名称</label>
+            <Input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="技能显示名称"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">描述</label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="技能描述"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">SKILL.md 内容</label>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Enter skill content..."
+              className="mt-1 font-mono text-sm"
+              rows={20}
+            />
+          </div>
+          {error && <p className="text-sm text-red-500">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleClose(false)}>
+            取消
+          </Button>
+          <Button onClick={handleUpdate} disabled={isPending}>
+            {isPending ? "保存中..." : "保存"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

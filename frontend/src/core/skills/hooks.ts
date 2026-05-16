@@ -4,6 +4,7 @@ import type {
   CreateCustomSkillRequest,
   RateSkillRequest,
   ShareSkillRequest,
+  UpdateCustomSkillRequest,
   UpdateUserSkillConfigRequest,
 } from "./api";
 import {
@@ -19,6 +20,7 @@ import {
   rateSkill,
   shareSkill,
   unshareSkill,
+  updateCustomSkill,
   updateUserSkillConfig,
 } from "./api";
 
@@ -191,6 +193,21 @@ export function useDeleteCustomSkill() {
   return useMutation({
     mutationFn: async (skillName: string) => {
       return deleteCustomSkill(skillName);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["custom-skills"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-custom-skills"] });
+      void queryClient.invalidateQueries({ queryKey: ["skills"] });
+      void queryClient.invalidateQueries({ queryKey: ["user-skills"] });
+    },
+  });
+}
+
+export function useUpdateCustomSkill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ skillName, request }: { skillName: string; request: UpdateCustomSkillRequest }) => {
+      return updateCustomSkill(skillName, request);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["custom-skills"] });
