@@ -46,6 +46,7 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 | **PPT Master 服务** | ❌ | ✅ **v1.4.7 新增** |
 | **深度研究技能增强** | ❌ | ✅ **v1.4.7 新增** |
 | **Bug 修复版本** | ❌ | ✅ **v1.4.8 新增** |
+| **登录 Session 修复** | ❌ | ✅ **v1.4.9.1 新增** |
 
 ---
 

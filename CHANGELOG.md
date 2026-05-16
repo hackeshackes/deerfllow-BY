@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.9.1] - 2026-05-16
+
+### Fixed
+
+#### 登录 Session Cookie 签名不一致问题 (Login Session Cookie Signature Mismatch)
+- 根因: `docker-compose-dev.yaml` 中 frontend 服务的 `BETTER_AUTH_SECRET` 硬编码为 `local-dev-secret-for-micx`，与 backend 的 `micx-local-dev-secret-2026-04-13-please-change` 不一致
+- 影响: backend 创建的 session cookie 被 frontend 拒绝验证，导致登录看似成功但立即跳转回登录页
+- 修复: 移除 docker-compose-dev.yaml 中 frontend 服务的硬编码 BETTER_AUTH_SECRET 环境变量，改为从 `frontend/.env` 文件读取
+
 ## [1.4.8] - 2026-05-12
 
 ### Fixed
