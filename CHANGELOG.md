@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.9.3] - 2026-05-17
+
+### Added
+
+#### GLM (智谱AI) Model Expansion (GLM 模型扩展)
+- Expanded from 6 to 13 GLM models:
+  - **Text Models**: GLM-5.1, GLM-5, GLM-5-Turbo, GLM-4.7, GLM-4.6, GLM-4.7-FlashX, GLM-4.5-Air, GLM-4.5-AirX, GLM-4.7-Flash (free)
+  - **Vision Models**: GLM-5V-Turbo, GLM-4.6V, GLM-4.6V-FlashX, GLM-4.6V-Flash (free)
+- Updated model descriptions with context window sizes (200K/128K)
+- Added GLM-5-Turbo (OpenClaw optimized for agentic workflows)
+
+#### Minimax (小米) Model Expansion (Minimax 模型扩展)
+- Expanded from 4 to 8 Minimax models:
+  - **Flagship**: M2.7, M2.7-Highspeed, M2.5, M2.5-Highspeed
+  - **Special**: M2-her (role-play/multi-turn conversations)
+  - **Legacy**: M2.1, M2.1-Highspeed, M2
+- Fixed model naming: `M2.5-Lightning` → `M2.5-Highspeed` (official naming)
+- Fixed API endpoint: `https://api.minimax.io/v1` → `https://api.minimax.io/anthropic` (Anthropic-compatible mode)
+- Corrected context window size in descriptions: 1M → 200K
+
+### Changed
+
+#### Model Presets Cleanup (模型预设修正)
+- All GLM/Minimax models now have accurate context window sizes in descriptions
+- Minimax API endpoint updated to Anthropic-compatible mode for better compatibility
+
+## [1.4.9.2] - 2026-05-16
+
+### Added
+
+#### MCP Preset Servers (MCP 预设服务器)
+- Added 10 MCP server presets: filesystem, github, postgres, sqlite, brave-search, slack, memory, google-maps, sentry, aws-kb
+- MCP server configuration UI with expandable OAuth settings panel
+- Client ID/Secret, Auth URL, Token URL, and Scopes configuration support
+
+#### IM Channel Test Integration (IM 渠道测试集成)
+- Added test functionality for all 5 IM channels: Feishu, Slack, Telegram, WeCom, DingTalk
+- Channel test API endpoints in backend
+- UI in channels-admin-page.tsx with test button and result display
+
+#### Model Presets Enhancement (模型预设增强)
+- Added 10 model providers with 40+ model presets:
+  - **OpenAI**: GPT-4.1, GPT-4.1 Mini, o3, o3-mini, o4-mini, o1-mini
+  - **Anthropic**: Claude Opus 4.7, Claude Sonnet 4.6, Claude 3.5 Sonnet, Claude 3.5 Haiku
+  - **Google**: Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash
+  - **DeepSeek**: V4 Pro, V4 Flash, R1, R1-0528
+  - **Groq**: Llama 4 Scout, Llama 4 Maverick, Llama 3.3 70B, Qwen3 32B
+  - **xAI**: Grok 4.3, Grok 3
+  - **Cohere**: Command A, Command R+, Command R7B
+  - **GLM**: GLM-5.1, GLM-5, GLM-4.7, GLM-4.7-FlashX, GLM-5V-Turbo, GLM-4.6V
+  - **Minimax**: M2.7, M2.7-Highspeed, M2.5, M2.5-Lightning
+  - **Qwen**: Qwen3-Max, Qwen3.5-Plus, Qwen3.5-Flash, Qwen-VL-Max, QVQ-Max
+- Model import UI in Admin panel with provider filtering
+- Updated config.example.yaml with comprehensive model configuration examples
+
+### Changed
+
+#### Config.example.yaml Update (配置文件更新)
+- Added MODEL PRESETS REFERENCE section at top of models configuration
+- Added example configurations for all 10 providers
+- Improved documentation with provider-specific settings
+
 ## [1.4.9.1] - 2026-05-16
 
 ### Fixed
