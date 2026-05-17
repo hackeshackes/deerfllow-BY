@@ -49,6 +49,7 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 | **登录 Session 修复** | ❌ | ✅ **v1.4.9.1 新增** |
 | **MCP 预设 + OAuth + IM 测试** | ❌ | ✅ **v1.4.9.2 新增** |
 | **模型预设增强 (10家 40+模型)** | ❌ | ✅ **v1.4.9.2 新增** |
+| **GLM/Minimax 模型扩展 (21家 60+模型)** | ❌ | ✅ **v1.4.9.3 新增** |
 
 ---
 
