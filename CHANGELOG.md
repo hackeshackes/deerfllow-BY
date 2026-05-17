@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.9.3] - 2026-05-17
+
+### Added
+
+#### GLM (智谱AI) Model Expansion (GLM 模型扩展)
+- Expanded from 6 to 13 GLM models:
+  - **Text Models**: GLM-5.1, GLM-5, GLM-5-Turbo, GLM-4.7, GLM-4.6, GLM-4.7-FlashX, GLM-4.5-Air, GLM-4.5-AirX, GLM-4.7-Flash (free)
+  - **Vision Models**: GLM-5V-Turbo, GLM-4.6V, GLM-4.6V-FlashX, GLM-4.6V-Flash (free)
+- Updated model descriptions with context window sizes (200K/128K)
+- Added GLM-5-Turbo (OpenClaw optimized for agentic workflows)
+
+#### Minimax (小米) Model Expansion (Minimax 模型扩展)
+- Expanded from 4 to 8 Minimax models:
+  - **Flagship**: M2.7, M2.7-Highspeed, M2.5, M2.5-Highspeed
+  - **Special**: M2-her (role-play/multi-turn conversations)
+  - **Legacy**: M2.1, M2.1-Highspeed, M2
+- Fixed model naming: `M2.5-Lightning` → `M2.5-Highspeed` (official naming)
+- Fixed API endpoint: `https://api.minimax.io/v1` → `https://api.minimax.io/anthropic` (Anthropic-compatible mode)
+- Corrected context window size in descriptions: 1M → 200K
+
+### Changed
+
+#### Model Presets Cleanup (模型预设修正)
+- All GLM/Minimax models now have accurate context window sizes in descriptions
+- Minimax API endpoint updated to Anthropic-compatible mode for better compatibility
+
 ## [1.4.9.2] - 2026-05-16
 
 ### Added
