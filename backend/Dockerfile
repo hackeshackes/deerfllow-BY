@@ -85,6 +85,9 @@ WORKDIR /app
 # Copy backend with pre-built virtualenv from builder
 COPY --from=builder /app/backend ./backend
 
+# Pre-download faster-whisper models for STT
+RUN cd backend && UV_INDEX_URL=${UV_INDEX_URL:-https://pypi.org/simple} uv run python -c "from faster_whisper import WhisperModel; print('Downloading whisper small model...'); WhisperModel('small', device='cpu', compute_type='int8'); print('Model download complete')"
+
 # Expose ports (gateway: 8001, langgraph: 2024)
 EXPOSE 8001 2024
 

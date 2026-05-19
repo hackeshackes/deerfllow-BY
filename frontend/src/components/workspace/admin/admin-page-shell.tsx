@@ -1,6 +1,6 @@
 "use client";
 
-import { ActivityIcon, BlocksIcon, BookOpenIcon, BrainIcon, CoinsIcon, LayoutDashboardIcon, MessageCircleIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
+import { ActivityIcon, BlocksIcon, BookOpenIcon, BrainIcon, CoinsIcon, LayoutDashboardIcon, MessageCircleIcon, MicIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -22,6 +22,7 @@ const adminLinks = [
   { href: "/workspace/admin/conversations", label: "会话管理", icon: MessageCircleIcon },
   { href: "/workspace/admin/knowledge", label: "知识库管理", icon: BookOpenIcon },
   { href: "/workspace/admin/memory", label: "记忆管理", icon: BrainIcon },
+  { href: "/workspace/admin/voice", label: "语音配置", icon: MicIcon },
 ] as const;
 
 export function AdminPageShell({

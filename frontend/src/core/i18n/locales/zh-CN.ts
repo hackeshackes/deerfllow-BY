@@ -576,4 +576,13 @@ export const zhCN: Translations = {
       emptyDescription: "相关的致谢信息会展示在这里。",
     },
   },
+
+  voice: {
+    startRecording: "开始录音",
+    stopRecording: "停止录音",
+    microphoneAccessFailed: "无法访问麦克风，请检查权限设置",
+    transcriptionFailed: "语音转文字失败，请重试",
+    noSpeechDetected: "未检测到语音内容",
+    playAudio: "播放语音",
+  },
 };

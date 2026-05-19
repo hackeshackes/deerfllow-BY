@@ -514,4 +514,14 @@ export interface Translations {
       emptyDescription: string;
     };
   };
+
+  // Voice
+  voice: {
+    startRecording: string;
+    stopRecording: string;
+    microphoneAccessFailed: string;
+    transcriptionFailed: string;
+    noSpeechDetected: string;
+    playAudio: string;
+  };
 }

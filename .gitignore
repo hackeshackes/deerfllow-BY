@@ -64,3 +64,5 @@ config.yaml.bak
 .playwright-mcp
 .gstack/
 .worktrees
+skills/ppt-master/
+frontend/src/lib/api/

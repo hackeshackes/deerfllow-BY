@@ -595,4 +595,13 @@ export const enUS: Translations = {
       emptyDescription: "Credits and acknowledgements will show here.",
     },
   },
+
+  voice: {
+    startRecording: "Start recording",
+    stopRecording: "Stop recording",
+    microphoneAccessFailed: "Cannot access microphone, please check permissions",
+    transcriptionFailed: "Speech to text failed, please retry",
+    noSpeechDetected: "No speech content detected",
+    playAudio: "Play audio",
+  },
 };

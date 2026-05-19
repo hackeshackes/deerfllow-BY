@@ -18,4 +18,5 @@ __all__ = [
     "tasks",
     "uploads",
     "user_skills",
+    "voice",
 ]

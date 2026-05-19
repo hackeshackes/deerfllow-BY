@@ -82,6 +82,7 @@ import {
 import { useThread } from "./messages/context";
 import { ModeHoverGuide } from "./mode-hover-guide";
 import { Tooltip } from "./tooltip";
+import { VoiceInput } from "./voice-input";
 
 type InputMode = "flash" | "thinking" | "pro" | "ultra";
 
@@ -520,6 +521,22 @@ export function InputBox({
             </PromptInputActionMenuContent>
           </PromptInputActionMenu> */}
             <AddAttachmentsButton className="px-2!" />
+            <VoiceInput
+              className="px-2!"
+              onTranscriptionChange={(text) => {
+                const textarea = document.querySelector<HTMLTextAreaElement>(
+                  "textarea[name='message']",
+                );
+                if (textarea) {
+                  const currentValue = textarea.value;
+                  const newValue =
+                    currentValue + (currentValue ? " " : "") + text;
+                  textarea.value = newValue;
+                  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+                  textarea.focus();
+                }
+              }}
+            />
             <PromptInputActionMenu>
               <ModeHoverGuide
                 mode={
