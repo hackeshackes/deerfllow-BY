@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_thread_visibility(value: str | None) -> str:
-    if value == THREAD_VISIBILITY_PRIVATE:
-        return THREAD_VISIBILITY_PRIVATE
-    return THREAD_VISIBILITY_WORKSPACE
+    if value == THREAD_VISIBILITY_WORKSPACE:
+        return THREAD_VISIBILITY_WORKSPACE
+    return THREAD_VISIBILITY_PRIVATE
 
 
 def get_thread_visibility(record: dict | None) -> str:

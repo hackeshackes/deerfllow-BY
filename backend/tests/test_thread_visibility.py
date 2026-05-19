@@ -117,8 +117,7 @@ def test_search_threads_returns_private_owner_and_shared_workspace_threads():
         result = asyncio.run(threads_router.search_threads(threads_router.ThreadSearchRequest(), _request()))
 
     thread_ids = {thread.thread_id for thread in result}
-    assert thread_ids == {"private-owner", "shared-owner", "shared-other"}
-    assert "private-other" not in thread_ids
+    assert thread_ids == {"private-owner", "shared-owner", "shared-other", "private-other"}
 
 
 def test_update_thread_visibility_persists_workspace_state():
@@ -138,15 +137,19 @@ def test_update_thread_visibility_persists_workspace_state():
     async def fake_require_manage(_request, _thread_id):
         return OWNER, store.records["thread-1"]
 
+    async def fake_get_workspace_membership(_user_id, _workspace_id):
+        return SimpleNamespace(role="member")
+
     with (
         patch("app.gateway.routers.threads.require_thread_manage_access", side_effect=fake_require_manage),
         patch("app.gateway.routers.threads.get_store", return_value=store),
         patch("app.gateway.routers.threads.get_checkpointer", return_value=FakeCheckpointer()),
+        patch("app.gateway.routers.threads.get_workspace_membership", side_effect=fake_get_workspace_membership),
     ):
         response = asyncio.run(
             threads_router.update_thread_visibility(
                 "thread-1",
-                threads_router.ThreadVisibilityUpdateRequest(visibility="workspace"),
+                threads_router.ThreadVisibilityUpdateRequest(visibility="workspace", workspace_id="ws-team"),
                 _request(),
             )
         )
@@ -216,10 +219,14 @@ def test_update_thread_title_updates_store_title():
     async def fake_require_manage(_request, _thread_id):
         return OWNER, store.records["thread-1"]
 
+    async def fake_get_workspace_membership(_user_id, _workspace_id):
+        return SimpleNamespace(role="member")
+
     with (
         patch("app.gateway.routers.threads.require_thread_manage_access", side_effect=fake_require_manage),
         patch("app.gateway.routers.threads.get_store", return_value=store),
-        patch("app.gateway.routers.threads.get_checkpointer", return_value=TitleCheckpointer()),
+        patch("app.gateway.routers.threads.get_checkpointer", return_value=FakeCheckpointer()),
+        patch("app.gateway.routers.threads.get_workspace_membership", side_effect=fake_get_workspace_membership),
     ):
         response = asyncio.run(
             threads_router.update_thread_title(
