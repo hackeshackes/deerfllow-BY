@@ -25,6 +25,16 @@
 
 services:
   # ── Reverse Proxy ──────────────────────────────────────────────────────────
+  # Nginx is the entry point for all HTTP traffic. It routes requests to
+  # backend services and serves static assets from the frontend.
+  #
+  # The port mapping `${PORT:-2026}` can be overridden via the PORT
+  # environment variable (e.g., `PORT=2027 make up` or in .env).
+  #
+  # Nginx depends on both frontend and gateway services and waits for them
+  # before starting. This ensures that when nginx starts, the backend
+  # services are at least in a "started" state, reducing the chance that
+  # nginx fails to resolve or connect to upstreams.
   nginx:
     image: nginx:alpine
     container_name: deer-flow-nginx
@@ -40,13 +50,19 @@ services:
       < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
       && nginx -g 'daemon off;'"
     depends_on:
-      - frontend
-      - gateway
+      frontend:
+        condition: service_started
+      gateway:
+        condition: service_started
     networks:
       - deer-flow
     restart: unless-stopped
 
   # ── Frontend: Next.js Production ───────────────────────────────────────────
+  # The frontend (Next.js production server) is the client-facing
+  # React application. It is built using a multi-stage Dockerfile that
+  # produces a minimal production image. Configuration comes from the
+  # node:22 image.
   frontend:
     build:
       context: ../
@@ -71,6 +87,37 @@ services:
     restart: unless-stopped
 
   # ── Gateway API ────────────────────────────────────────────────────────────
+  # The Gateway is the main backend API service written in Python/FastAPI.
+  #
+  # Command:
+  #   sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers ${GATEWAY_WORKERS:-4}"
+  #
+  # The command runs uvicorn with 4 workers by default (configurable via
+  # GATEWAY_WORKERS). The PYTHONPATH=. ensures the 'app' module is
+  # importable from the backend directory.
+  #
+  # Volume mappings:
+  #   - Config files (read‑only): 
+  #       • ${DEER_FLOW_CONFIG_PATH} /config.yaml
+  #       • ${DEER_FLOW_EXTENSIONS_CONFIG_PATH} /extensions_config.json
+  #   - Skills directory (read‑only): ../skills
+  #   - Runtime data: ${DEER_FLOW_HOME} → /app/backend/.deer-flow
+  #   - Docker socket: ${DEER_FLOW_DOCKER_SOCKET} → /var/run/docker.sock
+  #       for the DooD (Docker‑in‑Docker) SandboxProvider.
+  #   - CLI auth directories:
+  #       • $HOME/.claude → /root/.claude
+  #       • $HOME/.codex → /root/.codex
+  #       These allow the gateway to auto‑authenticate Claude Code and
+  #       Codex CLI tools when invoked from sandbox containers.
+  #
+  # Environment variables: 
+  #   The gateway uses several internal base URLs for service-to-service
+  #   communication:
+  #     • DEER_FLOW_CHANNELS_LANGGRAPH_URL
+  #     • DEER_FLOW_CHANNELS_GATEWAY_URL
+  #     • DEER_FLOW_HOST_BASE_DIR
+  #     • DEER_FLOW_HOST_SKILLS_PATH
+  #     • DEER_FLOW_SANDBOX_HOST
   gateway:
     build:
       context: ../
@@ -126,8 +173,17 @@ services:
     restart: unless-stopped
 
   # ── LangGraph Server ───────────────────────────────────────────────────────
-  # TODO: switch to langchain/langgraph-api (licensed) once a license key is available.
-  # For now, use `langgraph dev` (no license required) with the standard backend image.
+  # LangGraph orchestrates the AI agents. It runs `langgraph dev` with the
+  # following defaults: no auto‑browser, no reload, host 0.0.0.0, port 2024,
+  # and 10 jobs per worker.
+  #
+  # If $${LANGGRAPH_ALLOW_BLOCKING:-0} = "1", the `--allow-blocking` flag
+  # is passed, enabling blocking mode."`
+  #
+  # Note (optional license feature):
+  #   TODO: switch to langchain/langgraph-api (licensed) once a license key
+  #   is available. For now, use `langgraph dev` (no license required) with
+  #   the standard backend image.
   langgraph:
     build:
       context: ../
@@ -181,6 +237,14 @@ services:
     restart: unless-stopped
 
   # ── Sandbox Provisioner (optional, Kubernetes mode) ────────────────────────
+  # Provisioner is an optional Kubernetes dockergate for beyond "dooD" (Docker-in-Docker) mode.
+  # It requires a kubeconfig at ~/.kube/config.
+  #
+  # Healthcheck:
+  #   The provisioner includes a healthcheck that periodically pings the
+  #   /health endpoint. `-f` causes curl to fail on HTTP errors (4xx/5xx),
+  #   ensuring a proper HTTP 200 response. Intervals, timeouts, and retries
+  #   are tuned for fast detection of unresponsiveness.
   provisioner:
     build:
       context: ./provisioner

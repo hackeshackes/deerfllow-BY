@@ -27,10 +27,42 @@ def _build_content_disposition(disposition_type: str, filename: str) -> str:
     return f"{disposition_type}; filename*=UTF-8''{quote(filename)}"
 
 
-def _build_attachment_headers(filename: str, extra_headers: dict[str, str] | None = None) -> dict[str, str]:
-    headers = {"Content-Disposition": _build_content_disposition("attachment", filename)}
+def _build_attachment_headers(
+    filename: str,
+    extra_headers: dict[str, str] | None = None,
+    inline: bool = False,
+) -> dict[str, str]:
+    """Build headers for file response.
+
+    Args:
+        filename: The name of the file.
+        extra_headers: Optional additional headers.
+        inline: If True, use 'inline' disposition; otherwise use 'attachment'.
+
+    Returns:
+        Dictionary of headers.
+    """
+    disposition = "inline" if inline else "attachment"
+    headers = {"Content-Disposition": _build_content_disposition(disposition, filename)}
+
+    # Force download for active content types (HTML, SVG, etc.)
+    if disposition == "inline" and extra_headers:
+        mime_type = extra_headers.get("Content-Type", "")
+        if mime_type in ACTIVE_CONTENT_MIME_TYPES:
+            headers = {"Content-Disposition": _build_content_disposition("attachment", filename)}
+            extra_headers.pop("Content-Type", None)
+
     if extra_headers:
         headers.update(extra_headers)
+
+    # Ensure proper filename handling
+    cd = headers.get("Content-Disposition", "")
+    if disposition == "attachment":
+        if "filename=" not in cd:
+            headers["Content-Disposition"] = f'{cd}; filename="{filename}"'
+        if "filename*=" not in cd:
+            headers["Content-Disposition"] = f'{cd}; filename*=UTF-8\'\'{quote(filename)}'
+
     return headers
 
 
