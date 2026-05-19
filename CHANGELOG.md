@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-05-19
+
+### Added
+
+#### 语音转文字 (STT) 功能
+- 内置 faster-whisper 语音识别引擎，完全离线处理
+- 支持中文、英文等多语言识别
+- 管理员可配置模型大小（小/中/大）
+- 隐私安全，录音数据不上传第三方
+
+#### Admin 模型配置
+- STT 模型大小配置开关（小/中/大）
+- 根据服务器资源选择合适的模型规格
+
+### Fixed
+
+#### 对话可见性修复
+- 修复 `normalize_thread_visibility()` 默认值为 PRIVATE
+- 解决新创建对话在列表中不可见的问题
+- 测试用例已更新并全部通过
+
 ## [1.4.9.3] - 2026-05-17
 
 ### Added
