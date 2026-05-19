@@ -36,6 +36,7 @@ from app.gateway.routers import (
     uploads,
     user_skills,
     users,
+    voice,
 )
 from deerflow.config.app_config import get_app_config
 
@@ -294,6 +295,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Channels API is mounted at /api/channels
     app.include_router(channels.router)
+
+    # Voice API is mounted at /api/voice (STT/TTS)
+    app.include_router(voice.router)
 
     # Assistants compatibility API (LangGraph Platform stub)
     app.include_router(assistants_compat.router)

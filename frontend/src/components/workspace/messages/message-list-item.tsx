@@ -31,6 +31,7 @@ import { humanMessagePlugins } from "@/core/streamdown";
 import { cn } from "@/lib/utils";
 
 import { CopyButton } from "../copy-button";
+import { TTSPlayer } from "../tts-player";
 
 import { MarkdownContent } from "./markdown-content";
 
@@ -65,6 +66,15 @@ export function MessageListItem({
           )}
         >
           <div className="flex gap-1">
+            {!isHuman && (
+              <TTSPlayer
+                text={
+                  extractContentFromMessage(message) ??
+                  extractReasoningContentFromMessage(message) ??
+                  ""
+                }
+              />
+            )}
             <CopyButton
               clipboardData={
                 extractContentFromMessage(message) ??
