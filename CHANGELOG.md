@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-05-26
+
+### Added
+
+#### 知识库搜索增强 (RAG)
+- 知识库搜索功能持续开发中
+- 为后续 RAG 增强打下基础
+
+#### Artifacts .skill 档案支持
+- 新增从 .skill 压缩包中提取内部文件的功能
+- 支持路径格式: `xxx.skill/SKILL.md`
+- 增强 Content-Disposition 头部处理
+- 5 分钟缓存头避免重复 ZIP 解压
+
+### Changed
+
+#### Docker 配置优化
+- CLI auth 目录绑定 (`~/.claude`, `~/.codex`)
+- 环境变量整理和路径规范化
+- 新增 healthcheck 注释
+
+### Fixed
+
+#### 模型加载稳定性修复
+- 修复 LangGraph 多 worker 场景下模型配置缓存初始化时序问题
+- 症状: 首个请求报错 "No chat model could be resolved"
+- 解决: 重启 LangGraph 服务后配置正确加载
+
+#### 对话可见性修复
+- 修复 `normalize_thread_visibility()` 默认值为 PRIVATE
+- 解决新创建对话在列表中不可见的问题
+- 测试用例已更新并全部通过
+
 ## [1.5.0] - 2026-05-19
 
 ### Added
