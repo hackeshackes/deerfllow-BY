@@ -16,10 +16,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { buildSupportMailto } from "@/core/brand/config";
+import { useI18n } from "@/core/i18n/hooks";
 
 export default function SignInPage() {
   const brand = useBrand();
   const router = useRouter();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +45,14 @@ export default function SignInPage() {
         const body = (await response.json().catch(() => null)) as
           | { message?: string; detail?: string }
           | null;
-        setError(body?.detail ?? body?.message ?? "登录失败，请稍后重试。");
+        setError(t.signIn.loginFailed);
         return;
       }
 
       router.replace("/workspace/chats/new");
       router.refresh();
     } catch {
-      setError("无法连接登录服务，请稍后重试。");
+      setError(t.signIn.connectionFailed);
     } finally {
       setLoading(false);
     }
@@ -92,15 +94,17 @@ export default function SignInPage() {
 
         <Card className="border-white/10 bg-white/95 py-0 text-slate-900 shadow-2xl shadow-black/20 backdrop-blur-xl">
             <CardHeader className="gap-3 border-b border-slate-200/80 py-8">
-              <CardTitle className="text-2xl">欢迎回来</CardTitle>
+              <CardTitle className="text-2xl">
+                {brand.loginTitle.replace("{name}", brand.name)}
+              </CardTitle>
               <CardDescription>
-              使用你的 {brand.name} 账号进入工作台。
+                {brand.loginSubtitle.replace("{name}", brand.name)}
               </CardDescription>
             </CardHeader>
           <CardContent className="space-y-6 py-8">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
-                <label className="text-sm font-medium">邮箱</label>
+                <label className="text-sm font-medium">{t.signIn.email}</label>
                 <Input
                   autoComplete="email"
                   inputMode="email"
@@ -112,13 +116,13 @@ export default function SignInPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">密码</label>
+                <label className="text-sm font-medium">{t.signIn.password}</label>
                 <Input
                   autoComplete="current-password"
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="请输入账号密码"
+                  placeholder={t.signIn.passwordPlaceholder}
                   required
                 />
               </div>
@@ -131,20 +135,20 @@ export default function SignInPage() {
               )}
 
               <Button className="h-11 w-full rounded-xl" disabled={loading}>
-                {loading ? "登录中..." : "登录"}
+                {loading ? t.signIn.loggingIn : t.signIn.login}
                 {!loading && <ArrowRightIcon className="size-4" />}
               </Button>
             </form>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              如需帮助，请联系{" "}
+              {t.signIn.helpText}{" "}
               <a
                 className="font-medium text-slate-900 underline"
                   href={buildSupportMailto(brand.supportEmail, `${brand.name} access request`)}
               >
                 {brand.supportEmail}
               </a>
-              。如果你已经收到邀请，请先通过激活链接完成账号设置。
+              . {t.signIn.inviteHint}
             </div>
           </CardContent>
         </Card>

@@ -81,10 +81,10 @@ function sourceOfThread(thread: AgentThread): ThreadSource {
   return "manual";
 }
 
-function sourceLabelOfThread(thread: AgentThread): string | null {
+function sourceLabelOfThread(thread: AgentThread, t?: ReturnType<typeof useI18n>["t"]): string | null {
   const source = sourceOfThread(thread);
-  if (source === "automation") return "自动化";
-  if (source === "channel") return readMetadataString(thread, "channel") ?? "外部渠道";
+  if (source === "automation") return t?.conversation.automationResults ?? "Automation Results";
+  if (source === "channel") return readMetadataString(thread, "channel") ?? t?.conversation.externalChannel ?? "External Channel";
   return null;
 }
 
@@ -174,19 +174,19 @@ export function RecentChatList() {
   );
 
   const handleShareSuccess = useCallback(() => {
-    toast.success("已分享到工作区");
-  }, []);
+    toast.success(t.conversation.sharedToWorkspace);
+  }, [t]);
 
   const handleMakePrivate = useCallback(
     async (threadId: string) => {
       try {
         await updateThreadVisibility({ threadId, visibility: "private" });
-        toast.success("已切换为私有对话");
+        toast.success(t.conversation.switchedToPrivate);
       } catch {
-        toast.error("切换私有失败");
+        toast.error(t.conversation.switchToPrivateFailed);
       }
     },
-    [updateThreadVisibility],
+    [updateThreadVisibility, t],
   );
 
   const handleExport = useCallback(
@@ -230,9 +230,9 @@ export function RecentChatList() {
     (thread) => sourceOfThread(thread) === "channel",
   );
   const sections = [
-    { title: "最近继续", threads: manualThreads },
-    { title: "自动化结果", threads: automationThreads },
-    { title: "外部渠道", threads: channelThreads },
+    { title: t.conversation.recentContinue, threads: manualThreads },
+    { title: t.conversation.automationResults, threads: automationThreads },
+    { title: t.conversation.externalChannel, threads: channelThreads },
   ].filter((section) => section.threads.length > 0);
 
   return (
@@ -257,7 +257,7 @@ export function RecentChatList() {
                 const visibility = (thread.metadata?.visibility as string | undefined) === "private" ? "private" : "workspace";
                 const isThreadOwner = thread.metadata?.owner_user_id === sessionUserId;
                 const workspaceId = typeof thread.metadata?.workspace_id === "string" ? thread.metadata.workspace_id : "";
-                const sourceLabel = sourceLabelOfThread(thread);
+                const sourceLabel = sourceLabelOfThread(thread, t);
                 return (
                   <SidebarMenuItem
                     key={thread.thread_id}
@@ -274,7 +274,7 @@ export function RecentChatList() {
                         </Link>
                         <span className="inline-flex shrink-0 items-center gap-1">
                           <Badge variant={visibility === "private" ? "outline" : "default"} className="text-[10px]">
-                            {visibility === "private" ? "私有" : "已共享"}
+                            {visibility === "private" ? t.conversation.private : t.conversation.shared}
                           </Badge>
                           {sourceLabel && (
                             <Badge variant="secondary" className="text-[10px]">
@@ -283,7 +283,7 @@ export function RecentChatList() {
                           )}
                           {!sourceLabel && isWorkspaceThread(thread) && !isThreadOwner && (
                             <Badge variant="secondary" className="text-[10px]">
-                              团队
+                              {t.conversation.team}
                             </Badge>
                           )}
                         </span>
@@ -319,14 +319,14 @@ export function RecentChatList() {
                                 onSelect={() => handleShareClick(thread.thread_id, titleOfThread(thread), workspaceId)}
                               >
                                 <Share2 className="text-muted-foreground" />
-                                <span>共享到工作区</span>
+                                <span>{t.conversation.shareToWorkspace}</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => handleMakePrivate(thread.thread_id)}
                                 disabled={visibility === "private"}
                               >
                                 <Share2 className="text-muted-foreground" />
-                                <span>设为私有</span>
+                                <span>{t.conversation.setToPrivate}</span>
                               </DropdownMenuItem>
                               <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>

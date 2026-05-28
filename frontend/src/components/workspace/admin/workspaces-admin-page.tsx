@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 
 import { AdminPageShell } from "./admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 type WorkspaceRecord = {
   id: string;
@@ -35,6 +36,7 @@ type UserRecord = {
 };
 
 export function WorkspacesAdminPage() {
+  const { t } = useI18n();
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [sessionRole, setSessionRole] = useState<"owner" | "member">("member");
@@ -59,7 +61,7 @@ export function WorkspacesAdminPage() {
         fetch("/api/session/me"),
       ]);
       if (!workspacesResponse.ok || !usersResponse.ok || !sessionResponse.ok) {
-        throw new Error("加载空间数据失败");
+        throw new Error(t.admin.workspaces.loadFailed);
       }
       const workspacesPayload = (await workspacesResponse.json()) as {
         workspaces: WorkspaceRecord[];
@@ -75,13 +77,13 @@ export function WorkspacesAdminPage() {
       setSelectedUserId(usersPayload.users.find((user) => user.id !== "owner")?.id ?? "");
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载空间数据失败");
+      setError(err instanceof Error ? err.message : t.admin.workspaces.loadFailed);
     }
   }
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [t.admin.workspaces.loadFailed]);
 
   async function createWorkspace(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,11 +96,11 @@ export function WorkspacesAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "创建空间失败");
+      setError(body?.detail ?? t.admin.workspaces.createWorkspaceFailed);
       return;
     }
     setName("");
-    setStatusMessage("共享空间已创建");
+    setStatusMessage(t.admin.workspaces.workspaceCreated);
     await loadData();
   }
 
@@ -113,10 +115,10 @@ export function WorkspacesAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "添加成员失败");
+      setError(body?.detail ?? t.admin.workspaces.addMemberFailed);
       return;
     }
-    setStatusMessage("成员已加入共享空间");
+    setStatusMessage(t.admin.workspaces.memberAddedToWorkspace);
     await loadData();
   }
 
@@ -130,42 +132,42 @@ export function WorkspacesAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "更新空间失败");
+      setError(body?.detail ?? t.admin.workspaces.updateWorkspaceFailed);
       return;
     }
     setEditingWorkspaceId(null);
     setEditingWorkspaceName("");
-    setStatusMessage("空间名称已更新");
+    setStatusMessage(t.admin.workspaces.workspaceNameUpdated);
     await loadData();
   }
 
   async function deleteWorkspace(workspace: WorkspaceRecord) {
     setError(null);
     setStatusMessage(null);
-    const confirmed = window.confirm(`确认删除共享空间 ${workspace.name} 吗？该空间下的线程、文件和成员关系将一并移除。`);
+    const confirmed = window.confirm(t.admin.workspaces.confirmDeleteWorkspace.replace("{name}", workspace.name));
     if (!confirmed) return;
     const response = await fetch(`/api/workspaces/${workspace.id}`, { method: "DELETE" });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "删除空间失败");
+      setError(body?.detail ?? t.admin.workspaces.deleteWorkspaceFailed);
       return;
     }
-    setStatusMessage(`空间 ${workspace.name} 已删除`);
+    setStatusMessage(t.admin.workspaces.workspaceDeleted.replace("{name}", workspace.name));
     await loadData();
   }
 
   async function removeMember(workspace: WorkspaceRecord, user: WorkspaceMemberRecord) {
     setError(null);
     setStatusMessage(null);
-    const confirmed = window.confirm(`确认将 ${user.name}（${user.email}）移出空间 ${workspace.name} 吗？`);
+    const confirmed = window.confirm(t.admin.workspaces.confirmRemoveMember.replace("{name}", user.name).replace("{email}", user.email).replace("{workspace}", workspace.name));
     if (!confirmed) return;
     const response = await fetch(`/api/workspaces/${workspace.id}/members/${user.id}`, { method: "DELETE" });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "移除成员失败");
+      setError(body?.detail ?? t.admin.workspaces.removeMemberFailed);
       return;
     }
-    setStatusMessage(`已将 ${user.name} 移出空间 ${workspace.name}`);
+    setStatusMessage(t.admin.workspaces.memberRemovedFromWorkspace.replace("{name}", user.name).replace("{workspace}", workspace.name));
     await loadData();
   }
 
@@ -179,24 +181,30 @@ export function WorkspacesAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "更新成员角色失败");
+      setError(body?.detail ?? t.admin.workspaces.updateMemberRoleFailed);
       return;
     }
-    setStatusMessage(`已更新 ${user.name} 的空间角色`);
+    setStatusMessage(t.admin.workspaces.memberRoleUpdated.replace("{name}", user.name));
     await loadData();
   }
 
+  function getRoleLabel(role: string) {
+    if (role === "owner") return t.admin.workspaces.owner;
+    if (role === "admin") return t.admin.workspaces.admin;
+    return t.admin.workspaces.member;
+  }
+
   return (
-    <AdminPageShell title="空间管理" description="为团队创建共享空间，查看空间规模，并把成员加入对应的协作区域。">
+    <AdminPageShell title={t.admin.workspaces.title} description={t.admin.workspaces.description}>
       <Card>
         <CardHeader>
-          <CardTitle>空间管理</CardTitle>
-          <CardDescription>为团队创建共享空间，并把成员加入对应的协作区域。</CardDescription>
+          <CardTitle>{t.admin.workspaces.workspaceManagement}</CardTitle>
+          <CardDescription>{t.admin.workspaces.workspaceManagementDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form className="flex gap-3" onSubmit={createWorkspace}>
-            <Input placeholder="空间名称，例如 市场调研组" value={name} onChange={(event) => setName(event.target.value)} required />
-            <Button>创建共享空间</Button>
+            <Input placeholder={t.admin.workspaces.workspaceNamePlaceholder} value={name} onChange={(event) => setName(event.target.value)} required />
+            <Button>{t.admin.workspaces.createSharedWorkspace}</Button>
           </form>
 
           <form className="grid gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={addMember}>
@@ -214,7 +222,7 @@ export function WorkspacesAdminPage() {
                 </option>
               ))}
             </select>
-            <Button disabled={!selectedWorkspaceId || !selectedUserId}>添加成员</Button>
+            <Button disabled={!selectedWorkspaceId || !selectedUserId}>{t.admin.workspaces.addMember}</Button>
           </form>
 
           {error && <p className="text-sm text-rose-600">{error}</p>}
@@ -224,8 +232,8 @@ export function WorkspacesAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>空间概览</CardTitle>
-          <CardDescription>清晰区分个人空间与共享空间，帮助团队成员理解数据归属。</CardDescription>
+          <CardTitle>{t.admin.workspaces.workspaceOverview}</CardTitle>
+          <CardDescription>{t.admin.workspaces.workspaceOverviewDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           {workspaces.map((workspace) => (
@@ -235,29 +243,29 @@ export function WorkspacesAdminPage() {
                   {editingWorkspaceId === workspace.id ? (
                     <div className="flex items-center gap-2">
                       <Input value={editingWorkspaceName} onChange={(event) => setEditingWorkspaceName(event.target.value)} className="h-9 w-72" />
-                      <Button size="sm" onClick={() => void saveWorkspaceName(workspace.id)}>保存</Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingWorkspaceId(null)}>取消</Button>
+                      <Button size="sm" onClick={() => void saveWorkspaceName(workspace.id)}>{t.admin.workspaces.save}</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingWorkspaceId(null)}>{t.admin.workspaces.cancel}</Button>
                     </div>
                   ) : (
                     <div className="font-medium">{workspace.name}</div>
                   )}
                   <div className="text-muted-foreground mt-1">
-                    {workspace.default_personal ? "个人空间" : "共享空间"} · 你的身份：
-                    {workspace.role === "owner" ? "拥有者" : workspace.role === "admin" ? "管理员" : "成员"}
+                    {workspace.default_personal ? t.admin.workspaces.personalSpace : t.admin.workspaces.sharedSpace} · {t.admin.workspaces.yourRole}：
+                    {getRoleLabel(workspace.role)}
                   </div>
                 </div>
                 <div className="text-right text-sm text-slate-500">
-                  <div>{workspace.member_count} 名成员</div>
-                  <div>{workspace.thread_count ?? 0} 个线程 · {workspace.agent_count ?? 0} 个智能体</div>
-                  <div>{workspace.upload_file_count ?? 0} 个上传 · {workspace.artifact_file_count ?? 0} 个产物</div>
-                  <div>{workspace.default_personal ? "仅自己可见" : "空间成员可协作"}</div>
+                  <div>{workspace.member_count} {t.admin.workspaces.members}</div>
+                  <div>{workspace.thread_count ?? 0} {t.admin.workspaces.threads} · {workspace.agent_count ?? 0} {t.admin.workspaces.agents}</div>
+                  <div>{workspace.upload_file_count ?? 0} {t.admin.workspaces.uploads} · {workspace.artifact_file_count ?? 0} {t.admin.workspaces.artifacts}</div>
+                  <div>{workspace.default_personal ? t.admin.workspaces.onlyVisibleToYourself : t.admin.workspaces.workspaceMembersCanCollaborate}</div>
                   {!workspace.default_personal && sessionRole === "owner" && editingWorkspaceId !== workspace.id && (
                     <div className="mt-3 flex justify-end gap-2">
                       <Button size="sm" variant="outline" onClick={() => { setEditingWorkspaceId(workspace.id); setEditingWorkspaceName(workspace.name); }}>
-                        编辑空间
+                        {t.admin.workspaces.editWorkspace}
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => void deleteWorkspace(workspace)}>
-                        删除空间
+                        {t.admin.workspaces.deleteWorkspace}
                       </Button>
                     </div>
                   )}
@@ -265,13 +273,13 @@ export function WorkspacesAdminPage() {
               </div>
               {!workspace.default_personal && (workspace.members?.length ?? 0) > 0 && (
                 <div className="mt-4 rounded-2xl border bg-slate-50/60 p-3">
-                  <div className="mb-2 text-sm font-medium text-slate-700">空间成员</div>
+                  <div className="mb-2 text-sm font-medium text-slate-700">{t.admin.workspaces.workspaceMembersCanCollaborate}</div>
                   <div className="space-y-2">
                     {workspace.members?.map((member) => (
                       <div key={member.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm">
                         <div>
                           <div className="font-medium">{member.name}</div>
-                          <div className="text-slate-500">{member.email} · {member.role}</div>
+                          <div className="text-slate-500">{member.email} · {getRoleLabel(member.role)}</div>
                         </div>
                         {sessionRole === "owner" && member.role !== "owner" && (
                           <div className="flex items-center gap-2">
@@ -280,11 +288,11 @@ export function WorkspacesAdminPage() {
                               value={member.role}
                               onChange={(event) => void updateMemberRole(workspace, member, event.target.value)}
                             >
-                              <option value="member">member</option>
-                              <option value="admin">admin</option>
+                              <option value="member">{t.admin.workspaces.member}</option>
+                              <option value="admin">{t.admin.workspaces.admin}</option>
                             </select>
                             <Button size="sm" variant="outline" onClick={() => void removeMember(workspace, member)}>
-                              移除成员
+                              {t.admin.workspaces.removeMember}
                             </Button>
                           </div>
                         )}

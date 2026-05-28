@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 import { AdminPageShell } from "./admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 function emitBrandUpdate(branding: AdminConfig["branding"]) {
   if (typeof window === "undefined") {
@@ -164,6 +165,7 @@ type AdminConfig = {
 };
 
 export function ConfigAdminPage() {
+  const { t } = useI18n();
   const [form, setForm] = useState<AdminConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,14 +175,14 @@ export function ConfigAdminPage() {
     async function load() {
       try {
         const response = await fetch("/api/admin/config");
-        if (!response.ok) throw new Error("加载配置失败");
+        if (!response.ok) throw new Error(t.admin.config.loadFailed);
         setForm((await response.json()) as AdminConfig);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "加载配置失败");
+        setError(err instanceof Error ? err.message : t.admin.config.loadFailed);
       }
     }
     void load();
-  }, []);
+  }, [t.admin.config.loadFailed]);
 
   async function save() {
     if (!form) return;
@@ -195,14 +197,14 @@ export function ConfigAdminPage() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(body?.detail ?? "保存配置失败");
+        throw new Error(body?.detail ?? t.admin.config.loadFailed);
       }
       const nextForm = (await response.json()) as AdminConfig;
       setForm(nextForm);
       emitBrandUpdate(nextForm.branding);
-      setMessage("系统配置已保存。");
+      setMessage(t.admin.config.configSaved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存配置失败");
+      setError(err instanceof Error ? err.message : t.admin.config.loadFailed);
     } finally {
       setSaving(false);
     }
@@ -210,29 +212,29 @@ export function ConfigAdminPage() {
 
   if (!form) {
     return (
-      <AdminPageShell title="配置中心" description="集中管理 MicX 的系统级配置、追踪配置和品牌配置。">
-        <p className="text-sm text-slate-500">正在加载配置...</p>
+      <AdminPageShell title={t.admin.config.title} description={t.admin.config.description}>
+        <p className="text-sm text-slate-500">{t.admin.config.loading}</p>
       </AdminPageShell>
     );
   }
 
   return (
-    <AdminPageShell title="配置中心" description="支持 owner 在后台统一管理系统配置、Tracing 密钥及 MicX 品牌信息。">
+    <AdminPageShell title={t.admin.config.title} description={t.admin.config.description}>
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>系统配置</CardTitle>
-            <CardDescription>控制日志等级和 Token 用量统计。</CardDescription>
+            <CardTitle>{t.admin.config.systemConfig}</CardTitle>
+            <CardDescription>{t.admin.config.tokenUsageDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <div className="text-sm font-medium">日志等级</div>
+              <div className="text-sm font-medium">{t.admin.config.logLevel}</div>
               <Input value={form.system.log_level ?? ""} onChange={(event) => setForm((current) => current ? { ...current, system: { ...current.system, log_level: event.target.value } } : current)} />
             </div>
             <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
               <div>
-                <div className="font-medium">启用 Token Usage</div>
-                <div className="text-sm text-slate-500">用于记录模型调用的 token 使用情况。</div>
+                <div className="font-medium">{t.admin.config.enableTokenUsage}</div>
+                <div className="text-sm text-slate-500">{t.admin.config.tokenUsageDescription}</div>
               </div>
               <Switch checked={Boolean(form.system.token_usage_enabled)} onCheckedChange={(checked) => setForm((current) => current ? { ...current, system: { ...current.system, token_usage_enabled: checked } } : current)} />
             </div>
@@ -241,109 +243,109 @@ export function ConfigAdminPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>MicX 品牌配置</CardTitle>
-            <CardDescription>配置产品名称、简介和联系信息。</CardDescription>
+            <CardTitle>{t.admin.config.brandingConfig}</CardTitle>
+            <CardDescription>{t.admin.config.productDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">基础信息</div>
+              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">{t.admin.config.productName}</div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">产品名称</div>
+                  <div className="text-sm font-medium">{t.admin.config.productName}</div>
                   <Input value={form.branding.name} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, name: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">短名称</div>
+                  <div className="text-sm font-medium">{t.admin.config.shortName}</div>
                   <Input value={form.branding.short_name} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, short_name: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">Tagline</div>
+                  <div className="text-sm font-medium">{t.admin.config.tagline}</div>
                   <Input value={form.branding.tagline} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, tagline: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">支持邮箱</div>
+                  <div className="text-sm font-medium">{t.admin.config.supportEmail}</div>
                   <Input value={form.branding.support_email} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, support_email: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">官网路径</div>
+                  <div className="text-sm font-medium">{t.admin.config.websitePath}</div>
                   <Input value={form.branding.website_path} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, website_path: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">文档路径</div>
+                  <div className="text-sm font-medium">{t.admin.config.docsPath}</div>
                   <Input value={form.branding.docs_path} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, docs_path: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">产品描述</div>
+                  <div className="text-sm font-medium">{t.admin.config.productDescription}</div>
                   <Textarea value={form.branding.description} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, description: event.target.value } } : current)} />
                 </div>
               </div>
             </div>
 
             <div className="border-t border-slate-700 pt-6">
-              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">登录页配置</div>
+              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">{t.admin.config.loginBadge}</div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">顶部 Badge 文字</div>
+                  <div className="text-sm font-medium">{t.admin.config.loginBadge}</div>
                   <Input value={form.branding.login_badge} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, login_badge: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">登录标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.loginTitle}</div>
                   <Input value={form.branding.login_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, login_title: event.target.value } } : current)} />
-                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                  <div className="text-xs text-slate-500">可用 {"{name}"} {t.admin.config.productName}</div>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">登录副标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.loginSubtitle}</div>
                   <Textarea value={form.branding.login_subtitle} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, login_subtitle: event.target.value } } : current)} />
-                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                  <div className="text-xs text-slate-500">可用 {"{name}"} {t.admin.config.productName}</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">功能卡片 1 标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.featureTitle} 1</div>
                   <Input value={form.branding.feature_title_1} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_title_1: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">功能卡片 1 描述</div>
+                  <div className="text-sm font-medium">{t.admin.config.featureDescription} 1</div>
                   <Input value={form.branding.feature_desc_1} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_desc_1: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">功能卡片 2 标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.featureTitle} 2</div>
                   <Input value={form.branding.feature_title_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_title_2: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">功能卡片 2 描述</div>
+                  <div className="text-sm font-medium">{t.admin.config.featureDescription} 2</div>
                   <Input value={form.branding.feature_desc_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, feature_desc_2: event.target.value } } : current)} />
                 </div>
               </div>
             </div>
 
             <div className="border-t border-slate-700 pt-6">
-              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">首页配置</div>
+              <div className="mb-3 text-sm font-medium text-slate-400 uppercase tracking-wider">{t.admin.config.homepageConfig}</div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">能力卡片 1 标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.capabilityCard} 1</div>
                   <Input value={form.branding.homepage_capabilities_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_title: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">能力卡片 1 描述</div>
+                  <div className="text-sm font-medium">{t.admin.config.capabilityCard} 1</div>
                   <Input value={form.branding.homepage_capabilities_desc} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_desc: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">能力卡片 2 标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.capabilityCard} 2</div>
                   <Input value={form.branding.homepage_capabilities_title_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_title_2: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">能力卡片 2 描述</div>
+                  <div className="text-sm font-medium">{t.admin.config.capabilityCard} 2</div>
                   <Input value={form.branding.homepage_capabilities_desc_2} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_desc_2: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">能力卡片 3 标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.capabilityCard} 3</div>
                   <Input value={form.branding.homepage_capabilities_title_3} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_title_3: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">能力卡片 3 描述</div>
+                  <div className="text-sm font-medium">{t.admin.config.capabilityCard} 3</div>
                   <Input value={form.branding.homepage_capabilities_desc_3} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_capabilities_desc_3: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">适用场景（4 行，用换行分隔）</div>
+                  <div className="text-sm font-medium">{t.admin.config.workflowsSection}</div>
                   <Textarea
                     value={[form.branding.homepage_workflow_1, form.branding.homepage_workflow_2, form.branding.homepage_workflow_3, form.branding.homepage_workflow_4].join("\n")}
                     onChange={(event) => {
@@ -363,40 +365,40 @@ export function ConfigAdminPage() {
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">为什么选择标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.whyChooseTitle}</div>
                   <Input value={form.branding.homepage_why_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_why_title: event.target.value } } : current)} />
-                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                  <div className="text-xs text-slate-500">可用 {"{name}"} {t.admin.config.productName}</div>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">为什么选择副标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.whyChooseSubtitle}</div>
                   <Input value={form.branding.homepage_why_subtitle} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_why_subtitle: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">为什么选择正文</div>
+                  <div className="text-sm font-medium">{t.admin.config.whyChooseDescription}</div>
                   <Textarea value={form.branding.homepage_why_description} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_why_description: event.target.value } } : current)} />
-                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                  <div className="text-xs text-slate-500">可用 {"{name}"} {t.admin.config.productName}</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">适用场景小标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.scenariosTitle}</div>
                   <Input value={form.branding.homepage_scenarios_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_scenarios_title: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">团队版标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.teamEditionTitle}</div>
                   <Input value={form.branding.homepage_team_title} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_title: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">团队版副标题</div>
+                  <div className="text-sm font-medium">{t.admin.config.teamEditionSubtitle}</div>
                   <Input value={form.branding.homepage_team_subtitle} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_subtitle: event.target.value } } : current)} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">团队版正文</div>
+                  <div className="text-sm font-medium">{t.admin.config.teamEditionDescription}</div>
                   <Textarea value={form.branding.homepage_team_description} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_description: event.target.value } } : current)} />
-                  <div className="text-xs text-slate-500">可用 {"{name}"} 和 {"{support_email}"} 引用产品名称和支持邮箱</div>
+                  <div className="text-xs text-slate-500">可用 {"{name}"} 和 {"{support_email}"} {t.admin.config.productName} {t.admin.config.supportEmail}</div>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm font-medium">团队版按钮文字</div>
+                  <div className="text-sm font-medium">{t.admin.config.teamEditionButton}</div>
                   <Input value={form.branding.homepage_team_button} onChange={(event) => setForm((current) => current ? { ...current, branding: { ...current.branding, homepage_team_button: event.target.value } } : current)} />
-                  <div className="text-xs text-slate-500">可用 {"{name}"} 引用产品名称</div>
+                  <div className="text-xs text-slate-500">可用 {"{name}"} {t.admin.config.productName}</div>
                 </div>
               </div>
             </div>
@@ -406,28 +408,28 @@ export function ConfigAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Tracing 配置</CardTitle>
-          <CardDescription>配置 LangSmith / Langfuse 的启用状态与连接参数。</CardDescription>
+          <CardTitle>{t.admin.config.tracingConfig}</CardTitle>
+          <CardDescription>{t.admin.config.tracingDescription}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-4 rounded-3xl border p-4">
             <div className="flex items-center justify-between">
-              <div className="font-medium">LangSmith</div>
+              <div className="font-medium">{t.admin.config.langsmith}</div>
               <Switch checked={Boolean(form.tracing.langsmith.enabled)} onCheckedChange={(checked) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langsmith: { ...current.tracing.langsmith, enabled: checked } } } : current)} />
             </div>
-            <Input value={form.tracing.langsmith.project ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langsmith: { ...current.tracing.langsmith, project: event.target.value } } } : current)} placeholder="Project" />
-            <Input value={form.tracing.langsmith.endpoint ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langsmith: { ...current.tracing.langsmith, endpoint: event.target.value } } } : current)} placeholder="Endpoint" />
+            <Input value={form.tracing.langsmith.project ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langsmith: { ...current.tracing.langsmith, project: event.target.value } } } : current)} placeholder={t.admin.config.project} />
+            <Input value={form.tracing.langsmith.endpoint ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langsmith: { ...current.tracing.langsmith, endpoint: event.target.value } } } : current)} placeholder={t.admin.config.endpoint} />
             <Input value={form.tracing.langsmith.api_key ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langsmith: { ...current.tracing.langsmith, api_key: event.target.value } } } : current)} placeholder="API Key / $ENV_VAR" />
           </div>
 
           <div className="space-y-4 rounded-3xl border p-4">
             <div className="flex items-center justify-between">
-              <div className="font-medium">Langfuse</div>
+              <div className="font-medium">{t.admin.config.langfuse}</div>
               <Switch checked={Boolean(form.tracing.langfuse.enabled)} onCheckedChange={(checked) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, enabled: checked } } } : current)} />
             </div>
-            <Input value={form.tracing.langfuse.host ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, host: event.target.value } } } : current)} placeholder="Host" />
-            <Input value={form.tracing.langfuse.public_key ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, public_key: event.target.value } } } : current)} placeholder="Public Key / $ENV_VAR" />
-            <Input value={form.tracing.langfuse.secret_key ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, secret_key: event.target.value } } } : current)} placeholder="Secret Key / $ENV_VAR" />
+            <Input value={form.tracing.langfuse.host ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, host: event.target.value } } } : current)} placeholder={t.admin.config.host} />
+            <Input value={form.tracing.langfuse.public_key ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, public_key: event.target.value } } } : current)} placeholder={`${t.admin.config.publicKey} / $ENV_VAR`} />
+            <Input value={form.tracing.langfuse.secret_key ?? ""} onChange={(event) => setForm((current) => current ? { ...current, tracing: { ...current.tracing, langfuse: { ...current.tracing.langfuse, secret_key: event.target.value } } } : current)} placeholder={`${t.admin.config.secretKey} / $ENV_VAR`} />
           </div>
         </CardContent>
       </Card>
@@ -435,12 +437,12 @@ export function ConfigAdminPage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>上传配置</CardTitle>
-            <CardDescription>控制文件上传的大小限制和格式。</CardDescription>
+            <CardTitle>{t.admin.config.uploadConfig}</CardTitle>
+            <CardDescription>{t.admin.config.autoConvertDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <div className="text-sm font-medium">最大文件大小 (MB)</div>
+              <div className="text-sm font-medium">{t.admin.config.maxFileSize}</div>
               <Input
                 type="number"
                 value={form.upload.max_size_mb}
@@ -452,7 +454,7 @@ export function ConfigAdminPage() {
               />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">允许的文件扩展名 (逗号分隔)</div>
+              <div className="text-sm font-medium">{t.admin.config.allowedExtensions}</div>
               <Input
                 value={form.upload.allowed_extensions.join(", ")}
                 onChange={(event) =>
@@ -472,8 +474,8 @@ export function ConfigAdminPage() {
             </div>
             <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
               <div>
-                <div className="font-medium">自动转换为 Markdown</div>
-                <div className="text-sm text-slate-500">将 PDF、PPT、Word、Excel 文件自动转为 Markdown。</div>
+                <div className="font-medium">{t.admin.config.autoConvertToMarkdown}</div>
+                <div className="text-sm text-slate-500">{t.admin.config.autoConvertDescription}</div>
               </div>
               <Switch
                 checked={form.upload.convert_to_markdown}
@@ -487,12 +489,12 @@ export function ConfigAdminPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>沙箱配置</CardTitle>
-            <CardDescription>控制代码执行沙箱的行为。</CardDescription>
+            <CardTitle>{t.admin.config.sandboxConfig}</CardTitle>
+            <CardDescription>{t.admin.config.allowHostBashDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <div className="text-sm font-medium">沙箱 Provider</div>
+              <div className="text-sm font-medium">{t.admin.config.sandboxProvider}</div>
               <Input
                 value={form.sandbox.use}
                 onChange={(event) =>
@@ -502,8 +504,8 @@ export function ConfigAdminPage() {
             </div>
             <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
               <div>
-                <div className="font-medium">允许宿主 Bash</div>
-                <div className="text-sm text-slate-500">允许在宿主系统执行 Bash 命令。</div>
+                <div className="font-medium">{t.admin.config.allowHostBash}</div>
+                <div className="text-sm text-slate-500">{t.admin.config.allowHostBashDescription}</div>
               </div>
               <Switch
                 checked={form.sandbox.allow_host_bash}
@@ -514,7 +516,7 @@ export function ConfigAdminPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <div className="text-sm font-medium">Bash 输出最大字符</div>
+                <div className="text-sm font-medium">{t.admin.config.bashOutputMaxChars}</div>
                 <Input
                   type="number"
                   value={form.sandbox.bash_output_max_chars}
@@ -526,7 +528,7 @@ export function ConfigAdminPage() {
                 />
               </div>
               <div className="space-y-2">
-                <div className="text-sm font-medium">读取文件最大字符</div>
+                <div className="text-sm font-medium">{t.admin.config.readFileMaxChars}</div>
                 <Input
                   type="number"
                   value={form.sandbox.read_file_output_max_chars}
@@ -540,7 +542,7 @@ export function ConfigAdminPage() {
                 />
               </div>
               <div className="space-y-2">
-                <div className="text-sm font-medium">ls 输出最大字符</div>
+                <div className="text-sm font-medium">{t.admin.config.lsOutputMaxChars}</div>
                 <Input
                   type="number"
                   value={form.sandbox.ls_output_max_chars}
@@ -558,14 +560,14 @@ export function ConfigAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>技能配置</CardTitle>
-          <CardDescription>控制技能的安全扫描和自动更新。</CardDescription>
+          <CardTitle>{t.admin.config.skillsConfig}</CardTitle>
+          <CardDescription>{t.admin.config.autoUpdateDescription}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
             <div>
-              <div className="font-medium">自动更新</div>
-              <div className="text-sm text-slate-500">自动更新已安装的技能到最新版本。</div>
+              <div className="font-medium">{t.admin.config.autoUpdate}</div>
+              <div className="text-sm text-slate-500">{t.admin.config.autoUpdateDescription}</div>
             </div>
             <Switch
               checked={form.skills.auto_update}
@@ -576,8 +578,8 @@ export function ConfigAdminPage() {
           </div>
           <div className="flex items-center justify-between rounded-2xl border px-4 py-3">
             <div>
-              <div className="font-medium">安全扫描</div>
-              <div className="text-sm text-slate-500">安装前扫描技能文件的安全性。</div>
+              <div className="font-medium">{t.admin.config.securityScan}</div>
+              <div className="text-sm text-slate-500">{t.admin.config.securityScanDescription}</div>
             </div>
             <Switch
               checked={form.skills.security_scan}
@@ -592,12 +594,12 @@ export function ConfigAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>工具配置</CardTitle>
-          <CardDescription>配置可用的工具及其启用状态。</CardDescription>
+          <CardTitle>{t.admin.config.toolsConfig}</CardTitle>
+          <CardDescription>{t.admin.config.implementationClass}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {form.tools.length === 0 ? (
-            <p className="text-sm text-slate-500">暂无工具配置。</p>
+            <p className="text-sm text-slate-500">{t.admin.config.noMcpServers}</p>
           ) : (
             <div className="space-y-4">
               {form.tools.map((tool, index) => (
@@ -621,7 +623,7 @@ export function ConfigAdminPage() {
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2 md:col-span-2">
-                      <div className="text-sm font-medium">实现类路径</div>
+                      <div className="text-sm font-medium">{t.admin.config.implementationClass}</div>
                       <Input
                         value={tool.use || ""}
                         onChange={(event) => {
@@ -635,7 +637,7 @@ export function ConfigAdminPage() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <div className="text-sm font-medium">额外参数 (JSON 格式)</div>
+                      <div className="text-sm font-medium">{t.admin.config.extraParams}</div>
                       <Textarea
                         value={JSON.stringify(tool.extra_params || {}, null, 2)}
                         onChange={(event) => {
@@ -665,12 +667,12 @@ export function ConfigAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>MCP 服务器配置</CardTitle>
-          <CardDescription>配置 Model Context Protocol 服务器。</CardDescription>
+          <CardTitle>{t.admin.config.mcpServerConfig}</CardTitle>
+          <CardDescription>{t.admin.config.mcpServers}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {form.mcp.length === 0 ? (
-            <p className="text-sm text-slate-500">暂无 MCP 服务器配置。</p>
+            <p className="text-sm text-slate-500">{t.admin.config.noMcpServers}</p>
           ) : (
             form.mcp.map((server, index) => (
               <div key={server.name || index} className="rounded-2xl border p-4">
@@ -690,7 +692,7 @@ export function ConfigAdminPage() {
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <div className="text-sm font-medium">类型</div>
+                    <div className="text-sm font-medium">{t.admin.config.serverType}</div>
                     <select
                       className="w-full rounded-lg border px-3 py-2"
                       value={server.type || "stdio"}
@@ -709,7 +711,7 @@ export function ConfigAdminPage() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-sm font-medium">命令 (仅 stdio)</div>
+                    <div className="text-sm font-medium">{t.admin.config.command}</div>
                     <Input
                       value={server.command || ""}
                       onChange={(event) => {
@@ -724,7 +726,7 @@ export function ConfigAdminPage() {
                   </div>
                   {(server.type === "sse" || server.type === "http") && (
                     <div className="space-y-2">
-                      <div className="text-sm font-medium">URL ({server.type})</div>
+                      <div className="text-sm font-medium">{t.admin.config.url} ({server.type})</div>
                       <Input
                         value={server.url ?? ""}
                         onChange={(event) => {
@@ -739,7 +741,7 @@ export function ConfigAdminPage() {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <div className="text-sm font-medium">参数 (逗号分隔)</div>
+                    <div className="text-sm font-medium">{t.admin.config.args}</div>
                     <Input
                       value={(server.args || []).join(", ")}
                       onChange={(event) => {
@@ -755,7 +757,7 @@ export function ConfigAdminPage() {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <div className="text-sm font-medium">环境变量 (key=value, 逗号分隔)</div>
+                    <div className="text-sm font-medium">{t.admin.config.envVariables}</div>
                     <Input
                       value={Object.entries(server.env || {}).map(([k, v]) => `${k}=${v}`).join(", ")}
                       onChange={(event) => {
@@ -777,7 +779,7 @@ export function ConfigAdminPage() {
                   </div>
                   {(server.type === "sse" || server.type === "http") && (
                     <div className="space-y-2 md:col-span-2">
-                      <div className="text-sm font-medium">请求头 (key=value, 逗号分隔)</div>
+                      <div className="text-sm font-medium">{t.admin.config.headers}</div>
                       <Input
                         value={Object.entries(server.headers || {}).map(([k, v]) => `${k}=${v}`).join(", ")}
                         onChange={(event) => {
@@ -799,7 +801,7 @@ export function ConfigAdminPage() {
                     </div>
                   )}
                   <div className="space-y-2 md:col-span-2">
-                    <div className="text-sm font-medium">描述</div>
+                    <div className="text-sm font-medium">{t.admin.config.description}</div>
                     <Input
                       value={server.description || ""}
                       onChange={(event) => {
@@ -820,7 +822,7 @@ export function ConfigAdminPage() {
       </Card>
 
       <div className="flex items-center gap-3">
-        <Button onClick={() => void save()} disabled={saving}>{saving ? "保存中..." : "保存配置"}</Button>
+        <Button onClick={() => void save()} disabled={saving}>{saving ? t.admin.config.saving : t.admin.config.saveConfig}</Button>
         {message && <p className="text-sm text-emerald-600">{message}</p>}
         {error && <p className="text-sm text-rose-600">{error}</p>}
       </div>

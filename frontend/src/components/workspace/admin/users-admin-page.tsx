@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 
 import { AdminPageShell } from "./admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 type UserRecord = {
   id: string;
@@ -25,6 +26,7 @@ type UserRecord = {
 };
 
 export function UsersAdminPage() {
+  const { t } = useI18n();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +41,9 @@ export function UsersAdminPage() {
   }
 
   function statusLabel(status: UserRecord["status"]) {
-    if (status === "invited") return "待激活";
-    if (status === "active") return "正常";
-    return "已禁用";
+    if (status === "invited") return t.admin.users.pendingActivation;
+    if (status === "active") return t.admin.users.normal;
+    return t.admin.users.accountDisabled;
   }
 
   async function loadUsers() {
@@ -50,12 +52,12 @@ export function UsersAdminPage() {
     try {
       const response = await fetch("/api/users");
       if (!response.ok) {
-        throw new Error("加载成员失败");
+        throw new Error(t.admin.users.loadFailed);
       }
       const payload = (await response.json()) as { users: UserRecord[] };
       setUsers(payload.users);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载成员失败");
+      setError(err instanceof Error ? err.message : t.admin.users.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -63,7 +65,7 @@ export function UsersAdminPage() {
 
   useEffect(() => {
     void loadUsers();
-  }, []);
+  }, [t.admin.users.loadFailed]);
 
   async function handleCreateUser(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,14 +80,14 @@ export function UsersAdminPage() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(body?.detail ?? "创建成员失败");
+        throw new Error(body?.detail ?? t.admin.users.createMemberFailed);
       }
       setEmail("");
       setName("");
-      setStatusMessage("成员已创建");
+      setStatusMessage(t.admin.users.memberCreated);
       await loadUsers();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建成员失败");
+      setError(err instanceof Error ? err.message : t.admin.users.createMemberFailed);
     } finally {
       setCreating(false);
     }
@@ -102,9 +104,9 @@ export function UsersAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(body?.detail ?? "更新成员状态失败");
+      throw new Error(body?.detail ?? t.admin.users.createMemberFailed);
     }
-    setStatusMessage(nextStatus === "disabled" ? "账号已禁用" : "账号已恢复");
+    setStatusMessage(nextStatus === "disabled" ? t.admin.users.accountDisabled_ : t.admin.users.accountRestored);
     await loadUsers();
   }
 
@@ -118,16 +120,16 @@ export function UsersAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(body?.detail ?? "重新邀请失败");
+      throw new Error(body?.detail ?? t.admin.users.createMemberFailed);
     }
-    setStatusMessage("已重新发送邀请");
+    setStatusMessage(t.admin.users.inviteResent);
     await loadUsers();
   }
 
   async function deleteUser(user: UserRecord) {
     setError(null);
     setStatusMessage(null);
-    const confirmed = window.confirm(`确认删除用户 ${user.email} 吗？该操作不可撤销。`);
+    const confirmed = window.confirm(t.admin.users.confirmDeleteUser.replace("{email}", user.email));
     if (!confirmed) {
       return;
     }
@@ -135,9 +137,9 @@ export function UsersAdminPage() {
     const response = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(body?.detail ?? "删除用户失败");
+      throw new Error(body?.detail ?? t.admin.users.createMemberFailed);
     }
-    setStatusMessage(`用户 ${user.email} 已删除`);
+    setStatusMessage(t.admin.users.userDeleted.replace("{email}", user.email));
     await loadUsers();
   }
 
@@ -150,17 +152,17 @@ export function UsersAdminPage() {
   }
 
   return (
-    <AdminPageShell title="用户管理" description="创建受邀成员、发出激活链接，并管理当前 MicX 部署的访问权限。">
+    <AdminPageShell title={t.admin.users.title} description={t.admin.users.description}>
       <Card>
         <CardHeader>
-          <CardTitle>用户管理</CardTitle>
-          <CardDescription>创建受邀成员、发出激活链接，并管理当前 MicX 部署的访问权限。</CardDescription>
+          <CardTitle>{t.admin.users.userManagement}</CardTitle>
+          <CardDescription>{t.admin.users.userManagementDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-[1.4fr_1fr_auto]" onSubmit={handleCreateUser}>
-            <Input type="email" placeholder="成员邮箱，例如 member@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
-            <Input placeholder="显示名称，例如 市场负责人" value={name} onChange={(event) => setName(event.target.value)} />
-            <Button disabled={creating}>{creating ? "创建中..." : "创建受邀成员"}</Button>
+            <Input type="email" placeholder={t.admin.users.memberEmailPlaceholder} value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <Input placeholder={t.admin.users.displayNamePlaceholder} value={name} onChange={(event) => setName(event.target.value)} />
+            <Button disabled={creating}>{creating ? t.admin.users.creating : t.admin.users.createInvitedMember}</Button>
           </form>
           {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
           {statusMessage && <p className="mt-4 text-sm text-emerald-700">{statusMessage}</p>}
@@ -169,24 +171,24 @@ export function UsersAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>成员列表</CardTitle>
-          <CardDescription>受邀成员需要通过一次性激活链接设置密码后，才能正式登录使用。</CardDescription>
+          <CardTitle>{t.admin.users.memberList}</CardTitle>
+          <CardDescription>{t.admin.users.memberListDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-sm text-slate-500">正在加载成员信息...</p>
+            <p className="text-sm text-slate-500">{t.admin.users.loadingMembers}</p>
           ) : (
             <div className="overflow-hidden rounded-2xl border">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-4 py-3 font-medium">成员</th>
-                    <th className="px-4 py-3 font-medium">邮箱</th>
-                    <th className="px-4 py-3 font-medium">角色</th>
-                    <th className="px-4 py-3 font-medium">状态</th>
-                    <th className="px-4 py-3 font-medium">邀请信息</th>
-                    <th className="px-4 py-3 font-medium">最近登录</th>
-                    <th className="px-4 py-3 font-medium text-right">操作</th>
+                    <th className="px-4 py-3 font-medium">{t.admin.users.member}</th>
+                    <th className="px-4 py-3 font-medium">{t.admin.users.email}</th>
+                    <th className="px-4 py-3 font-medium">{t.admin.users.role}</th>
+                    <th className="px-4 py-3 font-medium">{t.admin.users.status}</th>
+                    <th className="px-4 py-3 font-medium">{t.admin.users.inviteInfo}</th>
+                    <th className="px-4 py-3 font-medium">{t.admin.users.lastLogin}</th>
+                    <th className="px-4 py-3 font-medium text-right">{t.admin.users.operations}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -194,21 +196,21 @@ export function UsersAdminPage() {
                     <tr key={user.id} className="border-t align-top">
                       <td className="px-4 py-3">{user.name}</td>
                       <td className="px-4 py-3 text-slate-600">{user.email}</td>
-                      <td className="px-4 py-3">{user.role === "owner" ? "拥有者" : "成员"}</td>
+                      <td className="px-4 py-3">{user.role === "owner" ? t.admin.users.owner : t.admin.users.member}</td>
                       <td className="px-4 py-3">{statusLabel(user.status)}</td>
                       <td className="px-4 py-3 text-slate-600">
                         {user.invite ? (
                           <div className="space-y-1">
-                            <div>邀请时间：{formatTime(user.invited_at)}</div>
-                            <div>过期时间：{new Date(user.invite.expires_at).toLocaleString()}</div>
+                            <div>{t.admin.users.inviteTime}：{formatTime(user.invited_at)}</div>
+                            <div>{t.admin.users.expiresTime}：{new Date(user.invite.expires_at).toLocaleString()}</div>
                             <button className="text-primary cursor-pointer text-xs underline" type="button" onClick={() => void copyInviteLink(user)}>
-                              {copiedUserId === user.id ? "已复制" : "复制激活链接"}
+                              {copiedUserId === user.id ? t.admin.users.copied : t.admin.users.copyInviteLink}
                             </button>
                           </div>
                         ) : (
                           <div className="space-y-1">
-                            <div>邀请时间：{formatTime(user.invited_at)}</div>
-                            <div>激活时间：{formatTime(user.activated_at)}</div>
+                            <div>{t.admin.users.inviteTime}：{formatTime(user.invited_at)}</div>
+                            <div>{t.admin.users.activationTime}：{formatTime(user.activated_at)}</div>
                           </div>
                         )}
                       </td>
@@ -218,14 +220,14 @@ export function UsersAdminPage() {
                           <div className="flex justify-end gap-2">
                             {user.status === "invited" && (
                               <Button variant="outline" size="sm" onClick={() => void resendInvite(user)}>
-                                重新邀请
+                                {t.admin.users.resendInvite}
                               </Button>
                             )}
                             <Button variant="outline" size="sm" onClick={() => void toggleStatus(user)}>
-                              {user.status === "disabled" ? "恢复使用" : "禁用账号"}
+                              {user.status === "disabled" ? t.admin.users.restoreAccount : t.admin.users.disableAccount}
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => void deleteUser(user).catch((err) => setError(err instanceof Error ? err.message : "删除用户失败"))}>
-                              删除用户
+                            <Button variant="destructive" size="sm" onClick={() => void deleteUser(user).catch((err) => setError(err instanceof Error ? err.message : t.admin.users.createMemberFailed))}>
+                              {t.admin.users.deleteUser}
                             </Button>
                           </div>
                         )}

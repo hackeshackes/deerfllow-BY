@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import Galaxy from "@/components/ui/galaxy";
 import { WordRotate } from "@/components/ui/word-rotate";
+import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 export function Hero({ className }: { className?: string }) {
   const brand = useBrand();
+  const { t } = useI18n();
   return (
     <div
       className={cn(
@@ -69,7 +71,7 @@ export function Hero({ className }: { className?: string }) {
               className="size-lg scale-108 rounded-full bg-white px-6 text-slate-950 hover:bg-cyan-50"
               size="lg"
             >
-              <span className="text-md">进入中文工作台</span>
+              <span className="text-md">{t.landing.enterWorkspace}</span>
               <ChevronRightIcon className="size-4" />
             </Button>
           </Link>
@@ -79,19 +81,19 @@ export function Hero({ className }: { className?: string }) {
               size="lg"
               variant="outline"
             >
-              查看文档
+              {t.landing.viewDocs}
             </Button>
           </Link>
         </div>
         <div className="mt-10 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            面向团队协作的流式执行与任务进度
+            {t.landing.featureStreamingExecution}
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            支持上传、产物沉淀与结果导出
+            {t.landing.featureFileUpload}
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            支持个人空间与共享空间协作
+            {t.landing.featureCollaboration}
           </div>
         </div>
       </div>

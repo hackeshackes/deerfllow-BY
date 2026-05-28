@@ -130,7 +130,7 @@ export default function KnowledgePage() {
     if (kbs.length === 0) {
       return (
         <div className="text-center text-muted-foreground py-8">
-          {activeTab === "private" ? t.knowledge.empty : "当前范围暂无资料库"}
+          {activeTab === "private" ? t.knowledge.empty : t.knowledge.emptyScope}
         </div>
       );
     }
@@ -156,11 +156,11 @@ export default function KnowledgePage() {
                     </p>
                   )}
                   <p className="text-muted-foreground text-xs mt-1">
-                    可见范围：{kb.is_global ? "全局" : kb.visibility === "workspace" ? "共享空间" : "个人私有"}
+                    {t.knowledge.visibility.label}: {kb.is_global ? t.knowledge.visibility.global : kb.visibility === "workspace" ? t.knowledge.visibility.workspace : t.knowledge.visibility.private}
                   </p>
                 </div>
                 <div className="text-right text-sm text-muted-foreground">
-                  <div>{kb.document_count} documents</div>
+                  <div>{kb.document_count} {t.knowledge.documents}</div>
                   <div>{formatTimeAgo(kb.updated_at)}</div>
                 </div>
               </div>
@@ -197,11 +197,11 @@ export default function KnowledgePage() {
             />
             <Select value={newVisibility} onValueChange={setNewVisibility}>
               <SelectTrigger className="w-40">
-                <SelectValue placeholder="类型" />
+                <SelectValue placeholder={t.knowledge.type} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="private">私有</SelectItem>
-                <SelectItem value="workspace">工作区共享</SelectItem>
+                <SelectItem value="private">{t.knowledge.visibility.private}</SelectItem>
+                <SelectItem value="workspace">{t.knowledge.visibility.workspace}</SelectItem>
               </SelectContent>
             </Select>
             <Button type="submit" size="sm" disabled={creating}>
@@ -223,7 +223,7 @@ export default function KnowledgePage() {
         ) : (
           <Button size="sm" onClick={() => setShowCreate(true)}>
             <PlusIcon className="size-4 mr-1" />
-            添加资料库
+            {t.knowledge.addKnowledgeBase}
           </Button>
         )}
       </WorkspaceHeader>
@@ -239,13 +239,13 @@ export default function KnowledgePage() {
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList>
                       <TabsTrigger value="workspace">
-                        当前空间资料
+                        {t.knowledge.currentSpaceKnowledge}
                       </TabsTrigger>
                       <TabsTrigger value="private">
-                        我的私人资料
+                        {t.knowledge.myPrivateKnowledge}
                       </TabsTrigger>
                       <TabsTrigger value="global">
-                        全局资料
+                        {t.knowledge.globalKnowledge}
                       </TabsTrigger>
                     </TabsList>
                   <TabsContent value="workspace" className="mt-4">

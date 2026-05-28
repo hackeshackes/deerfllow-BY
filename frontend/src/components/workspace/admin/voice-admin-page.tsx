@@ -1,9 +1,8 @@
 "use client";
 
-import { MicIcon, Settings2Icon, Volume2Icon } from "lucide-react";
+import { MicIcon, Volume2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -14,22 +13,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { getVoiceConfig, updateVoiceConfig, type VoiceConfig } from "@/lib/api/voice";
+import { useI18n } from "@/core/i18n/hooks";
 
 import { AdminPageShell } from "./admin-page-shell";
 
-const STT_MODEL_OPTIONS = [
-  { value: "tiny", label: "小（tiny）", description: "快速响应，低资源占用" },
-  { value: "small", label: "中（small）", description: "平衡模式（推荐）" },
-  { value: "medium", label: "大（medium）", description: "高质量，需较强算力" },
-];
-
-const STT_LANGUAGE_OPTIONS = [
-  { value: "zh", label: "中文" },
-  { value: "en", label: "English" },
-  { value: "auto", label: "自动检测" },
-];
-
 export function VoiceAdminPage() {
+  const { t } = useI18n();
   const [config, setConfig] = useState<VoiceConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,7 +33,7 @@ export function VoiceAdminPage() {
       const data = await getVoiceConfig();
       setConfig(data);
     } catch {
-      setStatusMessage("加载语音配置失败");
+      setStatusMessage(t.admin.voice.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -57,9 +46,9 @@ export function VoiceAdminPage() {
     try {
       const updated = await updateVoiceConfig({ ...config, ...updates });
       setConfig(updated);
-      setStatusMessage("配置已保存");
+      setStatusMessage(t.admin.voice.configSaved);
     } catch {
-      setStatusMessage("保存配置失败");
+      setStatusMessage(t.admin.voice.configSaveFailed);
     } finally {
       setSaving(false);
     }
@@ -67,9 +56,9 @@ export function VoiceAdminPage() {
 
   if (loading) {
     return (
-      <AdminPageShell title="语音配置" description="配置语音转文字和语音合成功能">
+      <AdminPageShell title={t.admin.voice.title} description={t.admin.voice.description}>
         <div className="flex items-center justify-center py-12">
-          <div className="text-muted-foreground">加载中...</div>
+          <div className="text-muted-foreground">{t.admin.voice.loading}</div>
         </div>
       </AdminPageShell>
     );
@@ -77,16 +66,16 @@ export function VoiceAdminPage() {
 
   if (!config) {
     return (
-      <AdminPageShell title="语音配置" description="配置语音转文字和语音合成功能">
+      <AdminPageShell title={t.admin.voice.title} description={t.admin.voice.description}>
         <div className="flex items-center justify-center py-12">
-          <div className="text-destructive">加载配置失败</div>
+          <div className="text-destructive">{t.admin.voice.loadFailed}</div>
         </div>
       </AdminPageShell>
     );
   }
 
   return (
-    <AdminPageShell title="语音配置" description="配置语音转文字（STT）和语音合成（TTS）功能">
+    <AdminPageShell title={t.admin.voice.title} description={t.admin.voice.description}>
       {statusMessage && (
         <div className="rounded-lg bg-muted px-4 py-2 text-sm">{statusMessage}</div>
       )}
@@ -95,15 +84,15 @@ export function VoiceAdminPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <MicIcon className="size-5" />
-            <CardTitle>语音转文字（STT）</CardTitle>
+            <CardTitle>STT</CardTitle>
           </div>
-          <CardDescription>配置语音识别功能，将麦克风输入转为文字</CardDescription>
+          <CardDescription>{t.admin.voice.sttEnabledDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-medium">启用 STT</div>
-              <div className="text-sm text-muted-foreground">开启后用户可使用麦克风输入</div>
+              <div className="font-medium">{t.admin.voice.sttEnabled}</div>
+              <div className="text-sm text-muted-foreground">{t.admin.voice.sttEnabledDescription}</div>
             </div>
             <Switch
               checked={config.stt_enabled}
@@ -113,7 +102,7 @@ export function VoiceAdminPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">识别语言</label>
+            <label className="text-sm font-medium">{t.admin.voice.sttLanguage}</label>
             <Select
               value={config.stt_language}
               onValueChange={(value) => saveConfig({ stt_language: value })}
@@ -123,34 +112,55 @@ export function VoiceAdminPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STT_LANGUAGE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
+                <SelectItem value="zh">{t.admin.voice.chinese}</SelectItem>
+                <SelectItem value="en">{t.admin.voice.english}</SelectItem>
+                <SelectItem value="auto">{t.admin.voice.autoDetect}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-3">
-            <div className="text-sm font-medium">模型大小</div>
+            <div className="text-sm font-medium">{t.admin.voice.sttModelSize}</div>
             <div className="grid gap-3 md:grid-cols-3">
-              {STT_MODEL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => saveConfig({ stt_model_size: opt.value as VoiceConfig["stt_model_size"] })}
-                  disabled={saving}
-                  className={`rounded-lg border-2 p-4 text-left transition-colors ${
-                    config.stt_model_size === opt.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div className="font-medium">{opt.label}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">{opt.description}</div>
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={() => saveConfig({ stt_model_size: "tiny" })}
+                disabled={saving}
+                className={`rounded-lg border-2 p-4 text-left transition-colors ${
+                  config.stt_model_size === "tiny"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <div className="font-medium">{t.admin.voice.modelSizeSmall}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{t.admin.voice.modelSizeSmallDesc}</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => saveConfig({ stt_model_size: "small" })}
+                disabled={saving}
+                className={`rounded-lg border-2 p-4 text-left transition-colors ${
+                  config.stt_model_size === "small"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <div className="font-medium">{t.admin.voice.modelSizeMedium}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{t.admin.voice.modelSizeMediumDesc}</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => saveConfig({ stt_model_size: "medium" })}
+                disabled={saving}
+                className={`rounded-lg border-2 p-4 text-left transition-colors ${
+                  config.stt_model_size === "medium"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <div className="font-medium">{t.admin.voice.modelSizeLarge}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{t.admin.voice.modelSizeLargeDesc}</div>
+              </button>
             </div>
           </div>
         </CardContent>
@@ -160,15 +170,15 @@ export function VoiceAdminPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Volume2Icon className="size-5" />
-            <CardTitle>语音合成（TTS）</CardTitle>
+            <CardTitle>TTS</CardTitle>
           </div>
-          <CardDescription>配置语音播报功能，开启后可在AI回复时选择语音播报</CardDescription>
+          <CardDescription>{t.admin.voice.ttsEnabledDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-medium">启用 TTS</div>
-              <div className="text-sm text-muted-foreground">开启后 AI 回答可选择语音播报</div>
+              <div className="font-medium">{t.admin.voice.ttsEnabled}</div>
+              <div className="text-sm text-muted-foreground">{t.admin.voice.ttsEnabledDescription}</div>
             </div>
             <Switch
               checked={config.tts_enabled}
@@ -178,7 +188,7 @@ export function VoiceAdminPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">音色</label>
+            <label className="text-sm font-medium">{t.admin.voice.voice}</label>
             <Select
               value={config.tts_voice}
               onValueChange={(value) => saveConfig({ tts_voice: value })}
@@ -188,15 +198,15 @@ export function VoiceAdminPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="zh-CN-XiaoxiaoNeural">晓晓（女声）</SelectItem>
-                <SelectItem value="zh-CN-YunxiNeural">云希（男声）</SelectItem>
-                <SelectItem value="zh-CN-YunyangNeural">云扬（男声）</SelectItem>
+                <SelectItem value="zh-CN-XiaoxiaoNeural">{t.admin.voice.voiceFemale}</SelectItem>
+                <SelectItem value="zh-CN-YunxiNeural">{t.admin.voice.voiceMale1}</SelectItem>
+                <SelectItem value="zh-CN-YunyangNeural">{t.admin.voice.voiceMale2}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">语速: {config.tts_speed.toFixed(1)}x</label>
+            <label className="text-sm font-medium">{t.admin.voice.speed}: {config.tts_speed.toFixed(1)}x</label>
             <input
               type="range"
               min="0.5"

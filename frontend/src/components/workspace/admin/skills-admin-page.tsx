@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/core/i18n/hooks";
 
 import { AdminPageShell } from "./admin-page-shell";
 
@@ -29,6 +30,7 @@ function isMeaningfulChinese(value?: string | null) {
 }
 
 export function SkillsAdminPage() {
+  const { t } = useI18n();
   const [skills, setSkills] = useState<SkillRecord[]>([]);
   const [url, setUrl] = useState("");
   const [renameTo, setRenameTo] = useState("");
@@ -48,15 +50,15 @@ export function SkillsAdminPage() {
   async function loadSkills() {
     const response = await fetch("/api/skills");
     if (!response.ok) {
-      throw new Error("加载技能失败");
+      throw new Error(t.admin.skills.loadFailed);
     }
     const payload = (await response.json()) as { skills: SkillRecord[] };
     setSkills(payload.skills);
   }
 
   useEffect(() => {
-    void loadSkills().catch((err) => setError(err instanceof Error ? err.message : "加载技能失败"));
-  }, []);
+    void loadSkills().catch((err) => setError(err instanceof Error ? err.message : t.admin.skills.loadFailed));
+  }, [t.admin.skills.loadFailed]);
 
   async function toggleSkill(skill: SkillRecord, enabled: boolean) {
     const response = await fetch(`/api/skills/${skill.name}`, {
@@ -66,7 +68,7 @@ export function SkillsAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(body?.detail ?? "更新技能失败");
+      throw new Error(body?.detail ?? t.admin.skills.updateSkillFailed);
     }
     await loadSkills();
   }
@@ -84,14 +86,14 @@ export function SkillsAdminPage() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(body?.detail ?? "远程安装技能失败");
+        throw new Error(body?.detail ?? t.admin.skills.remoteInstallFailed);
       }
       setUrl("");
       setRenameTo("");
-      setMessage("远程技能已安装，默认处于禁用状态，请按需启用。");
+      setMessage(t.admin.skills.installSuccess);
       await loadSkills();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "远程安装技能失败");
+      setError(err instanceof Error ? err.message : t.admin.skills.remoteInstallFailed);
     } finally {
       setInstalling(false);
     }
@@ -105,7 +107,7 @@ export function SkillsAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(body?.detail ?? "保存技能中文信息失败");
+      throw new Error(body?.detail ?? t.admin.skills.saveLocalizationFailed);
     }
     setEditingName(null);
     setDraftTitle("");
@@ -122,34 +124,34 @@ export function SkillsAdminPage() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(body?.detail ?? "删除技能失败");
+        throw new Error(body?.detail ?? t.admin.skills.deleteSkillFailed);
       }
       await loadSkills();
       setDeleteConfirm({ open: false, skill: null });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除技能失败");
+      setError(err instanceof Error ? err.message : t.admin.skills.deleteSkillFailed);
     } finally {
       setDeleting(false);
     }
   }
 
   return (
-    <AdminPageShell title="技能管理" description="查看当前技能清单、切换启用状态，并从远程地址安装新的 skill 包。">
+    <AdminPageShell title={t.admin.skills.title} description={t.admin.skills.description}>
       <Card>
         <CardHeader>
-          <CardTitle>远程安装</CardTitle>
-          <CardDescription>输入可访问的 `.skill` / `.zip` / `.tar.gz` 地址，安装后默认会保持禁用状态。</CardDescription>
+          <CardTitle>{t.admin.skills.remoteInstall}</CardTitle>
+          <CardDescription>{t.admin.skills.remoteInstallDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-[1.6fr_0.8fr_0.8fr_auto]" onSubmit={installRemoteSkill}>
             <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com/my-skill.skill" required />
             <select className="border-input bg-background rounded-xl border px-3 py-2" value={conflictStrategy} onChange={(event) => setConflictStrategy(event.target.value)}>
-              <option value="error">冲突时报错</option>
-              <option value="replace">覆盖同名技能</option>
-              <option value="rename">重命名安装</option>
+              <option value="error">{t.admin.skills.conflictError}</option>
+              <option value="replace">{t.admin.skills.conflictReplace}</option>
+              <option value="rename">{t.admin.skills.conflictRename}</option>
             </select>
-            <Input value={renameTo} onChange={(event) => setRenameTo(event.target.value)} placeholder="重命名（可选）" />
-            <Button disabled={installing}>{installing ? "安装中..." : "安装技能"}</Button>
+            <Input value={renameTo} onChange={(event) => setRenameTo(event.target.value)} placeholder={t.admin.skills.renamePlaceholder} />
+            <Button disabled={installing}>{installing ? t.admin.skills.installing : t.admin.skills.installSkill}</Button>
           </form>
           {message && <p className="mt-4 text-sm text-emerald-600">{message}</p>}
           {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
@@ -158,8 +160,8 @@ export function SkillsAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>技能清单</CardTitle>
-          <CardDescription>中文优先展示技能描述，并允许直接切换启用状态。</CardDescription>
+          <CardTitle>{t.admin.skills.skillList}</CardTitle>
+          <CardDescription>{t.admin.skills.skillListDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {skills.map((skill) => (
@@ -168,15 +170,15 @@ export function SkillsAdminPage() {
                 <div className="space-y-2">
                   <div className="font-medium">{isMeaningfulChinese(skill.display_name_zh) ? skill.display_name_zh : skill.name}</div>
                   <div className="text-sm leading-6 text-slate-500">{isMeaningfulChinese(skill.description_zh) ? skill.description_zh : skill.description}</div>
-                  <div className="text-xs text-slate-400">分类：{skill.category} · 作者：{skill.author ?? "—"} · 版本：{skill.version ?? "—"}</div>
-                  <div className="text-xs text-slate-400">来源：{skill.source ?? "内置/本地"}</div>
+                  <div className="text-xs text-slate-400">{t.admin.skills.category}：{skill.category} · {t.admin.skills.author}：{skill.author ?? "—"} · {t.admin.skills.version}：{skill.version ?? "—"}</div>
+                  <div className="text-xs text-slate-400">{t.admin.skills.source}：{skill.source ?? t.admin.skills.builtIn}</div>
                   {editingName === skill.name && (
                     <div className="mt-3 space-y-3 rounded-2xl border bg-slate-50 p-3">
-                      <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder="中文显示名称" />
-                      <Textarea value={draftDescription} onChange={(event) => setDraftDescription(event.target.value)} placeholder="中文技能简介" />
+                      <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder={t.admin.skills.displayNamePlaceholder || "Chinese display name"} />
+                      <Textarea value={draftDescription} onChange={(event) => setDraftDescription(event.target.value)} placeholder={t.admin.skills.skillDescriptionPlaceholder || "Chinese skill description"} />
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => void saveLocalization(skill).catch((err) => setError(err instanceof Error ? err.message : "保存技能中文信息失败"))}>保存中文信息</Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingName(null)}>取消</Button>
+                        <Button size="sm" onClick={() => void saveLocalization(skill).catch((err) => setError(err instanceof Error ? err.message : t.admin.skills.saveLocalizationFailed))}>{t.admin.skills.saveLocalization}</Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingName(null)}>{t.admin.skills.cancel}</Button>
                       </div>
                     </div>
                   )}
@@ -191,7 +193,7 @@ export function SkillsAdminPage() {
                       setDraftDescription(isMeaningfulChinese(skill.description_zh) ? skill.description_zh ?? "" : skill.description);
                     }}
                   >
-                    中文化
+                    {t.admin.skills.localization}
                   </Button>
                   {skill.category === "custom" && (
                     <Button
@@ -203,8 +205,8 @@ export function SkillsAdminPage() {
                       <Trash2Icon className="size-4" />
                     </Button>
                   )}
-                  <div className="text-sm text-slate-500">{skill.enabled ? "已启用" : "已禁用"}</div>
-                  <Switch checked={skill.enabled} onCheckedChange={(checked) => void toggleSkill(skill, checked).catch((err) => setError(err instanceof Error ? err.message : "更新技能失败"))} />
+                  <div className="text-sm text-slate-500">{skill.enabled ? t.admin.skills.enabled : t.admin.skills.disabled}</div>
+                  <Switch checked={skill.enabled} onCheckedChange={(checked) => void toggleSkill(skill, checked).catch((err) => setError(err instanceof Error ? err.message : t.admin.skills.updateSkillFailed))} />
                 </div>
               </div>
             </div>
@@ -215,17 +217,17 @@ export function SkillsAdminPage() {
       <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, skill: null })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>删除技能</DialogTitle>
+            <DialogTitle>{t.admin.skills.deleteSkill}</DialogTitle>
             <DialogDescription>
-              确定要删除技能 &quot;{deleteConfirm.skill?.name}&quot; 吗？此操作无法撤销。
+              {t.admin.skills.deleteConfirm.replace("{name}", deleteConfirm.skill?.name ?? "")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, skill: null })}>
-              取消
+              {t.admin.skills.cancel}
             </Button>
             <Button variant="destructive" onClick={deleteSkill} disabled={deleting}>
-              {deleting ? "删除中..." : "删除"}
+              {deleting ? t.admin.skills.deleting : t.admin.skills.delete}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { useI18n } from "@/core/i18n/hooks";
 
 type WorkspaceSummary = {
   id: string;
@@ -27,6 +28,7 @@ export function WorkspaceSwitcher({
   activeWorkspaceName: string;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -67,7 +69,7 @@ export function WorkspaceSwitcher({
       <div className="min-w-0 flex-1 text-left">
         <div className="truncate text-sm font-medium">{activeWorkspaceName}</div>
         <div className="text-muted-foreground text-xs">
-          {isPersonal ? "个人空间" : "共享空间"}
+          {isPersonal ? t.workspace.personalSpace : t.workspace.sharedSpace}
         </div>
       </div>
       <ChevronsUpDownIcon className="text-muted-foreground ml-auto size-4" />
@@ -115,7 +117,7 @@ export function WorkspaceSwitcher({
             side="bottom"
             sideOffset={4}
           >
-            <DropdownMenuLabel>切换工作空间</DropdownMenuLabel>
+            <DropdownMenuLabel>{t.workspace.workspaceManagement}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {workspaces.map((workspace) => {
               const Icon = workspace.default_personal ? UserIcon : Building2Icon;
@@ -130,8 +132,8 @@ export function WorkspaceSwitcher({
                   <div className="min-w-0">
                     <div className="truncate font-medium">{workspace.name}</div>
                     <div className="text-muted-foreground text-xs">
-                      {workspace.default_personal ? "个人空间" : "共享空间"}
-                      {active ? " · 当前" : ""}
+                      {workspace.default_personal ? t.workspace.personalSpace : t.workspace.sharedSpace}
+                      {active ? ` · ${t.workspace.currentSpace}` : ""}
                     </div>
                   </div>
                 </DropdownMenuItem>

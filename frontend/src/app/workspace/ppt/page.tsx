@@ -17,19 +17,11 @@ import {
   WorkspaceContainer,
   WorkspaceHeader,
 } from "@/components/workspace/workspace-container";
-
-const PPT_STYLES = [
-  { value: "gradient-modern", label: "现代渐变", description: "适合创业公司、科技产品" },
-  { value: "dark-premium", label: "深色高端", description: "适合高管汇报、奢华品牌" },
-  { value: "glassmorphism", label: "玻璃拟态", description: "适合 AI/SaaS 产品演示" },
-  { value: "keynote", label: "Keynote 风格", description: "Apple 主题演示" },
-  { value: "minimal-swiss", label: "瑞士极简", description: "适合架构、设计演示" },
-  { value: "consulting", label: "咨询风格", description: "适合商业咨询报告" },
-];
+import { useI18n } from "@/core/i18n/hooks";
 
 const ASPECT_RATIOS = [
-  { value: "16:9", label: "16:9 宽屏" },
-  { value: "4:3", label: "4:3 标准" },
+  { value: "16:9", labelKey: "wide" },
+  { value: "4:3", labelKey: "standard" },
 ];
 
 interface GenerateResponse {
@@ -41,6 +33,7 @@ interface GenerateResponse {
 }
 
 export default function PPTPage() {
+  const { t } = useI18n();
   const [topic, setTopic] = useState("");
   const [numSlides, setNumSlides] = useState(8);
   const [style, setStyle] = useState("gradient-modern");
@@ -49,12 +42,12 @@ export default function PPTPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = `演示生成 - MicX`;
-  }, []);
+    document.title = t.ppt.pageTitle;
+  }, [t]);
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
-      setError("请输入 PPT 主题");
+      setError(t.ppt.topicRequired);
       return;
     }
 
@@ -76,12 +69,12 @@ export default function PPTPage() {
       const data: GenerateResponse = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error ?? "生成失败");
+        throw new Error(data.error ?? t.ppt.generateFailed);
       }
 
       window.location.href = `/api/ppt/download/${data.task_id}`;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "生成失败");
+      setError(err instanceof Error ? err.message : t.ppt.generateFailed);
     } finally {
       setIsGenerating(false);
     }
@@ -94,22 +87,22 @@ export default function PPTPage() {
         <div className="mx-auto w-full max-w-2xl py-12">
           <div className="mb-8 flex items-center gap-3 text-2xl font-semibold">
             <PresentationIcon className="size-7" />
-            演示生成
+            {t.ppt.pageTitle}
           </div>
 
           <div className="space-y-6">
             <div>
-              <label className="mb-2 block text-sm font-medium">PPT 主题</label>
+              <label className="mb-2 block text-sm font-medium">{t.ppt.topic}</label>
               <Input
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="例如：2024年Q3产品迭代总结"
+                placeholder={t.ppt.topicPlaceholder}
                 disabled={isGenerating}
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">幻灯片数量</label>
+              <label className="mb-2 block text-sm font-medium">{t.ppt.numSlides}</label>
               <Input
                 type="number"
                 min={3}
@@ -121,23 +114,36 @@ export default function PPTPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">设计风格</label>
+              <label className="mb-2 block text-sm font-medium">{t.ppt.designStyle}</label>
               <Select value={style} onValueChange={setStyle} disabled={isGenerating}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PPT_STYLES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label} - {s.description}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="gradient-modern">
+                    {t.ppt.styles.gradientModern} - {t.ppt.styles.gradientModernDesc}
+                  </SelectItem>
+                  <SelectItem value="dark-premium">
+                    {t.ppt.styles.darkPremium} - {t.ppt.styles.darkPremiumDesc}
+                  </SelectItem>
+                  <SelectItem value="glassmorphism">
+                    {t.ppt.styles.glassmorphism} - {t.ppt.styles.glassmorphismDesc}
+                  </SelectItem>
+                  <SelectItem value="keynote">
+                    {t.ppt.styles.keynote} - {t.ppt.styles.keynoteDesc}
+                  </SelectItem>
+                  <SelectItem value="minimal-swiss">
+                    {t.ppt.styles.minimalSwiss} - {t.ppt.styles.minimalSwissDesc}
+                  </SelectItem>
+                  <SelectItem value="consulting">
+                    {t.ppt.styles.consulting} - {t.ppt.styles.consultingDesc}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">幻灯片比例</label>
+              <label className="mb-2 block text-sm font-medium">{t.ppt.slideRatio}</label>
               <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={isGenerating}>
                 <SelectTrigger>
                   <SelectValue />
@@ -145,7 +151,7 @@ export default function PPTPage() {
                 <SelectContent>
                   {ASPECT_RATIOS.map((r) => (
                     <SelectItem key={r.value} value={r.value}>
-                      {r.label}
+                      {t.ppt.ratios[r.labelKey as keyof typeof t.ppt.ratios]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -154,8 +160,12 @@ export default function PPTPage() {
 
             {error && <div className="text-sm text-red-500">{error}</div>}
 
-            <Button onClick={handleGenerate} disabled={isGenerating || !topic.trim()} className="w-full">
-              {isGenerating ? "生成中..." : "生成 PPT"}
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating || !topic.trim()}
+              className="w-full"
+            >
+              {isGenerating ? t.ppt.generating : t.ppt.generate}
             </Button>
           </div>
         </div>

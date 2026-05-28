@@ -71,19 +71,19 @@ export function UserKnowledgePage() {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
       <div className="rounded-3xl border bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-6 py-6 text-white shadow-sm">
         <div className="mt-3 text-2xl font-semibold tracking-tight">
-          {t.settings.knowledge?.title ?? "知识库管理"}
+          {t.settings.knowledge.title}
         </div>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
-          {t.settings.knowledge?.description ?? "管理个人知识库、全局知识库、共享知识库"}
+          {t.settings.knowledge.description}
         </p>
       </div>
 
       <Tabs defaultValue="all">
         <div className="flex justify-between">
           <TabsList>
-            <TabsTrigger value="all">{t.settings.knowledge?.allTab ?? "全部"}</TabsTrigger>
-            <TabsTrigger value="mine">{t.settings.knowledge?.mineTab ?? "我的创建"}</TabsTrigger>
-            <TabsTrigger value="global">{t.settings.knowledge?.globalTab ?? "全局知识库"}</TabsTrigger>
+            <TabsTrigger value="all">{t.settings.knowledge.allTab}</TabsTrigger>
+            <TabsTrigger value="mine">{t.settings.knowledge.mineTab}</TabsTrigger>
+            <TabsTrigger value="global">{t.settings.knowledge.globalTab}</TabsTrigger>
           </TabsList>
           <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
             <PlusIcon className="size-4" />
@@ -180,7 +180,7 @@ function AllKnowledgeList({
                   {kb.name}
                   {isGlobal && (
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                      {t.settings.knowledge?.globalBadge ?? "全局"}
+                      {t.settings.knowledge.globalBadge}
                     </span>
                   )}
                 </CardTitle>
@@ -237,7 +237,7 @@ function AllKnowledgeList({
                   )}
                   {isGlobal && (
                     <span className="text-xs text-muted-foreground italic">
-                      {t.settings.knowledge?.readOnly ?? "只读"}
+                      {t.settings.knowledge.readOnly}
                     </span>
                   )}
                 </div>
@@ -307,7 +307,7 @@ function MyKnowledgeList({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <DatabaseIcon className="size-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">{t.settings.knowledge?.emptyMine ?? "暂无个人知识库"}</p>
+        <p className="text-muted-foreground">{t.settings.knowledge.emptyMine}</p>
         <p className="text-sm text-muted-foreground">{t.knowledge.empty}</p>
       </div>
     );
@@ -414,7 +414,7 @@ function GlobalKnowledgeList({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <GlobeIcon className="size-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">{t.settings.knowledge?.emptyGlobal ?? "暂无全局知识库"}</p>
+        <p className="text-muted-foreground">{t.settings.knowledge.emptyGlobal}</p>
       </div>
     );
   }
@@ -469,7 +469,7 @@ function CreateKnowledgeDialog({
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      setError(t.settings.knowledge?.nameRequired ?? "名称不能为空");
+      setError(t.settings.knowledge.nameRequired);
       return;
     }
     setError(null);
@@ -481,7 +481,7 @@ function CreateKnowledgeDialog({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建失败");
+      setError(err instanceof Error ? err.message : t.common.deleteFailed);
     } finally {
       setCreating(false);
     }
@@ -502,7 +502,7 @@ function CreateKnowledgeDialog({
         <DialogHeader>
           <DialogTitle>{t.knowledge.createKnowledgeBase}</DialogTitle>
           <DialogDescription>
-            {t.settings.knowledge?.createDescription ?? "创建一个新的知识库用于存储和检索文档"}
+            {t.settings.knowledge.createDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -566,7 +566,7 @@ function EditKnowledgeDialog({
 
   const handleUpdate = async () => {
     if (!kb || !name.trim()) {
-      setError(t.settings.knowledge?.nameRequired ?? "名称不能为空");
+      setError(t.settings.knowledge.nameRequired);
       return;
     }
     setError(null);
@@ -576,7 +576,7 @@ function EditKnowledgeDialog({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新失败");
+      setError(err instanceof Error ? err.message : t.common.deleteFailed);
     } finally {
       setUpdating(false);
     }
@@ -590,7 +590,7 @@ function EditKnowledgeDialog({
         <DialogHeader>
           <DialogTitle>{t.common.edit} {kb.name}</DialogTitle>
           <DialogDescription>
-            {t.settings.knowledge?.editDescription ?? "更新知识库的名称和描述"}
+            {t.settings.knowledge.editDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -664,7 +664,7 @@ function DeleteKnowledgeDialog({
         <DialogHeader>
           <DialogTitle>{t.knowledge.delete}</DialogTitle>
           <DialogDescription>
-            {t.settings.knowledge?.deleteConfirm ?? `确定要删除知识库 "${kb.name}" 吗？此操作无法撤销。`}
+            {t.settings.knowledge.deleteConfirm}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -698,7 +698,7 @@ function ShareKnowledgeDialog({
 
   const handleShare = async () => {
     if (!kb || !workspaceId.trim()) {
-      setError(t.settings.knowledge?.workspaceRequired ?? "工作区 ID 不能为空");
+      setError(t.settings.knowledge.workspaceRequired);
       return;
     }
     setError(null);
@@ -709,7 +709,7 @@ function ShareKnowledgeDialog({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "分享失败");
+      setError(err instanceof Error ? err.message : t.common.deleteFailed);
     } finally {
       setSharing(false);
     }
@@ -736,11 +736,11 @@ function ShareKnowledgeDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium">{t.settings.knowledge?.workspaceId ?? "工作区 ID"}</label>
+            <label className="text-sm font-medium">{t.settings.knowledge.workspaceId}</label>
             <Input
               value={workspaceId}
               onChange={(e) => setWorkspaceId(e.target.value)}
-              placeholder={t.settings.knowledge?.workspaceIdPlaceholder ?? "输入目标工作区 ID"}
+              placeholder={t.settings.knowledge.workspaceIdPlaceholder}
               className="mt-1"
             />
           </div>

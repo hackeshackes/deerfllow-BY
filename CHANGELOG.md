@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-05-28
+
+### Added
+
+#### Admin 页面全量 i18n 本地化
+- 所有 Admin 管理页面完全支持中英文切换
+- 修复页面包括:
+  - memory-admin-page.tsx (记忆管理)
+  - models-admin-page.tsx (模型管理)
+  - monitoring-admin-page.tsx (监控中心)
+  - token-usage-admin-page.tsx (Token 统计)
+  - users-admin-page.tsx (用户管理)
+  - workspaces-admin-page.tsx (工作区管理)
+
+#### 中英文切换完整支持
+- Settings → Appearance → Language 可切换中文/英文
+- 所有管理后台界面现已支持完整国际化
+
 ## [1.5.1] - 2026-05-26
 
 ### Added
