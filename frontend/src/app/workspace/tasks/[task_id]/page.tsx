@@ -211,7 +211,7 @@ export default function TaskDetailPage() {
             <Button size="sm" variant="outline" asChild>
               <Link href={`/workspace/chats/${task.thread_id}`}>
                 <MessageCircle className="size-4 mr-1" />
-                查看对话
+                {t.tasks.viewChat}
               </Link>
             </Button>
           )}

@@ -1,7 +1,7 @@
 "use client";
 
-import { BrainIcon, ChevronRightIcon, Loader2Icon, SearchIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BrainIcon, Loader2Icon, SearchIcon } from "lucide-react";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 type MemoryData = {
   user_id: string;
@@ -22,6 +23,7 @@ type MemoryData = {
 };
 
 export function MemoryAdminPage() {
+  const { t } = useI18n();
   const [userId, setUserId] = useState("");
   const [memoryData, setMemoryData] = useState<MemoryData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,12 +40,12 @@ export function MemoryAdminPage() {
       const response = await fetch(`/api/admin/memory/users/${userId.trim()}`);
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "加载记忆失败");
+        throw new Error(data?.detail ?? t.admin.memory.loadFailed);
       }
       const data = (await response.json()) as MemoryData;
       setMemoryData(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载记忆失败");
+      setError(err instanceof Error ? err.message : t.admin.memory.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,7 @@ export function MemoryAdminPage() {
 
   function renderMemorySection() {
     if (!memoryData?.memory) {
-      return <div className="py-8 text-center text-sm text-slate-500">暂无记忆数据</div>;
+      return <div className="py-8 text-center text-sm text-slate-500">{t.admin.memory.noMemoryData}</div>;
     }
 
     const memory = memoryData.memory;
@@ -62,14 +64,14 @@ export function MemoryAdminPage() {
       <div className="space-y-6">
         {memory.last_updated && (
           <div className="text-sm text-slate-400">
-            最后更新: {new Date(memory.last_updated).toLocaleString("zh-CN")}
+            {t.admin.memory.lastUpdated}: {new Date(memory.last_updated).toLocaleString()}
           </div>
         )}
 
         {memory.system_prompt_context && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">System Prompt Context</CardTitle>
+              <CardTitle className="text-base">{t.admin.memory.systemPromptContext}</CardTitle>
             </CardHeader>
             <CardContent>
               <pre className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
@@ -82,8 +84,8 @@ export function MemoryAdminPage() {
         {hasFacts && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Facts ({memory.facts!.length})</CardTitle>
-              <CardDescription>用户事实和偏好</CardDescription>
+              <CardTitle className="text-base">{t.admin.memory.facts} ({memory.facts!.length})</CardTitle>
+              <CardDescription>{t.admin.memory.userFactsPreferences}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -93,10 +95,10 @@ export function MemoryAdminPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant="secondary" className="text-xs">{fact.category}</Badge>
                         <Badge variant="outline" className="text-xs">
-                          置信度: {fact.confidence.toFixed(2)}
+                          {t.admin.memory.factConfidence}: {fact.confidence.toFixed(2)}
                         </Badge>
                         {fact.source && (
-                          <span className="text-xs text-slate-400">来源: {fact.source}</span>
+                          <span className="text-xs text-slate-400">{t.admin.memory.factSource}: {fact.source}</span>
                         )}
                       </div>
                       <p className="text-sm">{fact.fact}</p>
@@ -111,8 +113,8 @@ export function MemoryAdminPage() {
         {hasContext && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Context ({memory.context!.length})</CardTitle>
-              <CardDescription>用户上下文信息</CardDescription>
+              <CardTitle className="text-base">{t.admin.memory.context} ({memory.context!.length})</CardTitle>
+              <CardDescription>{t.admin.memory.userContextInfo}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -122,10 +124,10 @@ export function MemoryAdminPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant="secondary" className="text-xs">{ctx.category}</Badge>
                         <Badge variant="outline" className="text-xs">
-                          置信度: {ctx.confidence.toFixed(2)}
+                          {t.admin.memory.factConfidence}: {ctx.confidence.toFixed(2)}
                         </Badge>
                         {ctx.source && (
-                          <span className="text-xs text-slate-400">来源: {ctx.source}</span>
+                          <span className="text-xs text-slate-400">{t.admin.memory.factSource}: {ctx.source}</span>
                         )}
                       </div>
                       <p className="text-sm">{ctx.content}</p>
@@ -138,7 +140,7 @@ export function MemoryAdminPage() {
         )}
 
         {!hasFacts && !hasContext && !memory.system_prompt_context && (
-          <div className="py-8 text-center text-sm text-slate-500">暂无记忆数据</div>
+          <div className="py-8 text-center text-sm text-slate-500">{t.admin.memory.noMemoryData}</div>
         )}
       </div>
     );
@@ -146,24 +148,24 @@ export function MemoryAdminPage() {
 
   return (
     <AdminPageShell
-      title="记忆管理"
-      description="查看指定用户的记忆数据（上下文、事实、历史）"
+      title={t.admin.memory.title}
+      description={t.admin.memory.description}
     >
       <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <SearchIcon className="size-5" />
-              查询用户记忆
+              {t.admin.memory.searchUserMemory}
             </CardTitle>
             <CardDescription>
-              输入用户ID查看该用户的完整记忆数据
+              {t.admin.memory.searchDescription}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-3">
               <Input
-                placeholder="输入用户 ID"
+                placeholder={t.admin.memory.userIdPlaceholder}
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleSearch()}
@@ -171,7 +173,7 @@ export function MemoryAdminPage() {
               />
               <Button onClick={() => void handleSearch()} disabled={loading || !userId.trim()}>
                 {loading ? <Loader2Icon className="size-4 animate-spin" /> : <SearchIcon className="size-4" />}
-                查询
+                {t.admin.memory.search}
               </Button>
             </div>
 
@@ -182,7 +184,7 @@ export function MemoryAdminPage() {
             )}
 
             {searched && !loading && !memoryData && !error && (
-              <div className="text-sm text-slate-500">未找到该用户的记忆数据</div>
+              <div className="text-sm text-slate-500">{t.admin.memory.noDataFound}</div>
             )}
           </CardContent>
         </Card>
@@ -192,10 +194,10 @@ export function MemoryAdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BrainIcon className="size-5" />
-                用户记忆数据
+                {t.admin.memory.userMemoryData}
               </CardTitle>
               <CardDescription>
-                用户ID: {memoryData.user_id}
+                {t.admin.memory.userId}: {memoryData.user_id}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -206,7 +208,7 @@ export function MemoryAdminPage() {
 
         {!searched && (
           <div className="text-center text-sm text-slate-400 py-8">
-            请输入用户 ID 开始查询
+            {t.admin.memory.enterUserId}
           </div>
         )}
       </div>

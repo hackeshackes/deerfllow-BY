@@ -2,13 +2,12 @@
 
 import { MicIcon, SquareIcon, Loader2Icon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { getBackendBaseURL } from "@/core/config";
 import { useI18n } from "@/core/i18n/hooks";
+import { cn } from "@/lib/utils";
 
 interface VoiceInputProps {
   className?: string;
@@ -79,7 +78,7 @@ export function VoiceInput({
           }
 
           const data = (await response.json()) as { text?: string };
-          const transcribedText = data.text?.trim() || "";
+          const transcribedText = data.text?.trim() ?? "";
 
           if (transcribedText) {
             onTranscriptionChange?.(transcribedText);
@@ -150,7 +149,7 @@ export function VoiceInput({
     if (isRecording) {
       stopRecording();
     } else {
-      startRecording();
+      void startRecording();
     }
   }, [isRecording, startRecording, stopRecording]);
 

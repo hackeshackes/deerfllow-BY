@@ -4,9 +4,11 @@ import { useMemo } from "react";
 
 import { useBrand } from "@/components/brand/brand-provider";
 import { buildSupportMailto } from "@/core/brand/config";
+import { useI18n } from "@/core/i18n/hooks";
 
 export function Footer() {
   const brand = useBrand();
+  const { t } = useI18n();
   const year = useMemo(() => new Date().getFullYear(), []);
 
   return (
@@ -20,12 +22,12 @@ export function Footer() {
           </p>
         </div>
         <div className="text-left md:text-right">
-          <p>中文优先 · 私有部署 · 团队协作</p>
+          <p>{t.landing.footerBadge}</p>
           <a className="mt-2 inline-block text-white underline" href={buildSupportMailto(brand.supportEmail, "MicX support")}>{brand.supportEmail}</a>
         </div>
       </div>
       <div className="container mb-8 flex flex-col items-center justify-center text-xs text-slate-500">
-        <p>基于 MIT License 许可的软件构建</p>
+        <p>{t.landing.license}</p>
         <p>&copy; {year} {brand.name}</p>
       </div>
     </footer>

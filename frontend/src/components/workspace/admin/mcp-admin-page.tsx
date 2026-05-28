@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 import type { MCPServerConfig, MCPPreset } from "@/core/mcp/types";
 
 const defaultServerConfig: MCPServerConfig = {
@@ -25,6 +26,7 @@ const defaultServerConfig: MCPServerConfig = {
 };
 
 export function MCPAdminPage() {
+  const { t } = useI18n();
   const [servers, setServers] = useState<Record<string, MCPServerConfig>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +51,12 @@ export function MCPAdminPage() {
     try {
       const response = await fetch("/api/mcp/config");
       if (!response.ok) {
-        throw new Error("Failed to load MCP configuration");
+        throw new Error(t.admin.mcp.loadFailed);
       }
       const data = await response.json();
       setServers(data.mcp_servers ?? {});
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load MCP configuration");
+      setError(err instanceof Error ? err.message : t.admin.mcp.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -82,7 +84,7 @@ export function MCPAdminPage() {
         body: JSON.stringify({ mcp_servers: updatedServers }),
       });
       if (!response.ok) {
-        throw new Error("Failed to save MCP configuration");
+        throw new Error(t.admin.mcp.loadFailed);
       }
       const data = await response.json();
       setServers(data.mcp_servers ?? {});
@@ -91,7 +93,7 @@ export function MCPAdminPage() {
       setForm(defaultServerConfig);
       setServerName("");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save");
+      alert(err instanceof Error ? err.message : t.admin.mcp.loadFailed);
     } finally {
       setSaving(false);
     }
@@ -141,7 +143,7 @@ export function MCPAdminPage() {
       const result = await response.json();
       setTestResult(result);
     } catch {
-      setTestResult({ success: false, error: "Connection test failed" });
+      setTestResult({ success: false, error: t.admin.mcp.connectionFailed });
     } finally {
       setTesting(false);
     }
@@ -149,7 +151,7 @@ export function MCPAdminPage() {
 
   function handleSave() {
     if (!serverName.trim()) {
-      alert("Server name is required");
+      alert(t.admin.mcp.serverName);
       return;
     }
     const updatedServers = { ...servers };
@@ -161,7 +163,7 @@ export function MCPAdminPage() {
   }
 
   function handleDelete(name: string) {
-    if (!confirm(`Delete MCP server "${name}"?`)) return;
+    if (!confirm(t.admin.mcp.deleteConfirm.replace("{name}", name))) return;
     const updatedServers = { ...servers };
     delete updatedServers[name];
     void saveServers(updatedServers);
@@ -185,12 +187,12 @@ export function MCPAdminPage() {
 
   return (
     <AdminPageShell
-      title="MCP 配置"
-      description="Model Context Protocol 服务器配置"
+      title={t.admin.mcp.title}
+      description={t.admin.mcp.description}
     >
       <div className="space-y-6">
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">加载中...</div>
+          <div className="text-center py-8 text-muted-foreground">{t.admin.mcp.loading}</div>
         ) : error ? (
           <div className="text-center py-8 text-red-500">{error}</div>
         ) : (
@@ -198,17 +200,17 @@ export function MCPAdminPage() {
             <div className="flex gap-2">
               <Button onClick={openCreateDialog}>
                 <PlusIcon className="size-4 mr-1" />
-                自定义服务器
+                {t.admin.mcp.addCustomServer}
               </Button>
               <Button variant="outline" onClick={openPresetDialog}>
-                从预设添加
+                {t.admin.mcp.addFromPreset}
               </Button>
             </div>
 
             {Object.keys(servers).length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
-                  暂无 MCP 服务器配置。点击上方按钮添加。
+                  {t.admin.mcp.noMcpServers}
                 </CardContent>
               </Card>
             ) : (
@@ -223,22 +225,22 @@ export function MCPAdminPage() {
                         </div>
                         <div className="flex gap-1">
                           <Button size="sm" variant="outline" onClick={() => openEditDialog(name)}>
-                            编辑
+                            {t.admin.mcp.edit}
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleDelete(name)}>
                             <TrashIcon className="size-4" />
                           </Button>
                         </div>
                       </div>
-                      <CardDescription>{config.description || "无描述"}</CardDescription>
+                      <CardDescription>{config.description || t.admin.mcp.noDescription}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="text-sm text-muted-foreground">
-                        <div>类型: {config.type}</div>
-                        {config.command && <div>命令: {config.command} {config.args?.join(" ")}</div>}
-                        {config.url && <div>URL: {config.url}</div>}
+                        <div>{t.admin.mcp.serverType}: {config.type}</div>
+                        {config.command && <div>{t.admin.mcp.command}: {config.command} {config.args?.join(" ")}</div>}
+                        {config.url && <div>{t.admin.mcp.url}: {config.url}</div>}
                         {Object.keys(config.env || {}).length > 0 && (
-                          <div>环境变量: {Object.keys(config.env).join(", ")}</div>
+                          <div>{t.admin.mcp.envVariables}: {Object.keys(config.env).join(", ")}</div>
                         )}
                       </div>
                     </CardContent>
@@ -253,15 +255,15 @@ export function MCPAdminPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingServer ? "编辑 MCP 服务器" : "创建 MCP 服务器"}</DialogTitle>
+            <DialogTitle>{editingServer ? t.admin.mcp.editServer : t.admin.mcp.createServer}</DialogTitle>
             <DialogDescription>
-              {editingServer ? `编辑 ${editingServer}` : "配置新的 MCP 服务器"}
+              {editingServer ? `${editingServer}` : t.admin.mcp.serverDescription}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">服务器名称</label>
+                <label className="text-sm font-medium">{t.admin.mcp.serverName}</label>
                 <Input
                   value={serverName}
                   onChange={(e) => setServerName(e.target.value)}
@@ -270,7 +272,7 @@ export function MCPAdminPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">类型</label>
+                <label className="text-sm font-medium">{t.admin.mcp.serverType}</label>
                 <select
                   className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={form.type}
@@ -284,18 +286,18 @@ export function MCPAdminPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">描述</label>
+              <label className="text-sm font-medium">{t.admin.mcp.serverDescription}</label>
               <Input
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="服务器功能描述"
+                placeholder={t.admin.mcp.serverDescription}
               />
             </div>
 
             {form.type === "stdio" ? (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">命令</label>
+                  <label className="text-sm font-medium">{t.admin.mcp.command}</label>
                   <Input
                     value={form.command ?? ""}
                     onChange={(e) => setForm({ ...form, command: e.target.value })}
@@ -303,7 +305,7 @@ export function MCPAdminPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">参数</label>
+                  <label className="text-sm font-medium">{t.admin.mcp.args}</label>
                   <Input
                     value={form.args?.join(" ") ?? ""}
                     onChange={(e) => setForm({ ...form, args: e.target.value.split(" ").filter(Boolean) })}
@@ -313,7 +315,7 @@ export function MCPAdminPage() {
               </>
             ) : (
               <div className="space-y-2">
-                <label className="text-sm font-medium">URL</label>
+                <label className="text-sm font-medium">{t.admin.mcp.url}</label>
                 <Input
                   value={form.url ?? ""}
                   onChange={(e) => setForm({ ...form, url: e.target.value })}
@@ -324,10 +326,10 @@ export function MCPAdminPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">环境变量</label>
+                <label className="text-sm font-medium">{t.admin.mcp.envVariables}</label>
                 <Button size="sm" variant="ghost" onClick={copyEnvTemplate}>
                   <CopyIcon className="size-4 mr-1" />
-                  复制模板
+                  {t.admin.mcp.copyTemplate}
                 </Button>
               </div>
               <Textarea
@@ -349,16 +351,16 @@ export function MCPAdminPage() {
 
             {testResult && (
               <div className={`p-3 rounded-md ${testResult.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
-                {testResult.success ? "连接成功" : `连接失败: ${testResult.error}`}
+                {testResult.success ? t.admin.mcp.connectionSuccess : `${t.admin.mcp.connectionFailed}: ${testResult.error}`}
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={handleTest} disabled={testing}>
-              {testing ? "测试中..." : "测试连接"}
+              {testing ? t.admin.mcp.testing : t.admin.mcp.testConnection}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "保存中..." : "保存"}
+              {saving ? t.admin.mcp.saving : t.admin.mcp.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -367,8 +369,8 @@ export function MCPAdminPage() {
       <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>选择预设</DialogTitle>
-            <DialogDescription>选择一个 MCP 服务器预设快速配置</DialogDescription>
+            <DialogTitle>{t.admin.mcp.selectPreset}</DialogTitle>
+            <DialogDescription>{t.admin.mcp.serverDescription}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
             {presets.map((preset) => (

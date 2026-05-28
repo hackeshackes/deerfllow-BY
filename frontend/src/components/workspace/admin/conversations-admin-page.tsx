@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 type ChannelThread = {
   channel: string;
@@ -24,11 +25,11 @@ type ChannelThread = {
 };
 
 const channelLabels: Record<string, string> = {
-  feishu: "飞书",
+  feishu: "Feishu",
   slack: "Slack",
   telegram: "Telegram",
-  wecom: "企业微信",
-  dingtalk: "钉钉",
+  wecom: "WeCom",
+  dingtalk: "DingTalk",
 };
 
 const channelIcons: Record<string, string> = {
@@ -40,6 +41,7 @@ const channelIcons: Record<string, string> = {
 };
 
 export function ConversationsAdminPage() {
+  const { t } = useI18n();
   const [threads, setThreads] = useState<ChannelThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,12 +57,12 @@ export function ConversationsAdminPage() {
       const res = await fetch("/api/channels/threads");
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "加载会话失败");
+        throw new Error(data?.detail ?? t.admin.conversations.loadFailed);
       }
       const data = (await res.json()) as { channels: ChannelThread[] };
       setThreads(data.channels);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "加载会话失败");
+      setError(e instanceof Error ? e.message : t.admin.conversations.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export function ConversationsAdminPage() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [t.admin.conversations.loadFailed]);
 
   function openAssignDialog(thread: ChannelThread) {
     setAssignTarget(thread);
@@ -90,41 +92,41 @@ export function ConversationsAdminPage() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "分配失败");
+        throw new Error(data?.detail ?? t.admin.conversations.assignFailed);
       }
-      toast.success("会话分配成功");
+      toast.success(t.admin.conversations.assignSuccess);
       setAssignTarget(null);
       await loadData();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "分配失败");
+      toast.error(e instanceof Error ? e.message : t.admin.conversations.assignFailed);
     } finally {
       setAssigning(false);
     }
   }
 
   const groupedThreads: Record<string, ChannelThread[]> = {};
-  for (const t of threads) {
-    (groupedThreads[t.channel] ??= []).push(t);
+  for (const t_local of threads) {
+    (groupedThreads[t_local.channel] ??= []).push(t_local);
   }
 
   return (
-    <AdminPageShell title="会话管理" description="查看和管理所有 IM 渠道发起的会话，设置用户和工作区归属。">
+    <AdminPageShell title={t.admin.conversations.title} description={t.admin.conversations.description}>
       <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageCircleIcon className="size-5" />
-              所有 IM 会话 ({threads.length})
+              {t.admin.conversations.title} ({threads.length})
             </CardTitle>
-            <CardDescription>通过飞书、Slack、Telegram 等渠道发起的会话。管理员可分配归属。</CardDescription>
+            <CardDescription>IM conversations initiated through Feishu, Slack, Telegram, etc.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="py-8 text-center text-sm text-slate-500">加载中...</div>
+              <div className="py-8 text-center text-sm text-slate-500">{t.admin.conversations.loading}</div>
             ) : error ? (
               <div className="py-8 text-center text-sm text-red-500">{error}</div>
             ) : threads.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-500">暂无 IM 会话</div>
+              <div className="py-8 text-center text-sm text-slate-500">{t.admin.conversations.noConversations}</div>
             ) : (
               <div className="space-y-6">
                 {Object.entries(groupedThreads).map(([channel, channelThreads]) => (
@@ -149,31 +151,31 @@ export function ConversationsAdminPage() {
                               </span>
                               {thread.topic_id && (
                                 <Badge variant="outline" className="text-xs">
-                                  topic: {thread.topic_id.slice(0, 12)}...
+                                  {t.admin.conversations.topic}: {thread.topic_id.slice(0, 12)}...
                                 </Badge>
                               )}
                               <Badge variant="outline" className="text-xs">
-                                thread: {thread.thread_id.slice(0, 12)}...
+                                {t.admin.conversations.thread}: {thread.thread_id.slice(0, 12)}...
                               </Badge>
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
                               <span className="flex items-center gap-1">
                                 <UserIcon className="size-3" />
-                                {thread.user_id || "未关联"}
+                                {thread.user_id || t.admin.conversations.unassigned}
                               </span>
                               {thread.micx_user_id && (
                                 <span className="flex items-center gap-1 text-emerald-600">
                                   <UsersIcon className="size-3" />
-                                  MicX 用户: {thread.micx_user_id}
+                                  {t.admin.conversations.micxUser}: {thread.micx_user_id}
                                 </span>
                               )}
                               {thread.micx_workspace_id && (
                                 <span className="flex items-center gap-1 text-blue-600">
                                   <UsersIcon className="size-3" />
-                                  工作区: {thread.micx_workspace_id}
+                                  {t.admin.conversations.workspace}: {thread.micx_workspace_id}
                                 </span>
                               )}
-                              <span>{new Date(thread.created_at * 1000).toLocaleDateString("zh-CN")}</span>
+                              <span>{new Date(thread.created_at * 1000).toLocaleDateString()}</span>
                             </div>
                           </div>
                           <Button
@@ -182,7 +184,7 @@ export function ConversationsAdminPage() {
                             onClick={() => openAssignDialog(thread)}
                             className="ml-4 shrink-0"
                           >
-                            分配归属
+                            {t.admin.conversations.assignOwnership}
                           </Button>
                         </div>
                       ))}
@@ -198,24 +200,24 @@ export function ConversationsAdminPage() {
       <Dialog open={assignTarget !== null} onOpenChange={() => setAssignTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>分配会话归属</DialogTitle>
+            <DialogTitle>{t.admin.conversations.assignOwnership}</DialogTitle>
             <DialogDescription>
-              将 IM 会话分配给 MicX 用户和工作区。分配后可让用户在自己的线程列表中看到该对话。
+              Assign IM conversation to MicX user and workspace.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">MicX 用户 ID（可选）</label>
+              <label className="text-sm font-medium">{t.admin.conversations.micxUserId}</label>
               <Input
-                placeholder="留空表示未分配"
+                placeholder="Leave empty for unassigned"
                 value={micxUserId}
                 onChange={(e) => setMicxUserId(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">MicX 工作区 ID（可选）</label>
+              <label className="text-sm font-medium">{t.admin.conversations.micxWorkspaceId}</label>
               <Input
-                placeholder="留空表示未分配"
+                placeholder="Leave empty for unassigned"
                 value={micxWorkspaceId}
                 onChange={(e) => setMicxWorkspaceId(e.target.value)}
               />
@@ -223,10 +225,10 @@ export function ConversationsAdminPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignTarget(null)}>
-              取消
+              {t.admin.channels.cancel}
             </Button>
             <Button onClick={() => void handleAssign()} disabled={assigning}>
-              {assigning ? "分配中..." : "确认分配"}
+              {assigning ? t.admin.conversations.assigning : t.admin.conversations.assign}
             </Button>
           </DialogFooter>
         </DialogContent>

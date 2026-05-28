@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 type ChannelStatus = {
   service_running: boolean;
@@ -43,19 +44,19 @@ type EditingChannel = {
 const channelInfo = [
   {
     id: "feishu",
-    name: "飞书",
+    name: "Feishu",
     icon: "📱",
-    description: "字节跳动飞书平台集成",
+    description: "ByteDance Feishu Platform Integration",
     fields: [
-      { key: "app_id", label: "App ID", placeholder: "飞书应用 App ID" },
-      { key: "app_secret", label: "App Secret", placeholder: "飞书应用 App Secret", isPassword: true },
+      { key: "app_id", label: "App ID", placeholder: "Feishu App ID" },
+      { key: "app_secret", label: "App Secret", placeholder: "Feishu App Secret", isPassword: true },
     ],
   },
   {
     id: "slack",
     name: "Slack",
     icon: "💬",
-    description: "Slack 工作区消息集成",
+    description: "Slack Workspace Messaging Integration",
     fields: [
       { key: "bot_token", label: "Bot Token", placeholder: "xoxb-your-bot-token", isPassword: true },
       { key: "app_token", label: "App Token (Socket Mode)", placeholder: "xapp-your-app-token", isPassword: true },
@@ -65,34 +66,35 @@ const channelInfo = [
     id: "telegram",
     name: "Telegram",
     icon: "✈️",
-    description: "Telegram Bot 消息集成",
+    description: "Telegram Bot Messaging Integration",
     fields: [
       { key: "bot_token", label: "Bot Token", placeholder: "Telegram Bot Token", isPassword: true },
     ],
   },
   {
     id: "wecom",
-    name: "企业微信",
+    name: "WeCom",
     icon: "💼",
-    description: "腾讯企业微信集成",
+    description: "Tencent WeCom Integration",
     fields: [
-      { key: "bot_id", label: "Bot ID", placeholder: "企业微信 Bot ID" },
-      { key: "bot_secret", label: "Bot Secret", placeholder: "企业微信 Bot Secret", isPassword: true },
+      { key: "bot_id", label: "Bot ID", placeholder: "WeCom Bot ID" },
+      { key: "bot_secret", label: "Bot Secret", placeholder: "WeCom Bot Secret", isPassword: true },
     ],
   },
   {
     id: "dingtalk",
-    name: "钉钉",
+    name: "DingTalk",
     icon: "📌",
-    description: "阿里巴巴钉钉平台集成",
+    description: "Alibaba DingTalk Platform Integration",
     fields: [
-      { key: "client_id", label: "Client ID", placeholder: "钉钉应用 Client ID" },
-      { key: "client_secret", label: "Client Secret", placeholder: "钉钉应用 Client Secret", isPassword: true },
+      { key: "client_id", label: "Client ID", placeholder: "DingTalk Client ID" },
+      { key: "client_secret", label: "Client Secret", placeholder: "DingTalk Client Secret", isPassword: true },
     ],
   },
 ];
 
 export function ChannelsAdminPage() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<ChannelStatus | null>(null);
   const [config, setConfig] = useState<ChannelConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,7 +133,7 @@ export function ChannelsAdminPage() {
       const data = await response.json();
       setConfig(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load channel config");
+      setError(err instanceof Error ? err.message : t.admin.channels.title);
     } finally {
       setLoading(false);
     }
@@ -147,10 +149,10 @@ export function ChannelsAdminPage() {
       if (result.success) {
         await loadStatus();
       } else {
-        alert(`重启失败: ${result.message}`);
+        alert(`${t.admin.channels.restartFailed}: ${result.message}`);
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "重启失败");
+      alert(err instanceof Error ? err.message : t.admin.channels.restartFailed);
     } finally {
       setRestarting(null);
     }
@@ -165,11 +167,11 @@ export function ChannelsAdminPage() {
         body: JSON.stringify({ enabled: !currentEnabled }),
       });
       if (!response.ok) {
-        throw new Error("更新渠道失败");
+        throw new Error(t.admin.channels.updateChannelFailed);
       }
       await Promise.all([loadStatus(), loadConfig()]);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "更新渠道失败");
+      alert(err instanceof Error ? err.message : t.admin.channels.updateChannelFailed);
     } finally {
       setToggling(null);
     }
@@ -221,12 +223,12 @@ export function ChannelsAdminPage() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        throw new Error("保存配置失败");
+        throw new Error(t.admin.channels.saveConfigFailed);
       }
       setEditDialogOpen(false);
       await Promise.all([loadStatus(), loadConfig()]);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "保存配置失败");
+      alert(err instanceof Error ? err.message : t.admin.channels.saveConfigFailed);
     } finally {
       setSaving(false);
     }
@@ -236,25 +238,25 @@ export function ChannelsAdminPage() {
 
   return (
     <AdminPageShell
-      title="IM 渠道配置"
-      description="即时通讯渠道集成管理"
+      title={t.admin.channels.title}
+      description={t.admin.channels.description}
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-medium">渠道状态</h3>
+            <h3 className="text-lg font-medium">{t.admin.channels.channelStatus}</h3>
             <p className="text-sm text-muted-foreground">
-              服务运行中: {status?.service_running ? "✅" : "❌"}
+              {t.admin.channels.serviceRunning}: {status?.service_running ? "✅" : "❌"}
             </p>
           </div>
           <Button variant="outline" onClick={() => Promise.all([loadStatus(), loadConfig()])} disabled={loading}>
             <RefreshCwIcon className={`size-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-            刷新状态
+            {t.admin.channels.refreshStatus}
           </Button>
         </div>
 
         {loading && !status && !config ? (
-          <div className="text-center py-8 text-muted-foreground">加载中...</div>
+          <div className="text-center py-8 text-muted-foreground">{t.admin.voice.loading}</div>
         ) : error ? (
           <Card>
             <CardContent className="py-8 text-center text-red-500">{error}</CardContent>
@@ -291,7 +293,7 @@ export function ChannelsAdminPage() {
                                 : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
                           }`}
                         >
-                          {isRunning ? "运行中" : isEnabled ? "已启用" : "未配置"}
+                          {isRunning ? t.admin.channels.running : isEnabled ? t.admin.channels.enabled : t.admin.channels.notConfigured}
                         </span>
                         <Switch
                           checked={!!isEnabled}
@@ -304,7 +306,7 @@ export function ChannelsAdminPage() {
                           onClick={() => openEditDialog(channel.id)}
                         >
                           <SettingsIcon className="size-4" />
-                          配置
+                          {t.admin.channels.configure}
                         </Button>
                         <Button
                           size="sm"
@@ -315,7 +317,7 @@ export function ChannelsAdminPage() {
                           <RefreshCwIcon
                             className={`size-4 mr-1 ${restarting === channel.id ? "animate-spin" : ""}`}
                           />
-                          重启
+                          {t.admin.channels.restart}
                         </Button>
                       </div>
                     </div>
@@ -341,7 +343,7 @@ export function ChannelsAdminPage() {
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground">
-                        尚未配置渠道凭证
+                        {t.admin.channels.noConfig}
                       </div>
                     )}
                   </CardContent>
@@ -355,13 +357,13 @@ export function ChannelsAdminPage() {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingChannel?.name} 配置</DialogTitle>
-            <DialogDescription>填写渠道配置信息</DialogDescription>
+            <DialogTitle>{editingChannel?.name} {t.admin.channels.configure}</DialogTitle>
+            <DialogDescription>{t.admin.channels.channelDescription}</DialogDescription>
           </DialogHeader>
           {editingChannel && currentChannel && (
             <div className="space-y-4 py-4">
               <div className="flex items-center justify-between rounded-lg border px-3 py-2">
-                <span className="text-sm font-medium">启用渠道</span>
+                <span className="text-sm font-medium">{t.admin.channels.enableChannel}</span>
                 <Switch
                   checked={editingChannel.enabled}
                   onCheckedChange={(checked) =>
@@ -391,10 +393,10 @@ export function ChannelsAdminPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              取消
+              {t.admin.channels.cancel}
             </Button>
             <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? "保存中..." : "保存配置"}
+              {saving ? t.admin.channels.saving : t.admin.channels.saveConfig}
             </Button>
           </DialogFooter>
         </DialogContent>

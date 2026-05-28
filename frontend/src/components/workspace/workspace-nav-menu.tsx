@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CircleUserIcon,
   ChevronsUpDown,
   GlobeIcon,
   InfoIcon,
@@ -155,7 +154,7 @@ export function WorkspaceNavMenu({
                     </div>
                     <div className="mt-1 text-sm font-medium">{sessionEmail}</div>
                     <div className="mt-1 text-xs text-slate-500">
-                      当前空间：{activeWorkspaceName}
+                      {t.workspace.currentSpace}：{activeWorkspaceName}
                     </div>
                   </div>
                   <DropdownMenuSeparator />
@@ -167,7 +166,7 @@ export function WorkspaceNavMenu({
                             key={workspace.id}
                             onClick={() => void handleWorkspaceSwitch(workspace.id)}
                           >
-                            {workspace.default_personal ? `个人空间 · ${workspace.name}` : `共享空间 · ${workspace.name}`}
+                            {workspace.default_personal ? `${t.workspace.personalSpace} · ${workspace.name}` : `${t.workspace.sharedSpace} · ${workspace.name}`}
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuGroup>
@@ -183,12 +182,6 @@ export function WorkspaceNavMenu({
                   >
                     <Settings2Icon />
                     {t.common.settings}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/workspace/account">
-                      <CircleUserIcon />
-                      我的账号
-                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <a
@@ -210,43 +203,43 @@ export function WorkspaceNavMenu({
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin">
                           <ShieldCheckIcon />
-                          后台总览
+                          {t.workspace.adminOverview}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/config">
                           <Settings2Icon />
-                          配置中心
+                          {t.workspace.configCenter}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/monitoring">
                           <MonitorCogIcon />
-                          监控中心
+                          {t.workspace.monitoringCenter}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/skills">
                           <ShieldCheckIcon />
-                          技能管理
+                          {t.workspace.skillsManagement}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/users">
                           <ShieldCheckIcon />
-                          用户管理
+                          {t.workspace.userManagement}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                       <Link href="/workspace/admin/workspaces">
                         <ShieldCheckIcon />
-                        空间管理
+                        {t.workspace.workspaceManagement}
                       </Link>
                     </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/workspace/admin/models">
                           <MonitorCogIcon />
-                          模型管理
+                          {t.workspace.modelManagement}
                         </Link>
                       </DropdownMenuItem>
                     </>
@@ -255,13 +248,13 @@ export function WorkspaceNavMenu({
                   <DropdownMenuItem asChild>
                     <Link href="/workspace/tasks">
                       <ShieldCheckIcon />
-                      定时任务
+                      {t.workspace.scheduledTasks}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/workspace/knowledge">
                       <ShieldCheckIcon />
-                      知识库
+                      {t.workspace.knowledgeBase}
                     </Link>
                   </DropdownMenuItem>
                   
@@ -279,7 +272,7 @@ export function WorkspaceNavMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => void handleLogout()}>
                   <LogOutIcon />
-                  {loggingOut ? "退出中..." : "退出登录"}
+                  {loggingOut ? t.workspace.loggingOut : t.workspace.logout}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

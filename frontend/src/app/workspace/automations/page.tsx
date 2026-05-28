@@ -11,46 +11,48 @@ import {
   WorkspaceContainer,
   WorkspaceHeader,
 } from "@/components/workspace/workspace-container";
+import { useI18n } from "@/core/i18n/hooks";
 import { loadTasks, type Task } from "@/core/tasks";
 import { formatTimeAgo } from "@/core/utils/datetime";
 
-function describeTrigger(task: Task): string {
+function describeTrigger(task: Task, t: ReturnType<typeof useI18n>["t"]): string {
   const config = task.trigger_config;
   if (task.trigger_type === "cron" && config.cron) {
     const [minute, hour, dayOfMonth, month, dayOfWeek] = config.cron.split(" ");
     if (dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
-      return `每天 ${hour?.padStart(2, "0")}:${minute?.padStart(2, "0")}`;
+      return `${t.automations.daily} ${hour?.padStart(2, "0")}:${minute?.padStart(2, "0")}`;
     }
     if (dayOfMonth === "*" && month === "*" && dayOfWeek && dayOfWeek !== "*") {
-      return `每周 ${dayOfWeek} ${hour?.padStart(2, "0")}:${minute?.padStart(2, "0")}`;
+      return `${t.automations.weekly} ${dayOfWeek} ${hour?.padStart(2, "0")}:${minute?.padStart(2, "0")}`;
     }
-    return `自定义时间规则：${config.cron}`;
+    return `${t.automations.customSchedule} ${config.cron}`;
   }
   if (task.trigger_type === "interval") {
-    if (config.interval_days) return `每 ${config.interval_days} 天`;
-    if (config.interval_hours) return `每 ${config.interval_hours} 小时`;
-    if (config.interval_minutes) return `每 ${config.interval_minutes} 分钟`;
+    if (config.interval_days) return t.automations.everyXDays(config.interval_days);
+    if (config.interval_hours) return t.automations.everyXHours(config.interval_hours);
+    if (config.interval_minutes) return t.automations.everyXMinutes(config.interval_minutes);
   }
-  return "手动或一次性运行";
+  return t.automations.manualOrOnce;
 }
 
-function outputLabel(task: Task): string {
-  if (task.thread_id) return "输出到关联对话";
-  if (task.output_config.webhook_url) return "输出到 Webhook";
-  return task.output_config.save_to_thread ? "输出到新对话" : "仅记录执行结果";
+function outputLabel(task: Task, t: ReturnType<typeof useI18n>["t"]): string {
+  if (task.thread_id) return t.automations.outputToThread;
+  if (task.output_config.webhook_url) return t.automations.outputToWebhook;
+  return task.output_config.save_to_thread ? t.automations.outputToNewThread : t.automations.logOnly;
 }
 
 export default function AutomationsPage() {
+  const { t } = useI18n();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    document.title = "自动化 - MicX";
+    document.title = `${t.sidebar.automations} - MicX`;
     loadTasks()
       .then(setTasks)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   const activeTasks = useMemo(
     () => tasks.filter((task) => task.status === "active"),
@@ -67,7 +69,7 @@ export default function AutomationsPage() {
         <Link href="/workspace/automations/new">
           <Button size="sm" className="gap-2">
             <PlusIcon className="size-4" />
-            创建自动化
+            {t.automations.createAutomation}
           </Button>
         </Link>
       </WorkspaceHeader>
@@ -76,29 +78,29 @@ export default function AutomationsPage() {
           <div>
             <div className="flex items-center gap-2 text-2xl font-semibold">
               <RepeatIcon className="size-6" />
-              自动化
+              {t.sidebar.automations}
             </div>
             <p className="text-muted-foreground mt-2 text-sm">
-              设置固定时间让 AI 自动完成例行工作，并把结果写回个人或共享空间。
+              {t.automations.description}
             </p>
           </div>
 
           {loading ? (
-            <div className="text-muted-foreground text-center">加载中...</div>
+            <div className="text-muted-foreground text-center">{t.common.loading}</div>
           ) : tasks.length === 0 ? (
             <div className="rounded-2xl border py-12 text-center">
-              <p className="text-muted-foreground mb-4">还没有自动化。</p>
+              <p className="text-muted-foreground mb-4">{t.automations.empty}</p>
               <Link href="/workspace/automations/new">
-                <Button>创建第一个自动化</Button>
+                <Button>{t.automations.createFirstAutomation}</Button>
               </Link>
             </div>
           ) : (
             <div className="space-y-8">
               {activeTasks.length > 0 && (
-                <AutomationSection title="运行中" tasks={activeTasks} />
+                <AutomationSection title={t.tasks.statusActive} tasks={activeTasks} t={t} />
               )}
               {pausedTasks.length > 0 && (
-                <AutomationSection title="已暂停" tasks={pausedTasks} />
+                <AutomationSection title={t.tasks.statusPaused} tasks={pausedTasks} t={t} />
               )}
             </div>
           )}
@@ -108,7 +110,7 @@ export default function AutomationsPage() {
   );
 }
 
-function AutomationSection({ title, tasks }: { title: string; tasks: Task[] }) {
+function AutomationSection({ title, tasks, t }: { title: string; tasks: Task[]; t: ReturnType<typeof useI18n>["t"] }) {
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">{title}</h2>
@@ -126,20 +128,20 @@ function AutomationSection({ title, tasks }: { title: string; tasks: Task[] }) {
                   )}
                 </div>
                 <Badge variant={task.status === "active" ? "default" : "outline"}>
-                  {task.status === "active" ? "运行中" : "已暂停"}
+                  {task.status === "active" ? t.tasks.statusActive : t.tasks.statusPaused}
                 </Badge>
               </div>
               <div className="text-muted-foreground mt-3 flex flex-wrap gap-3 text-sm">
                 <span className="inline-flex items-center gap-1">
                   <ClockIcon className="size-3.5" />
-                  {describeTrigger(task)}
+                  {describeTrigger(task, t)}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <MessageCircleIcon className="size-3.5" />
-                  {outputLabel(task)}
+                  {outputLabel(task, t)}
                 </span>
-                {task.next_run_at && <span>下次：{formatTimeAgo(task.next_run_at)}</span>}
-                {task.last_run_at && <span>上次：{formatTimeAgo(task.last_run_at)}</span>}
+                {task.next_run_at && <span>{t.automations.nextRun}{formatTimeAgo(task.next_run_at)}</span>}
+                {task.last_run_at && <span>{t.automations.lastRun}{formatTimeAgo(task.last_run_at)}</span>}
               </div>
             </div>
           </Link>

@@ -55,6 +55,8 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 | **Artifacts .skill 档案支持** | ❌ | ✅ **v1.5.1 新增** |
 | **Docker 配置优化** | ❌ | ✅ **v1.5.1 优化** |
 | **模型加载稳定性修复** | ❌ | ✅ **v1.5.1 修复** |
+| **Admin 页面全量 i18n 本地化** | ❌ | ✅ **v1.5.2 新增** |
+| **中英文切换完整支持** | ❌ | ✅ **v1.5.2 新增** |
 
 ---
 
@@ -651,6 +653,8 @@ MicX is an enhanced version of [DeerFlow](https://github.com/HACKESHACKES/deerfl
 | **PPT Master Service** | ❌ | ✅ **v1.4.7 New** |
 | **Deep-Research Skill Enhancement** | ❌ | ✅ **v1.4.7 New** |
 | **Bug Fix Release** | ❌ | ✅ **v1.4.8 New** |
+| **Admin Pages Full i18n Localization** | ❌ | ✅ **v1.5.2 New** |
+| **Complete Chinese/English Language Switch** | ❌ | ✅ **v1.5.2 New** |
 
 ---
 

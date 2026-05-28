@@ -18,6 +18,7 @@ import {
   WorkspaceContainer,
   WorkspaceHeader,
 } from "@/components/workspace/workspace-container";
+import { useI18n } from "@/core/i18n/hooks";
 import { createTask, type CreateTaskRequest } from "@/core/tasks";
 
 type Frequency = "daily" | "weekly" | "monthly" | "custom";
@@ -30,6 +31,7 @@ function buildCron(frequency: Frequency, time: string, weekday: string): string 
 }
 
 export default function NewAutomationPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const workflow = searchParams.get("workflow");
@@ -53,8 +55,8 @@ export default function NewAutomationPage() {
 
   useEffect(() => {
     setMounted(true);
-    document.title = "创建自动化 - MicX";
-  }, []);
+    document.title = t.automations.newAutomationTitle + " - MicX";
+  }, [t.automations.newAutomationTitle]);
 
   const cronExpression = useMemo(() => {
     if (frequency === "custom") return customCron;
@@ -64,7 +66,7 @@ export default function NewAutomationPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim() || !promptTemplate.trim()) {
-      setError("请填写自动化名称和要执行的任务内容。");
+      setError(t.automations.automationNameRequired);
       return;
     }
 
@@ -89,7 +91,7 @@ export default function NewAutomationPage() {
       await createTask(request);
       router.push("/workspace/automations");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建自动化失败");
+      setError(t.automations.automationFailed);
       setSaving(false);
     }
   }
@@ -99,70 +101,70 @@ export default function NewAutomationPage() {
       <WorkspaceHeader />
       <WorkspaceBody>
         <div className="mx-auto w-full max-w-3xl py-8">
-          <h1 className="text-2xl font-bold">创建自动化</h1>
+          <h1 className="text-2xl font-bold">{t.automations.newAutomationTitle}</h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            用自然语言描述 AI 要定期完成的工作，再选择运行时间和输出位置。
+            {t.automations.newAutomationDescription}
           </p>
 
           {mounted ? (
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="name">名称</label>
+              <label className="text-sm font-medium" htmlFor="name">{t.automations.name}</label>
               <Input
                 id="name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="例如：每日晨报"
+                placeholder={t.automations.namePlaceholder}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="description">说明</label>
+              <label className="text-sm font-medium" htmlFor="description">{t.automations.descriptionLabel}</label>
               <Input
                 id="description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="这项自动化会帮你做什么"
+                placeholder={t.automations.descriptionPlaceholder}
               />
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">运行频率</label>
+                <label className="text-sm font-medium">{t.automations.frequency}</label>
                 <Select value={frequency} onValueChange={(value) => setFrequency(value as Frequency)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="daily">每天</SelectItem>
-                    <SelectItem value="weekly">每周</SelectItem>
-                    <SelectItem value="monthly">每月</SelectItem>
-                    <SelectItem value="custom">自定义时间规则</SelectItem>
+                    <SelectItem value="daily">{t.automations.daily}</SelectItem>
+                    <SelectItem value="weekly">{t.automations.weekly}</SelectItem>
+                    <SelectItem value="monthly">{t.automations.monthly}</SelectItem>
+                    <SelectItem value="custom">{t.automations.customCron}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {frequency !== "custom" && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="time">运行时间</label>
+                  <label className="text-sm font-medium" htmlFor="time">{t.automations.time}</label>
                   <Input id="time" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
                 </div>
               )}
               {frequency === "weekly" && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">星期</label>
+                  <label className="text-sm font-medium">{t.automations.weekday}</label>
                   <Select value={weekday} onValueChange={setWeekday}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">周一</SelectItem>
-                      <SelectItem value="2">周二</SelectItem>
-                      <SelectItem value="3">周三</SelectItem>
-                      <SelectItem value="4">周四</SelectItem>
-                      <SelectItem value="5">周五</SelectItem>
-                      <SelectItem value="6">周六</SelectItem>
-                      <SelectItem value="0">周日</SelectItem>
+                      <SelectItem value="1">{t.automations.monday}</SelectItem>
+                      <SelectItem value="2">{t.automations.tuesday}</SelectItem>
+                      <SelectItem value="3">{t.automations.wednesday}</SelectItem>
+                      <SelectItem value="4">{t.automations.thursday}</SelectItem>
+                      <SelectItem value="5">{t.automations.friday}</SelectItem>
+                      <SelectItem value="6">{t.automations.saturday}</SelectItem>
+                      <SelectItem value="0">{t.automations.sunday}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -171,33 +173,33 @@ export default function NewAutomationPage() {
 
             {frequency === "custom" && (
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="cron">自定义时间规则</label>
+                <label className="text-sm font-medium" htmlFor="cron">{t.automations.customCron}</label>
                 <Input id="cron" value={customCron} onChange={(event) => setCustomCron(event.target.value)} />
-                <p className="text-muted-foreground text-xs">高级模式，使用 Cron 表达式。</p>
+                <p className="text-muted-foreground text-xs">{t.automations.customCronGuidance}</p>
               </div>
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">输出位置</label>
+              <label className="text-sm font-medium">{t.automations.outputLocation}</label>
               <Select value={outputTarget} onValueChange={setOutputTarget}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="thread">保存到对话</SelectItem>
-                  <SelectItem value="log">仅保存执行记录</SelectItem>
-                  <SelectItem value="webhook">Webhook（稍后配置）</SelectItem>
+                  <SelectItem value="thread">{t.automations.saveToThread}</SelectItem>
+                  <SelectItem value="log">{t.automations.onlyLog}</SelectItem>
+                  <SelectItem value="webhook">{t.automations.webhookLater}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="prompt">让 AI 做什么</label>
+              <label className="text-sm font-medium" htmlFor="prompt">{t.automations.promptTask}</label>
               <Textarea
                 id="prompt"
                 value={promptTemplate}
                 onChange={(event) => setPromptTemplate(event.target.value)}
-                placeholder="例如：每天早上总结今天的日程、待办和需要重点关注的事项。"
+                placeholder={t.automations.promptPlaceholder}
                 rows={8}
                 required
               />
@@ -206,13 +208,13 @@ export default function NewAutomationPage() {
             {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
             <div className="flex gap-3">
-              <Button type="submit" disabled={saving}>{saving ? "保存中..." : "保存自动化"}</Button>
-              <Button type="button" variant="outline" onClick={() => router.back()}>取消</Button>
+              <Button type="submit" disabled={saving}>{saving ? t.automations.saving : t.automations.saveAutomation}</Button>
+              <Button type="button" variant="outline" onClick={() => router.back()}>{t.automations.cancel}</Button>
             </div>
           </form>
           ) : (
             <div className="text-muted-foreground mt-8 rounded-2xl border p-8 text-center text-sm">
-              正在准备自动化表单...
+              {t.automations.preparingForm}
             </div>
           )}
         </div>

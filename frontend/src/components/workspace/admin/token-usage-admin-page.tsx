@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { AdminPageShell } from "./admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 type TokenUsageSummary = {
   input_tokens: number;
@@ -48,6 +49,7 @@ function formatNumber(n: number): string {
 }
 
 export function TokenUsageAdminPage() {
+  const { t } = useI18n();
   const [data, setData] = useState<TokenUsageResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,35 +61,35 @@ export function TokenUsageAdminPage() {
       setError(null);
       try {
         const response = await fetch(`/api/admin/token-usage?days=${days}`);
-        if (!response.ok) throw new Error("加载 Token 统计失败");
+        if (!response.ok) throw new Error(t.admin.tokenUsage.loadFailed);
         setData((await response.json()) as TokenUsageResponse);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "加载 Token 统计失败");
+        setError(err instanceof Error ? err.message : t.admin.tokenUsage.loadFailed);
       } finally {
         setLoading(false);
       }
     }
     void load();
-  }, [days]);
+  }, [days, t.admin.tokenUsage.loadFailed]);
 
   return (
     <AdminPageShell
-      title="Token 统计"
-      description="查看 Token 使用量，按用户和模型维度统计分析。"
+      title={t.admin.tokenUsage.title}
+      description={t.admin.tokenUsage.description}
     >
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500">统计周期：</span>
+          <span className="text-sm text-slate-500">{t.admin.tokenUsage.period}：</span>
           <select
             className="rounded-lg border px-3 py-1.5 text-sm"
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
           >
-            <option value={7}>最近 7 天</option>
-            <option value={14}>最近 14 天</option>
-            <option value={30}>最近 30 天</option>
-            <option value={60}>最近 60 天</option>
-            <option value={90}>最近 90 天</option>
+            <option value={7}>{t.admin.tokenUsage.last7Days}</option>
+            <option value={14}>{t.admin.tokenUsage.last14Days}</option>
+            <option value={30}>{t.admin.tokenUsage.last30Days}</option>
+            <option value={60}>{t.admin.tokenUsage.last60Days}</option>
+            <option value={90}>{t.admin.tokenUsage.last90Days}</option>
           </select>
         </div>
         {data?.period_start && (
@@ -100,13 +102,13 @@ export function TokenUsageAdminPage() {
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-slate-500">正在加载...</p>
+        <p className="text-sm text-slate-500">{t.admin.tokenUsage.loading}</p>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">总 Token</CardTitle>
+                <CardTitle className="text-sm font-medium text-slate-500">{t.admin.tokenUsage.totalToken}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatNumber(data?.total.total_tokens ?? 0)}</div>
@@ -114,7 +116,7 @@ export function TokenUsageAdminPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">输入 Token</CardTitle>
+                <CardTitle className="text-sm font-medium text-slate-500">{t.admin.tokenUsage.inputToken}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatNumber(data?.total.input_tokens ?? 0)}</div>
@@ -122,7 +124,7 @@ export function TokenUsageAdminPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">输出 Token</CardTitle>
+                <CardTitle className="text-sm font-medium text-slate-500">{t.admin.tokenUsage.outputToken}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatNumber(data?.total.output_tokens ?? 0)}</div>
@@ -130,7 +132,7 @@ export function TokenUsageAdminPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">请求次数</CardTitle>
+                <CardTitle className="text-sm font-medium text-slate-500">{t.admin.tokenUsage.requestCount}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatNumber(data?.total.request_count ?? 0)}</div>
@@ -140,18 +142,18 @@ export function TokenUsageAdminPage() {
 
           <Tabs defaultValue="users" className="w-full">
             <TabsList>
-              <TabsTrigger value="users">按用户</TabsTrigger>
-              <TabsTrigger value="models">按模型</TabsTrigger>
+              <TabsTrigger value="users">{t.admin.tokenUsage.byUser}</TabsTrigger>
+              <TabsTrigger value="models">{t.admin.tokenUsage.byModel}</TabsTrigger>
             </TabsList>
             <TabsContent value="users">
               <Card>
                 <CardHeader>
-                  <CardTitle>用户 Token 使用量</CardTitle>
-                  <CardDescription>各用户的 Token 消耗统计。</CardDescription>
+                  <CardTitle>{t.admin.tokenUsage.userTokenUsage}</CardTitle>
+                  <CardDescription>{t.admin.tokenUsage.userTokenUsageDescription}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {(data?.by_user ?? []).length === 0 ? (
-                    <p className="text-sm text-slate-500">暂无数据。</p>
+                    <p className="text-sm text-slate-500">{t.admin.tokenUsage.noData}</p>
                   ) : (
                     <div className="space-y-3">
                       {data?.by_user.map((user) => (
@@ -164,18 +166,18 @@ export function TokenUsageAdminPage() {
                           </div>
                           <div className="flex items-center gap-6 text-sm">
                             <div className="text-right">
-                              <div className="text-slate-500">输入</div>
+                              <div className="text-slate-500">{t.admin.tokenUsage.input}</div>
                               <div className="font-medium">{formatNumber(user.input_tokens)}</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-slate-500">输出</div>
+                              <div className="text-slate-500">{t.admin.tokenUsage.output}</div>
                               <div className="font-medium">{formatNumber(user.output_tokens)}</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-slate-500">总计</div>
+                              <div className="text-slate-500">{t.admin.tokenUsage.total}</div>
                               <div className="font-bold">{formatNumber(user.total_tokens)}</div>
                             </div>
-                            <Badge variant="secondary">{user.request_count} 次</Badge>
+                            <Badge variant="secondary">{user.request_count} {t.admin.tokenUsage.times}</Badge>
                           </div>
                         </div>
                       ))}
@@ -187,12 +189,12 @@ export function TokenUsageAdminPage() {
             <TabsContent value="models">
               <Card>
                 <CardHeader>
-                  <CardTitle>模型 Token 使用量</CardTitle>
-                  <CardDescription>各模型的 Token 消耗统计。</CardDescription>
+                  <CardTitle>{t.admin.tokenUsage.modelTokenUsage}</CardTitle>
+                  <CardDescription>{t.admin.tokenUsage.modelTokenUsageDescription}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {(data?.by_model ?? []).length === 0 ? (
-                    <p className="text-sm text-slate-500">暂无数据。</p>
+                    <p className="text-sm text-slate-500">{t.admin.tokenUsage.noData}</p>
                   ) : (
                     <div className="space-y-3">
                       {data?.by_model.map((model) => (
@@ -200,18 +202,18 @@ export function TokenUsageAdminPage() {
                           <div className="font-medium">{model.model_name}</div>
                           <div className="flex items-center gap-6 text-sm">
                             <div className="text-right">
-                              <div className="text-slate-500">输入</div>
+                              <div className="text-slate-500">{t.admin.tokenUsage.input}</div>
                               <div className="font-medium">{formatNumber(model.input_tokens)}</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-slate-500">输出</div>
+                              <div className="text-slate-500">{t.admin.tokenUsage.output}</div>
                               <div className="font-medium">{formatNumber(model.output_tokens)}</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-slate-500">总计</div>
+                              <div className="text-slate-500">{t.admin.tokenUsage.total}</div>
                               <div className="font-bold">{formatNumber(model.total_tokens)}</div>
                             </div>
-                            <Badge variant="secondary">{model.request_count} 次</Badge>
+                            <Badge variant="secondary">{model.request_count} {t.admin.tokenUsage.times}</Badge>
                           </div>
                         </div>
                       ))}

@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { modelPresets, providers, type ModelPreset } from "@/core/config/model-presets";
 import type { Model } from "@/core/models/types";
+import { useI18n } from "@/core/i18n/hooks";
 
 import { AdminPageShell } from "./admin-page-shell";
 
@@ -63,6 +64,7 @@ const emptyForm: FormState = {
 };
 
 export function ModelsAdminPage() {
+  const { t } = useI18n();
   const [models, setModels] = useState<Model[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export function ModelsAdminPage() {
   async function loadData() {
     const response = await fetch("/api/admin/models");
     if (!response.ok) {
-      setError("加载模型配置失败");
+      setError(t.admin.models.loadFailed);
       return;
     }
     const payload = (await response.json()) as { models: Model[] };
@@ -85,7 +87,7 @@ export function ModelsAdminPage() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [t.admin.models.loadFailed]);
 
   const sortedModels = useMemo(
     () => models.slice().sort((a, b) => Number(Boolean(b.is_default)) - Number(Boolean(a.is_default))),
@@ -143,11 +145,11 @@ export function ModelsAdminPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "保存模型失败");
+      setError(body?.detail ?? t.admin.models.loadFailed);
       return;
     }
     setDialogOpen(false);
-    setStatusMessage(form.originalName ? "模型修改已保存" : "模型已创建");
+    setStatusMessage(form.originalName ? t.admin.models.modelModifiedSaved : t.admin.models.modelCreated);
     await loadData();
   }
 
@@ -157,21 +159,21 @@ export function ModelsAdminPage() {
     setTestResult(null);
     const response = await fetch(`/api/admin/models/${name}/test`, { method: "POST" });
     const payload = (await response.json()) as { ok: boolean; message: string };
-    setTestResult(`${name}: ${payload.ok ? "成功" : "失败"} - ${payload.message}`);
+    setTestResult(`${name}: ${payload.ok ? t.admin.models.testSuccess : t.admin.models.testFailed} - ${payload.message}`);
   }
 
   async function reloadModels(name: string) {
     setError(null);
     setStatusMessage(null);
     await fetch(`/api/admin/models/${name}/reload`, { method: "POST" });
-    setStatusMessage(`已重载 ${name} 的模型配置`);
+    setStatusMessage(`${t.admin.models.configReloaded} ${name}`);
     await loadData();
   }
 
   async function deleteModel(name: string) {
     setError(null);
     setStatusMessage(null);
-    const confirmed = window.confirm(`确认删除模型 ${name} 吗？删除后将从管理台列表中移除。`);
+    const confirmed = window.confirm(`${t.admin.models.deleteConfirm.replace("{name}", name)}`);
     if (!confirmed) {
       return;
     }
@@ -179,11 +181,11 @@ export function ModelsAdminPage() {
     const response = await fetch(`/api/admin/models/${name}`, { method: "DELETE" });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail ?? "删除模型失败");
+      setError(body?.detail ?? t.admin.models.loadFailed);
       return;
     }
 
-    setStatusMessage(`模型 ${name} 已删除`);
+    setStatusMessage(t.admin.models.modelDeleted);
     await loadData();
   }
 
@@ -226,17 +228,17 @@ export function ModelsAdminPage() {
   }
 
   return (
-    <AdminPageShell title="模型管理" description="通过图形界面管理系统模型配置、启停状态、默认模型与连接测试。">
+    <AdminPageShell title={t.admin.models.title} description={t.admin.models.description}>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>模型管理中心</CardTitle>
-              <CardDescription>支持 OpenAI 兼容、MiniMax 中国区、Anthropic 等模型接入。</CardDescription>
+              <CardTitle>{t.admin.models.modelCenter}</CardTitle>
+              <CardDescription>{t.admin.models.modelCenterDescription}</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setPresetOpen(true)}>导入预设</Button>
-              <Button onClick={openCreateDialog}>新增模型</Button>
+              <Button variant="outline" onClick={() => setPresetOpen(true)}>{t.admin.models.importPreset}</Button>
+              <Button onClick={openCreateDialog}>{t.admin.models.addModel}</Button>
             </div>
           </div>
         </CardHeader>
@@ -244,8 +246,8 @@ export function ModelsAdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>已配置模型</CardTitle>
-          <CardDescription>管理员可修改启用状态、设为默认模型，并测试连接是否正常。</CardDescription>
+          <CardTitle>{t.admin.models.configuredModels}</CardTitle>
+          <CardDescription>{t.admin.models.configuredModelsDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {sortedModels.map((model) => (
@@ -254,13 +256,13 @@ export function ModelsAdminPage() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{model.display_name ?? model.name}</span>
-                    {model.is_default && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">默认</span>}
-                    {model.enabled === false && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">已禁用</span>}
+                    {model.is_default && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{t.admin.models.default}</span>}
+                    {model.enabled === false && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{t.admin.models.disabled}</span>}
                   </div>
-                  <div className="text-muted-foreground text-sm">内部名称：{model.name}</div>
-                  <div className="text-muted-foreground text-sm">模型标识：{model.model}</div>
-                  <div className="text-muted-foreground text-sm">Provider：{model.use}</div>
-                  <div className="text-muted-foreground text-sm">Base URL：{model.base_url ?? "—"}</div>
+                  <div className="text-muted-foreground text-sm">{t.admin.models.internalName}：{model.name}</div>
+                  <div className="text-muted-foreground text-sm">{t.admin.models.modelIdentifier}：{model.model}</div>
+                  <div className="text-muted-foreground text-sm">{t.admin.models.provider}：{model.use}</div>
+                  <div className="text-muted-foreground text-sm">{t.admin.models.baseUrl}：{model.base_url ?? "—"}</div>
                   <div className="flex gap-2">
                     {model.supports_vision && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Vision</span>}
                     {model.supports_thinking && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Thinking</span>}
@@ -271,10 +273,10 @@ export function ModelsAdminPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEditDialog(model)}>编辑</Button>
-                  <Button variant="outline" size="sm" onClick={() => void testModel(model.name)}>测试连接</Button>
-                  <Button variant="outline" size="sm" onClick={() => void reloadModels(model.name)}>重载配置</Button>
-                  <Button variant="destructive" size="sm" onClick={() => void deleteModel(model.name)}>删除</Button>
+                  <Button variant="outline" size="sm" onClick={() => openEditDialog(model)}>{t.admin.models.editModel}</Button>
+                  <Button variant="outline" size="sm" onClick={() => void testModel(model.name)}>{t.admin.models.testConnection}</Button>
+                  <Button variant="outline" size="sm" onClick={() => void reloadModels(model.name)}>{t.admin.models.reloadConfig}</Button>
+                  <Button variant="destructive" size="sm" onClick={() => void deleteModel(model.name)}>{t.admin.models.delete}</Button>
                 </div>
               </div>
             </div>
@@ -288,91 +290,91 @@ export function ModelsAdminPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{form.originalName ? "编辑模型" : "新增模型"}</DialogTitle>
-            <DialogDescription>填写模型配置信息，或从预设模板中选择。</DialogDescription>
+            <DialogTitle>{form.originalName ? t.admin.models.editModel : t.admin.models.addNewModel}</DialogTitle>
+            <DialogDescription>{t.admin.models.modelDescription}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <div className="text-sm font-medium">内部名称</div>
-              <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="例如 minimax-m2" />
+              <div className="text-sm font-medium">{t.admin.models.internalName}</div>
+              <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. minimax-m2" />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">显示名称</div>
-              <Input value={form.display_name} onChange={(event) => setForm((current) => ({ ...current, display_name: event.target.value }))} placeholder="例如 MiniMax M2" />
+              <div className="text-sm font-medium">{t.admin.models.displayName}</div>
+              <Input value={form.display_name} onChange={(event) => setForm((current) => ({ ...current, display_name: event.target.value }))} placeholder="e.g. MiniMax M2" />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">模型标识</div>
-              <Input value={form.model} onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))} placeholder="例如 gpt-4o" />
+              <div className="text-sm font-medium">{t.admin.models.modelIdentifier}</div>
+              <Input value={form.model} onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))} placeholder="e.g. gpt-4o" />
             </div>
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <div className="text-sm font-medium">描述</div>
-              <Textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="该模型适合什么场景" rows={2} />
+              <div className="text-sm font-medium">{t.admin.models.modelDescription}</div>
+              <Textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder={t.admin.models.modelDescription} rows={2} />
             </div>
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <div className="text-sm font-medium">Provider 路径</div>
+              <div className="text-sm font-medium">{t.admin.models.providerPath}</div>
               <Input value={form.use} onChange={(event) => setForm((current) => ({ ...current, use: event.target.value }))} />
             </div>
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <div className="text-sm font-medium">Base URL</div>
+              <div className="text-sm font-medium">{t.admin.models.baseUrl}</div>
               <Input value={form.base_url} onChange={(event) => setForm((current) => ({ ...current, base_url: event.target.value }))} placeholder="https://api.openai.com/v1" />
             </div>
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <div className="text-sm font-medium">API Key / 环境变量</div>
+              <div className="text-sm font-medium">{t.admin.models.apiKey}</div>
               <Input value={form.api_key} onChange={(event) => setForm((current) => ({ ...current, api_key: event.target.value }))} placeholder="可直接填 key，或填写 $ENV_VAR" />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">请求超时 (秒)</div>
+              <div className="text-sm font-medium">{t.admin.models.requestTimeout}</div>
               <Input type="number" value={form.request_timeout} onChange={(event) => setForm((current) => ({ ...current, request_timeout: Number(event.target.value) }))} />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">最大重试次数</div>
+              <div className="text-sm font-medium">{t.admin.models.maxRetries}</div>
               <Input type="number" value={form.max_retries} onChange={(event) => setForm((current) => ({ ...current, max_retries: Number(event.target.value) }))} />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">最大 Tokens</div>
+              <div className="text-sm font-medium">{t.admin.models.maxTokens}</div>
               <Input type="number" value={form.max_tokens} onChange={(event) => setForm((current) => ({ ...current, max_tokens: Number(event.target.value) }))} />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">温度</div>
+              <div className="text-sm font-medium">{t.admin.models.temperature}</div>
               <Input value={form.temperature} onChange={(event) => setForm((current) => ({ ...current, temperature: event.target.value }))} />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">Output Version</div>
+              <div className="text-sm font-medium">{t.admin.models.outputVersion}</div>
               <Input value={form.output_version} onChange={(event) => setForm((current) => ({ ...current, output_version: event.target.value }))} placeholder="responses/v1" />
             </div>
 
             <div className="space-y-3 md:col-span-1">
               <div className="flex items-center justify-between rounded-xl border px-3 py-2">
-                <span className="text-sm">启用模型</span>
+                <span className="text-sm">{t.admin.models.enableModel}</span>
                 <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
               </div>
               <div className="flex items-center justify-between rounded-xl border px-3 py-2">
-                <span className="text-sm">设为默认</span>
+                <span className="text-sm">{t.admin.models.setAsDefault}</span>
                 <Switch checked={form.is_default} onCheckedChange={(checked) => setForm((current) => ({ ...current, is_default: checked }))} />
               </div>
             </div>
             <div className="space-y-3 md:col-span-1">
               <div className="flex items-center justify-between rounded-xl border px-3 py-2">
-                <span className="text-sm">支持视觉</span>
+                <span className="text-sm">{t.admin.models.supportVision}</span>
                 <Switch checked={form.supports_vision} onCheckedChange={(checked) => setForm((current) => ({ ...current, supports_vision: checked }))} />
               </div>
               <div className="flex items-center justify-between rounded-xl border px-3 py-2">
-                <span className="text-sm">支持 Thinking</span>
+                <span className="text-sm">{t.admin.models.supportThinking}</span>
                 <Switch checked={form.supports_thinking} onCheckedChange={(checked) => setForm((current) => ({ ...current, supports_thinking: checked }))} />
               </div>
               <div className="flex items-center justify-between rounded-xl border px-3 py-2">
-                <span className="text-sm">支持 Reasoning Effort</span>
+                <span className="text-sm">{t.admin.models.supportReasoningEffort}</span>
                 <Switch checked={form.supports_reasoning_effort} onCheckedChange={(checked) => setForm((current) => ({ ...current, supports_reasoning_effort: checked }))} />
               </div>
               <div className="flex items-center justify-between rounded-xl border px-3 py-2">
-                <span className="text-sm">Responses API</span>
+                <span className="text-sm">{t.admin.models.responsesApi}</span>
                 <Switch checked={form.use_responses_api} onCheckedChange={(checked) => setForm((current) => ({ ...current, use_responses_api: checked }))} />
               </div>
             </div>
 
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <div className="text-sm font-medium">Thinking 配置 (JSON)</div>
+              <div className="text-sm font-medium">{t.admin.models.thinkingConfig}</div>
               <Textarea
                 value={form.thinking}
                 onChange={(event) => applyJson("thinking", event.target.value)}
@@ -381,7 +383,7 @@ export function ModelsAdminPage() {
               />
             </div>
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <div className="text-sm font-medium">When Thinking Enabled (JSON)</div>
+              <div className="text-sm font-medium">{t.admin.models.whenThinkingEnabled}</div>
               <Textarea
                 value={form.when_thinking_enabled}
                 onChange={(event) => applyJson("when_thinking_enabled", event.target.value)}
@@ -392,8 +394,8 @@ export function ModelsAdminPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={() => void saveModel()}>保存模型</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t.admin.models.cancel}</Button>
+            <Button onClick={() => void saveModel()}>{t.admin.models.saveModel}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -401,13 +403,13 @@ export function ModelsAdminPage() {
       <Dialog open={presetOpen} onOpenChange={setPresetOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>导入模型预设</DialogTitle>
-            <DialogDescription>选择要导入的模型预设配置。</DialogDescription>
+            <DialogTitle>{t.admin.models.importModelPreset}</DialogTitle>
+            <DialogDescription>{t.admin.models.selectPreset}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               <Button variant={selectedProvider === "" ? "default" : "outline"} size="sm" onClick={() => setSelectedProvider("")}>
-                全部
+                {t.admin.models.all}
               </Button>
               {providers.map((p) => (
                 <Button key={p} variant={selectedProvider === p ? "default" : "outline"} size="sm" onClick={() => setSelectedProvider(p)}>

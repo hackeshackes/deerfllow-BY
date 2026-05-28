@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdminPageShell } from "@/components/workspace/admin/admin-page-shell";
+import { useI18n } from "@/core/i18n/hooks";
 
 type KnowledgeBase = {
   id: string;
@@ -27,6 +28,7 @@ type KnowledgeBase = {
 };
 
 export function KnowledgeAdminPage() {
+  const { t } = useI18n();
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,6 @@ export function KnowledgeAdminPage() {
   const [newKbName, setNewKbName] = useState("");
   const [newKbDesc, setNewKbDesc] = useState("");
 
-  // Edit dialog state
   const [editTarget, setEditTarget] = useState<KnowledgeBase | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -51,12 +52,12 @@ export function KnowledgeAdminPage() {
       const res = await fetch("/api/admin/knowledge");
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "加载知识库失败");
+        throw new Error(data?.detail ?? t.admin.knowledge.loadFailed);
       }
       const data = (await res.json()) as { knowledge_bases: KnowledgeBase[] };
       setKnowledgeBases(data.knowledge_bases);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "加载知识库失败");
+      setError(e instanceof Error ? e.message : t.admin.knowledge.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ export function KnowledgeAdminPage() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [t.admin.knowledge.loadFailed]);
 
   async function handleDelete(kb: KnowledgeBase) {
     setDeleting(true);
@@ -72,13 +73,13 @@ export function KnowledgeAdminPage() {
       const res = await fetch(`/api/admin/knowledge/${kb.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "删除失败");
+        throw new Error(data?.detail ?? t.admin.knowledge.delete);
       }
-      toast.success(`知识库 "${kb.name}" 已删除`);
+      toast.success(`${t.admin.knowledge.delete} "${kb.name}"`);
       setDeleteTarget(null);
       await loadData();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "删除失败");
+      toast.error(e instanceof Error ? e.message : t.admin.knowledge.delete);
     } finally {
       setDeleting(false);
     }
@@ -86,7 +87,7 @@ export function KnowledgeAdminPage() {
 
   async function handleCreateGlobal() {
     if (!newKbName.trim()) {
-      toast.error("请输入知识库名称");
+      toast.error(t.admin.knowledge.name);
       return;
     }
     setCreatingGlobal(true);
@@ -98,14 +99,14 @@ export function KnowledgeAdminPage() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "创建失败");
+        throw new Error(data?.detail ?? t.admin.knowledge.delete);
       }
-      toast.success(`全局知识库 "${newKbName}" 创建成功`);
+      toast.success(`"${newKbName}" ${t.admin.knowledge.globalKnowledgeBases}`);
       setNewKbName("");
       setNewKbDesc("");
       await loadData();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "创建失败");
+      toast.error(e instanceof Error ? e.message : t.admin.knowledge.delete);
     } finally {
       setCreatingGlobal(false);
     }
@@ -129,7 +130,7 @@ export function KnowledgeAdminPage() {
 
   async function handleUpdate() {
     if (!editTarget || !editName.trim()) {
-      toast.error("请输入知识库名称");
+      toast.error(t.admin.knowledge.name);
       return;
     }
     setUpdating(true);
@@ -146,13 +147,13 @@ export function KnowledgeAdminPage() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "更新失败");
+        throw new Error(data?.detail ?? t.admin.knowledge.delete);
       }
-      toast.success(`知识库 "${editName}" 已更新`);
+      toast.success(`"${editName}" ${t.admin.knowledge.globalKnowledgeBases}`);
       closeEditDialog();
       await loadData();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "更新失败");
+      toast.error(e instanceof Error ? e.message : t.admin.knowledge.delete);
     } finally {
       setUpdating(false);
     }
@@ -161,32 +162,32 @@ export function KnowledgeAdminPage() {
   const globalKbs = knowledgeBases.filter((kb) => kb.is_global);
 
   return (
-    <AdminPageShell title="知识库管理" description="管理全局知识库，查看所有用户知识库。">
+    <AdminPageShell title={t.admin.knowledge.title} description={t.admin.knowledge.description}>
       <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <GlobeIcon className="size-5" />
-              创建全局知识库
+              {t.admin.knowledge.createGlobalKb}
             </CardTitle>
-            <CardDescription>全局知识库对所有用户可见，仅管理员可编辑和删除。</CardDescription>
+            <CardDescription>{t.admin.knowledge.globalKbDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-3">
               <Input
-                placeholder="知识库名称"
+                placeholder={t.admin.knowledge.namePlaceholder}
                 value={newKbName}
                 onChange={(e) => setNewKbName(e.target.value)}
                 className="max-w-sm"
               />
               <Input
-                placeholder="描述（可选）"
+                placeholder={t.admin.knowledge.descriptionPlaceholder}
                 value={newKbDesc}
                 onChange={(e) => setNewKbDesc(e.target.value)}
                 className="max-w-sm"
               />
               <Button onClick={() => void handleCreateGlobal()} disabled={creatingGlobal || !newKbName.trim()}>
-                {creatingGlobal ? "创建中..." : "创建全局知识库"}
+                {creatingGlobal ? t.admin.knowledge.creating : t.admin.knowledge.create}
               </Button>
             </div>
           </CardContent>
@@ -197,13 +198,13 @@ export function KnowledgeAdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <GlobeIcon className="size-5" />
-                全局知识库 ({globalKbs.length})
+                {t.admin.knowledge.globalKnowledgeBases} ({globalKbs.length})
               </CardTitle>
-              <CardDescription>所有用户均可检索这些知识库。</CardDescription>
+              <CardDescription>{t.admin.knowledge.allUsersCanSearch}</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="py-8 text-center text-sm text-slate-500">加载中...</div>
+                <div className="py-8 text-center text-sm text-slate-500">{t.admin.knowledge.loading}</div>
               ) : error ? (
                 <div className="py-8 text-center text-sm text-red-500">{error}</div>
               ) : (
@@ -215,13 +216,13 @@ export function KnowledgeAdminPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{kb.name}</span>
-                            <Badge variant="outline" className="text-xs">全局</Badge>
+                            <Badge variant="outline" className="text-xs">{t.admin.knowledge.global}</Badge>
                           </div>
                           {kb.description && <div className="mt-1 text-sm text-slate-500">{kb.description}</div>}
                           <div className="mt-1 flex gap-3 text-xs text-slate-400">
-                            <span>{kb.document_count} 个文档</span>
-                            <span>创建者: {kb.user_id}</span>
-                            <span>{new Date(kb.created_at).toLocaleDateString("zh-CN")}</span>
+                            <span>{kb.document_count} {t.admin.knowledge.documents}</span>
+                            <span>{t.admin.knowledge.createdBy}: {kb.user_id}</span>
+                            <span>{new Date(kb.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>
                       </div>
@@ -254,17 +255,17 @@ export function KnowledgeAdminPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BookOpenIcon className="size-5" />
-              所有知识库 ({knowledgeBases.length})
+              {t.admin.knowledge.allKnowledgeBases} ({knowledgeBases.length})
             </CardTitle>
-            <CardDescription>系统中全部知识库，包括用户私有知识库和共享知识库。</CardDescription>
+            <CardDescription>{t.admin.knowledge.allKnowledgeBasesDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="py-8 text-center text-sm text-slate-500">加载中...</div>
+              <div className="py-8 text-center text-sm text-slate-500">{t.admin.knowledge.loading}</div>
             ) : error ? (
               <div className="py-8 text-center text-sm text-red-500">{error}</div>
             ) : knowledgeBases.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-500">暂无知识库</div>
+              <div className="py-8 text-center text-sm text-slate-500">{t.admin.knowledge.noKnowledgeBases}</div>
             ) : (
               <div className="space-y-3">
                 {knowledgeBases.map((kb) => (
@@ -274,15 +275,15 @@ export function KnowledgeAdminPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{kb.name}</span>
-                          {kb.is_global && <Badge variant="outline" className="text-xs">全局</Badge>}
-                          {kb.visibility === "workspace" && <Badge variant="secondary" className="text-xs">工作区共享</Badge>}
-                          {kb.visibility === "private" && <Badge variant="secondary" className="text-xs">私有</Badge>}
+                          {kb.is_global && <Badge variant="outline" className="text-xs">{t.admin.knowledge.global}</Badge>}
+                          {kb.visibility === "workspace" && <Badge variant="secondary" className="text-xs">{t.admin.knowledge.workspaceShared}</Badge>}
+                          {kb.visibility === "private" && <Badge variant="secondary" className="text-xs">{t.admin.knowledge.private}</Badge>}
                         </div>
                         {kb.description && <div className="mt-1 text-sm text-slate-500">{kb.description}</div>}
                         <div className="mt-1 flex gap-3 text-xs text-slate-400">
-                          <span>{kb.document_count} 个文档</span>
-                          <span>创建者: {kb.user_id}</span>
-                          <span>{new Date(kb.created_at).toLocaleDateString("zh-CN")}</span>
+                          <span>{kb.document_count} {t.admin.knowledge.documents}</span>
+                          <span>{t.admin.knowledge.createdBy}: {kb.user_id}</span>
+                          <span>{new Date(kb.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
                     </div>
@@ -316,50 +317,50 @@ export function KnowledgeAdminPage() {
       <Dialog open={editTarget !== null} onOpenChange={(open) => !open && closeEditDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>编辑知识库</DialogTitle>
+            <DialogTitle>{t.admin.knowledge.editKnowledgeBase}</DialogTitle>
             <DialogDescription>
-              修改知识库的名称、描述和类型
+              {t.admin.knowledge.updateKnowledgeBase}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium">名称</label>
+              <label className="text-sm font-medium">{t.admin.knowledge.name}</label>
               <Input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                placeholder="知识库名称"
+                placeholder={t.admin.knowledge.namePlaceholder}
                 className="mt-1"
               />
             </div>
             <div>
-              <label className="text-sm font-medium">描述</label>
+              <label className="text-sm font-medium">{t.admin.knowledge.descriptionLabel}</label>
               <Input
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                placeholder="描述（可选）"
+                placeholder={t.admin.knowledge.descriptionPlaceholder}
                 className="mt-1"
               />
             </div>
             <div>
-              <label className="text-sm font-medium">类型</label>
+              <label className="text-sm font-medium">{t.admin.knowledge.type}</label>
               <Select value={editVisibility} onValueChange={setEditVisibility}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="private">私有</SelectItem>
-                  <SelectItem value="workspace">工作区共享</SelectItem>
-                  <SelectItem value="global">全局</SelectItem>
+                  <SelectItem value="private">{t.admin.knowledge.private}</SelectItem>
+                  <SelectItem value="workspace">{t.admin.knowledge.workspaceShared}</SelectItem>
+                  <SelectItem value="global">{t.admin.knowledge.global}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeEditDialog}>
-              取消
+              {t.admin.knowledge.cancel}
             </Button>
             <Button onClick={() => void handleUpdate()} disabled={updating}>
-              {updating ? "更新中..." : "保存"}
+              {updating ? t.admin.knowledge.updating : t.admin.knowledge.update}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -368,21 +369,18 @@ export function KnowledgeAdminPage() {
       <Dialog open={deleteTarget !== null} onOpenChange={() => setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>删除知识库</DialogTitle>
-            <DialogDescription>
-              确定要删除知识库 &quot;{deleteTarget?.name}&quot; 吗？此操作不可撤销。
-            </DialogDescription>
+            <DialogTitle>{t.admin.knowledge.deleteConfirm.replace("{name}", deleteTarget?.name ?? "")}</DialogTitle>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              取消
+              {t.admin.knowledge.cancel}
             </Button>
             <Button
               variant="destructive"
               onClick={() => deleteTarget && void handleDelete(deleteTarget)}
               disabled={deleting}
             >
-              {deleting ? "删除中..." : "删除"}
+              {deleting ? t.admin.knowledge.deleting : t.admin.knowledge.remove}
             </Button>
           </DialogFooter>
         </DialogContent>

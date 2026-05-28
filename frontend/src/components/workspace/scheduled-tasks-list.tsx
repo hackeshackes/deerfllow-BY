@@ -26,8 +26,8 @@ import { useI18n } from "@/core/i18n/hooks";
 import { pauseTask, resumeTask, type Task } from "@/core/tasks/api";
 import { useScheduledTasks } from "@/core/tasks/hooks";
 
-function formatNextRun(nextRunAt?: string): string {
-  if (!nextRunAt) return "未设置";
+function formatNextRun(nextRunAt?: string, t?: ReturnType<typeof useI18n>["t"]): string {
+  if (!nextRunAt) return t?.tasks.notSet ?? "Not set";
   const date = new Date(nextRunAt);
   const now = new Date();
   const diffMs = date.getTime() - now.getTime();
@@ -35,10 +35,10 @@ function formatNextRun(nextRunAt?: string): string {
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMs < 0) return "已过期";
-  if (diffMins < 60) return `${diffMins}分钟后`;
-  if (diffHours < 24) return `${diffHours}小时后`;
-  if (diffDays < 7) return `${diffDays}天后`;
+  if (diffMs < 0) return t?.tasks.expired ?? "Expired";
+  if (diffMins < 60) return t?.tasks.inMinutes(diffMins) ?? `${diffMins} minutes`;
+  if (diffHours < 24) return t?.tasks.inHours(diffHours) ?? `${diffHours} hours`;
+  if (diffDays < 7) return t?.tasks.inDays(diffDays) ?? `${diffDays} days`;
   return date.toLocaleDateString("zh-CN");
 }
 
@@ -91,12 +91,12 @@ function TaskItem({
             {isTaskActive ? (
               <Badge variant="outline" className="text-[10px]">
                 <Clock className="mr-1 h-2.5 w-2.5" />
-                {formatNextRun(task.next_run_at)}
+                {formatNextRun(task.next_run_at, t)}
               </Badge>
             ) : (
               <Badge variant="outline" className="text-[10px] opacity-60">
                 <Pause className="mr-1 h-2.5 w-2.5" />
-                已暂停
+                {t.tasks.paused}
               </Badge>
             )}
           </div>
@@ -119,7 +119,7 @@ function TaskItem({
                 <DropdownMenuItem asChild>
                   <Link href={`/workspace/chats/${task.thread_id}`}>
                     <MessageCircle className="text-muted-foreground" />
-                    <span>查看对话</span>
+                    <span>{t.tasks.viewChat}</span>
                   </Link>
                 </DropdownMenuItem>
               )}
@@ -130,12 +130,12 @@ function TaskItem({
                 {isTaskActive ? (
                   <>
                     <Pause className="text-muted-foreground" />
-                    <span>暂停任务</span>
+                    <span>{t.tasks.pausedTask}</span>
                   </>
                 ) : (
                   <>
                     <Play className="text-muted-foreground" />
-                    <span>恢复任务</span>
+                    <span>{t.tasks.resumeTask}</span>
                   </>
                 )}
               </DropdownMenuItem>
@@ -159,19 +159,19 @@ export function ScheduledTasksList() {
       try {
         if (task.status === "active") {
           await pauseTask(task.id);
-          toast.success("任务已暂停");
+          toast.success(t.tasks.taskPaused);
         } else {
           await resumeTask(task.id);
-          toast.success("任务已恢复");
+          toast.success(t.tasks.taskResumed);
         }
         void refetch();
       } catch {
-        toast.error("操作失败");
+        toast.error(t.tasks.operationFailed);
       } finally {
         setActionLoading(null);
       }
     },
-    [refetch],
+    [refetch, t],
   );
 
   const activeTasks = tasks.filter((task) => task.status === "active");
