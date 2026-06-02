@@ -1,5 +1,9 @@
 # DeerFlow docker image cache
 docker/.cache/
+# Docker test/scratch directories
+docker/node_modules/
+docker/test-results/
+docker/e2e-tests/
 # oh-my-claudecode state
 .omc/
 # OS generated files
