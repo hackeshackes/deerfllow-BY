@@ -272,7 +272,7 @@ class MemoryUpdater:
         model_name = self._model_name or config.model_name
         return create_chat_model(name=model_name, thinking_enabled=False)
 
-    def update_memory(
+    async def update_memory(
         self,
         messages: list[Any],
         thread_id: str | None = None,
@@ -337,7 +337,7 @@ class MemoryUpdater:
 
             # Call LLM
             model = self._get_model()
-            response = model.invoke(prompt)
+            response = await model.ainvoke(prompt)
             response_text = _extract_text(response.content).strip()
 
             # Parse response
@@ -454,7 +454,7 @@ class MemoryUpdater:
         return current_memory
 
 
-def update_memory_from_conversation(
+async def update_memory_from_conversation(
     messages: list[Any],
     thread_id: str | None = None,
     agent_name: str | None = None,
@@ -476,4 +476,4 @@ def update_memory_from_conversation(
         True if successful, False otherwise.
     """
     updater = MemoryUpdater()
-    return updater.update_memory(messages, thread_id, agent_name, user_id, correction_detected, reinforcement_detected)
+    return await updater.update_memory(messages, thread_id, agent_name, user_id, correction_detected, reinforcement_detected)
