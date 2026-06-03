@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from deerflow.agents.memory.queue import ConversationContext, MemoryUpdateQueue
 from deerflow.config.memory_config import MemoryConfig
@@ -37,15 +37,16 @@ def test_process_queue_forwards_correction_flag_to_updater() -> None:
         )
     ]
     mock_updater = MagicMock()
-    mock_updater.update_memory.return_value = True
+    mock_updater.update_memory = AsyncMock(return_value=True)
 
     with patch("deerflow.agents.memory.updater.MemoryUpdater", return_value=mock_updater):
         queue._process_queue()
 
-    mock_updater.update_memory.assert_called_once_with(
+    mock_updater.update_memory.assert_awaited_once_with(
         messages=["conversation"],
         thread_id="thread-1",
         agent_name="lead_agent",
+        user_id=None,
         correction_detected=True,
         reinforcement_detected=False,
     )
@@ -77,15 +78,16 @@ def test_process_queue_forwards_reinforcement_flag_to_updater() -> None:
         )
     ]
     mock_updater = MagicMock()
-    mock_updater.update_memory.return_value = True
+    mock_updater.update_memory = AsyncMock(return_value=True)
 
     with patch("deerflow.agents.memory.updater.MemoryUpdater", return_value=mock_updater):
         queue._process_queue()
 
-    mock_updater.update_memory.assert_called_once_with(
+    mock_updater.update_memory.assert_awaited_once_with(
         messages=["conversation"],
         thread_id="thread-1",
         agent_name="lead_agent",
+        user_id=None,
         correction_detected=False,
         reinforcement_detected=True,
     )
