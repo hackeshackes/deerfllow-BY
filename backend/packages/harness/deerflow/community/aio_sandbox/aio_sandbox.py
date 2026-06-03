@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import logging
 import shlex
@@ -48,7 +49,7 @@ class AioSandbox(Sandbox):
             self._home_dir = context.home_dir
         return self._home_dir
 
-    def execute_command(self, command: str) -> str:
+    async def execute_command(self, command: str) -> str:
         """Execute a shell command in the sandbox.
 
         Uses a lock to serialize concurrent requests. The AIO sandbox
@@ -58,27 +59,36 @@ class AioSandbox(Sandbox):
         detected despite the lock (e.g. multiple processes sharing a
         sandbox), the command is retried on a fresh session.
 
+        The underlying agent_sandbox SDK is synchronous, so the blocking
+        call is dispatched to a worker thread via ``asyncio.to_thread`` to
+        keep the event loop responsive when the sandbox is invoked from
+        async code (e.g. Gateway runtime).
+
         Args:
             command: The command to execute.
 
         Returns:
             The output of the command.
         """
-        with self._lock:
-            try:
-                result = self._client.shell.exec_command(command=command)
-                output = result.data.output if result.data else ""
 
-                if output and _ERROR_OBSERVATION_SIGNATURE in output:
-                    logger.warning("ErrorObservation detected in sandbox output, retrying with a fresh session")
-                    fresh_id = str(uuid.uuid4())
-                    result = self._client.shell.exec_command(command=command, id=fresh_id)
+        def _run_locked() -> str:
+            with self._lock:
+                try:
+                    result = self._client.shell.exec_command(command=command)
                     output = result.data.output if result.data else ""
 
-                return output if output else "(no output)"
-            except Exception as e:
-                logger.error(f"Failed to execute command in sandbox: {e}")
-                return f"Error: {e}"
+                    if output and _ERROR_OBSERVATION_SIGNATURE in output:
+                        logger.warning("ErrorObservation detected in sandbox output, retrying with a fresh session")
+                        fresh_id = str(uuid.uuid4())
+                        result = self._client.shell.exec_command(command=command, id=fresh_id)
+                        output = result.data.output if result.data else ""
+
+                    return output if output else "(no output)"
+                except Exception as e:
+                    logger.error(f"Failed to execute command in sandbox: {e}")
+                    return f"Error: {e}"
+
+        return await asyncio.to_thread(_run_locked)
 
     def read_file(self, path: str) -> str:
         """Read the content of a file in the sandbox.

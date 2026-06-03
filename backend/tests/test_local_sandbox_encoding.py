@@ -1,5 +1,7 @@
+import asyncio
 import builtins
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import deerflow.sandbox.local.local_sandbox as local_sandbox
 from deerflow.sandbox.local.local_sandbox import LocalSandbox
@@ -78,87 +80,84 @@ def test_get_shell_uses_cmd_as_last_windows_fallback(monkeypatch):
     assert LocalSandbox._get_shell() == r"C:\Windows\System32\cmd.exe"
 
 
-def test_execute_command_uses_powershell_command_mode_on_windows(monkeypatch):
-    calls: list[tuple[object, dict]] = []
+def _patch_async_subprocess_exec(monkeypatch, captured: list[tuple[tuple, dict]], stdout: bytes = b"ok", stderr: bytes = b"", returncode: int = 0) -> None:
+    """Patch asyncio.create_subprocess_exec to capture the call args and return a fake proc."""
 
-    def fake_run(*args, **kwargs):
-        calls.append((args[0], kwargs))
-        return SimpleNamespace(stdout="ok", stderr="", returncode=0)
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        captured.append((args, kwargs))
+        proc = SimpleNamespace()
+        proc.communicate = AsyncMock(return_value=(stdout, stderr))
+        proc.returncode = returncode
+        proc.kill = lambda: None
+        proc.wait = AsyncMock(return_value=None)
+        return proc
+
+    monkeypatch.setattr(local_sandbox.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+
+def test_execute_command_uses_powershell_command_mode_on_windows(monkeypatch):
+    captured: list[tuple[tuple, dict]] = []
 
     monkeypatch.setattr(local_sandbox.os, "name", "nt")
     monkeypatch.setattr(LocalSandbox, "_get_shell", staticmethod(lambda: r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"))
-    monkeypatch.setattr(local_sandbox.subprocess, "run", fake_run)
+    _patch_async_subprocess_exec(monkeypatch, captured)
 
-    output = LocalSandbox("t").execute_command("Write-Output hello")
+    output = asyncio.run(LocalSandbox("t").execute_command("Write-Output hello"))
 
     assert output == "ok"
-    assert calls == [
+    assert captured == [
         (
-            [
+            (
                 r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
                 "-NoProfile",
                 "-Command",
                 "Write-Output hello",
-            ],
+            ),
             {
-                "shell": False,
-                "capture_output": True,
-                "text": True,
-                "timeout": 600,
+                "stdout": local_sandbox.asyncio.subprocess.PIPE,
+                "stderr": local_sandbox.asyncio.subprocess.PIPE,
             },
         )
     ]
 
 
 def test_execute_command_uses_posix_shell_command_mode_on_windows(monkeypatch):
-    calls: list[tuple[object, dict]] = []
-
-    def fake_run(*args, **kwargs):
-        calls.append((args[0], kwargs))
-        return SimpleNamespace(stdout="ok", stderr="", returncode=0)
+    captured: list[tuple[tuple, dict]] = []
 
     monkeypatch.setattr(local_sandbox.os, "name", "nt")
     monkeypatch.setattr(LocalSandbox, "_get_shell", staticmethod(lambda: r"C:\Program Files\Git\bin\sh.exe"))
-    monkeypatch.setattr(local_sandbox.subprocess, "run", fake_run)
+    _patch_async_subprocess_exec(monkeypatch, captured)
 
-    output = LocalSandbox("t").execute_command("echo hello")
+    output = asyncio.run(LocalSandbox("t").execute_command("echo hello"))
 
     assert output == "ok"
-    assert calls == [
+    assert captured == [
         (
-            [r"C:\Program Files\Git\bin\sh.exe", "-c", "echo hello"],
+            (r"C:\Program Files\Git\bin\sh.exe", "-c", "echo hello"),
             {
-                "shell": False,
-                "capture_output": True,
-                "text": True,
-                "timeout": 600,
+                "stdout": local_sandbox.asyncio.subprocess.PIPE,
+                "stderr": local_sandbox.asyncio.subprocess.PIPE,
             },
         )
     ]
 
 
 def test_execute_command_uses_cmd_command_mode_on_windows(monkeypatch):
-    calls: list[tuple[object, dict]] = []
-
-    def fake_run(*args, **kwargs):
-        calls.append((args[0], kwargs))
-        return SimpleNamespace(stdout="ok", stderr="", returncode=0)
+    captured: list[tuple[tuple, dict]] = []
 
     monkeypatch.setattr(local_sandbox.os, "name", "nt")
     monkeypatch.setattr(LocalSandbox, "_get_shell", staticmethod(lambda: r"C:\Windows\System32\cmd.exe"))
-    monkeypatch.setattr(local_sandbox.subprocess, "run", fake_run)
+    _patch_async_subprocess_exec(monkeypatch, captured)
 
-    output = LocalSandbox("t").execute_command("echo hello")
+    output = asyncio.run(LocalSandbox("t").execute_command("echo hello"))
 
     assert output == "ok"
-    assert calls == [
+    assert captured == [
         (
-            [r"C:\Windows\System32\cmd.exe", "/c", "echo hello"],
+            (r"C:\Windows\System32\cmd.exe", "/c", "echo hello"),
             {
-                "shell": False,
-                "capture_output": True,
-                "text": True,
-                "timeout": 600,
+                "stdout": local_sandbox.asyncio.subprocess.PIPE,
+                "stderr": local_sandbox.asyncio.subprocess.PIPE,
             },
         )
     ]
