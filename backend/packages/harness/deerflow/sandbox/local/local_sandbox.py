@@ -1,3 +1,4 @@
+import asyncio
 import errno
 import ntpath
 import os
@@ -231,7 +232,7 @@ class LocalSandbox(Sandbox):
 
         raise RuntimeError("No suitable shell executable found. Tried /bin/zsh, /bin/bash, /bin/sh, and `sh` on PATH.")
 
-    def execute_command(self, command: str) -> str:
+    async def execute_command(self, command: str) -> str:
         # Resolve container paths in command before execution
         resolved_command = self._resolve_paths_in_command(command)
         shell = self._get_shell()
@@ -244,27 +245,33 @@ class LocalSandbox(Sandbox):
             else:
                 args = [shell, "-c", resolved_command]
 
-            result = subprocess.run(
-                args,
-                shell=False,
-                capture_output=True,
-                text=True,
-                timeout=600,
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
         else:
-            result = subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 resolved_command,
                 executable=shell,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=600,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-        output = result.stdout
-        if result.stderr:
-            output += f"\nStd Error:\n{result.stderr}" if output else result.stderr
-        if result.returncode != 0:
-            output += f"\nExit Code: {result.returncode}"
+
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=600)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            output = ""
+            stderr_bytes = b"Command timed out after 600 seconds"
+        else:
+            output = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
+            if stderr_bytes:
+                stderr_str = stderr_bytes.decode("utf-8", errors="replace")
+                output = f"{output}\nStd Error:\n{stderr_str}" if output else stderr_str
+            if proc.returncode != 0:
+                output = f"{output}\nExit Code: {proc.returncode}"
 
         final_output = output if output else "(no output)"
         # Reverse resolve local paths back to container paths in output

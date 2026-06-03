@@ -229,6 +229,8 @@ class TestMultipleMounts:
         assert (rw_dir / "file.txt").read_text() == "content"
 
     def test_execute_command_path_replacement(self, tmp_path, monkeypatch):
+        import asyncio
+
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         test_file = data_dir / "test.txt"
@@ -241,21 +243,28 @@ class TestMultipleMounts:
             ],
         )
 
-        # Mock subprocess to capture the resolved command
-        captured = {}
-        original_run = __import__("subprocess").run
+        # Mock asyncio.create_subprocess_shell to capture the resolved command
+        captured: dict[str, object] = {}
 
-        def mock_run(*args, **kwargs):
-            if len(args) > 0:
-                captured["command"] = args[0]
-            return original_run(*args, **kwargs)
+        async def mock_create_subprocess_shell(cmd, *args, **kwargs):
+            captured["command"] = cmd
+            proc = SimpleNamespace()
+            proc.communicate = AsyncMock(return_value=(b"", b""))
+            proc.returncode = 0
+            proc.kill = lambda: None
+            proc.wait = AsyncMock(return_value=None)
+            return proc
 
-        monkeypatch.setattr("deerflow.sandbox.local.local_sandbox.subprocess.run", mock_run)
-        monkeypatch.setattr("deerflow.sandbox.local.local_sandbox.LocalSandbox._get_shell", lambda self: "/bin/sh")
+        from unittest.mock import AsyncMock
 
-        sandbox.execute_command("cat /mnt/data/test.txt")
+        import deerflow.sandbox.local.local_sandbox as local_sandbox_mod
+
+        monkeypatch.setattr(local_sandbox_mod.asyncio, "create_subprocess_shell", mock_create_subprocess_shell)
+        monkeypatch.setattr(local_sandbox_mod.LocalSandbox, "_get_shell", lambda self: "/bin/sh")
+
+        asyncio.run(sandbox.execute_command("cat /mnt/data/test.txt"))
         # Verify the command received the resolved local path
-        assert str(data_dir) in captured.get("command", "")
+        assert str(data_dir) in str(captured.get("command", ""))
 
     def test_reverse_resolve_path_does_not_match_partial_prefix(self, tmp_path):
         foo_dir = tmp_path / "foo"

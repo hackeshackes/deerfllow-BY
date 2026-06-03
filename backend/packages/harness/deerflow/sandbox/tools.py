@@ -987,7 +987,7 @@ def _truncate_ls_output(output: str, max_chars: int) -> str:
 
 
 @tool("bash", parse_docstring=True)
-def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, command: str) -> str:
+async def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, command: str) -> str:
     """Execute a bash command in a Linux environment.
 
 
@@ -1009,7 +1009,7 @@ def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, com
             validate_local_bash_command_paths(command, thread_data)
             command = replace_virtual_paths_in_command(command, thread_data)
             command = _apply_cwd_prefix(command, thread_data)
-            output = sandbox.execute_command(command)
+            output = await sandbox.execute_command(command)
             try:
                 from deerflow.config.app_config import get_app_config
 
@@ -1026,7 +1026,7 @@ def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, com
             max_chars = sandbox_cfg.bash_output_max_chars if sandbox_cfg else 20000
         except Exception:
             max_chars = 20000
-        return _truncate_bash_output(sandbox.execute_command(command), max_chars)
+        return _truncate_bash_output(await sandbox.execute_command(command), max_chars)
     except SandboxError as e:
         return f"Error: {e}"
     except PermissionError as e:

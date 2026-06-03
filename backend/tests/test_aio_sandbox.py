@@ -1,6 +1,8 @@
 """Tests for AioSandbox concurrent command serialization (#1433)."""
 
+import asyncio
 import threading
+import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -17,37 +19,47 @@ def sandbox():
         return sb
 
 
+def _run(coro):
+    """Helper: run a coroutine from sync test code."""
+    return asyncio.run(coro)
+
+
 class TestExecuteCommandSerialization:
     """Verify that concurrent exec_command calls are serialized."""
 
     def test_lock_prevents_concurrent_execution(self, sandbox):
-        """Concurrent threads should not overlap inside execute_command."""
+        """Concurrent tasks should not overlap inside execute_command."""
         call_log = []
-        barrier = threading.Barrier(3)
+        call_log_lock = threading.Lock()
+        in_flight = 0
+        max_in_flight = 0
+        max_lock = threading.Lock()
 
         def slow_exec(command, **kwargs):
-            call_log.append(("enter", command))
-            import time
-
+            nonlocal in_flight, max_in_flight
+            with call_log_lock:
+                call_log.append(("enter", command))
+            with max_lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
             time.sleep(0.05)
-            call_log.append(("exit", command))
+            with max_lock:
+                in_flight -= 1
+            with call_log_lock:
+                call_log.append(("exit", command))
             return SimpleNamespace(data=SimpleNamespace(output=f"ok: {command}"))
 
         sandbox._client.shell.exec_command = slow_exec
 
-        def worker(cmd):
-            barrier.wait()  # ensure all threads contend for the lock simultaneously
-            sandbox.execute_command(cmd)
+        async def run_all():
+            tasks = [asyncio.create_task(sandbox.execute_command(f"cmd-{i}")) for i in range(3)]
+            return await asyncio.gather(*tasks)
 
-        threads = []
-        for i in range(3):
-            t = threading.Thread(target=worker, args=(f"cmd-{i}",))
-            threads.append(t)
+        results = _run(run_all())
 
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        assert results == [f"ok: cmd-{i}" for i in range(3)]
+        # Lock must prevent more than one execution at a time
+        assert max_in_flight == 1, f"Expected serialized execution, got max_in_flight={max_in_flight}"
 
         # Verify serialization: each "enter" should be followed by its own
         # "exit" before the next "enter" (no interleaving).
@@ -75,7 +87,7 @@ class TestErrorObservationRetry:
 
         sandbox._client.shell.exec_command = mock_exec
 
-        result = sandbox.execute_command("echo hello")
+        result = _run(sandbox.execute_command("echo hello"))
         assert result == "success"
         assert call_count == 2
 
@@ -91,7 +103,7 @@ class TestErrorObservationRetry:
 
         sandbox._client.shell.exec_command = mock_exec
 
-        sandbox.execute_command("test")
+        _run(sandbox.execute_command("test"))
         assert len(calls) == 2
         assert "id" not in calls[0]
         assert "id" in calls[1]
@@ -108,7 +120,7 @@ class TestErrorObservationRetry:
 
         sandbox._client.shell.exec_command = mock_exec
 
-        result = sandbox.execute_command("echo hello")
+        result = _run(sandbox.execute_command("echo hello"))
         assert result == "all good"
         assert call_count == 1
 
@@ -175,9 +187,9 @@ class TestConcurrentFileWrites:
             threading.Thread(target=writer, args=("B\n",)),
         ]
 
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
         assert storage["content"] in {"seed\nA\nB\n", "seed\nB\nA\n"}

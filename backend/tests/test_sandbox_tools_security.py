@@ -1,3 +1,4 @@
+import asyncio
 import threading
 from pathlib import Path
 from types import SimpleNamespace
@@ -358,10 +359,14 @@ def test_bash_tool_rejects_host_bash_when_local_sandbox_default(monkeypatch) -> 
     )
     monkeypatch.setattr("deerflow.sandbox.tools.is_host_bash_allowed", lambda: False)
 
-    result = bash_tool.func(
-        runtime=runtime,
-        description="run command",
-        command="/bin/echo hello",
+    # @tool decorator stores the underlying function in .func for sync and .coroutine for async.
+    target = bash_tool.func or bash_tool.coroutine
+    result = asyncio.run(
+        target(
+            runtime=runtime,
+            description="run command",
+            command="/bin/echo hello",
+        )
     )
 
     assert "Host bash execution is disabled" in result
