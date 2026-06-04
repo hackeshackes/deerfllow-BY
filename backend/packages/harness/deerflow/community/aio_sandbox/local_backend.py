@@ -110,7 +110,7 @@ class LocalContainerBackend(SandboxBackend):
 
     # ── SandboxBackend interface ──────────────────────────────────────────
 
-    def create(self, thread_id: str, sandbox_id: str, extra_mounts: list[tuple[str, str, bool]] | None = None) -> SandboxInfo:
+    async def create(self, thread_id: str, sandbox_id: str, extra_mounts: list[tuple[str, str, bool]] | None = None) -> SandboxInfo:
         """Start a new container and return its connection info.
 
         Args:
@@ -153,7 +153,7 @@ class LocalContainerBackend(SandboxBackend):
                 # discover and adopt the existing container instead of failing.
                 if "is already in use by container" in err_lower or "conflict. the container name" in err_lower:
                     logger.warning(f"Container name {container_name} already in use, attempting to discover existing sandbox instance")
-                    existing = self.discover(sandbox_id)
+                    existing = await self.discover(sandbox_id)
                     if existing is not None:
                         return existing
                 raise
@@ -170,7 +170,7 @@ class LocalContainerBackend(SandboxBackend):
             container_id=container_id,
         )
 
-    def destroy(self, info: SandboxInfo) -> None:
+    async def destroy(self, info: SandboxInfo) -> None:
         """Stop the container and release its port."""
         if info.container_id:
             self._stop_container(info.container_id)
@@ -184,13 +184,13 @@ class LocalContainerBackend(SandboxBackend):
         except Exception:
             pass
 
-    def is_alive(self, info: SandboxInfo) -> bool:
+    async def is_alive(self, info: SandboxInfo) -> bool:
         """Check if the container is still running (lightweight, no HTTP)."""
         if info.container_name:
             return self._is_container_running(info.container_name)
         return False
 
-    def discover(self, sandbox_id: str) -> SandboxInfo | None:
+    async def discover(self, sandbox_id: str) -> SandboxInfo | None:
         """Discover an existing container by its deterministic name.
 
         Checks if a container with the expected name is running, retrieves its
@@ -213,7 +213,7 @@ class LocalContainerBackend(SandboxBackend):
 
         sandbox_host = os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost")
         sandbox_url = f"http://{sandbox_host}:{port}"
-        if not wait_for_sandbox_ready(sandbox_url, timeout=5):
+        if not await wait_for_sandbox_ready(sandbox_url, timeout=5):
             return None
 
         return SandboxInfo(

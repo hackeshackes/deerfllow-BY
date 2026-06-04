@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Any
 
-import requests
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class InfoQuestClient:
             logger.debug(config_details)
             logger.debug("\n" + "*" * 70 + "\n")
 
-    def fetch(self, url: str, return_format: str = "html") -> str:
+    async def fetch(self, url: str, return_format: str = "html") -> str:
         if logger.isEnabledFor(logging.DEBUG):
             url_truncated = url[:50] + "..." if len(url) > 50 else url
             logger.debug(
@@ -63,7 +63,8 @@ class InfoQuestClient:
 
         logger.debug("Sending crawl request to InfoQuest API")
         try:
-            response = requests.post("https://reader.infoquest.bytepluses.com", headers=headers, json=data)
+            async with httpx.AsyncClient() as client:
+                response = await client.post("https://reader.infoquest.bytepluses.com", headers=headers, json=data)
 
             # Check if status code is not 200
             if response.status_code != 200:
@@ -148,7 +149,7 @@ class InfoQuestClient:
 
         return data
 
-    def web_search_raw_results(
+    async def web_search_raw_results(
         self,
         query: str,
         site: str,
@@ -164,7 +165,8 @@ class InfoQuestClient:
         if site != "":
             params["site"] = site
 
-        response = requests.post("https://search.infoquest.bytepluses.com", headers=headers, json=params)
+        async with httpx.AsyncClient() as client:
+            response = await client.post("https://search.infoquest.bytepluses.com", headers=headers, json=params)
         response.raise_for_status()
 
         # Print partial response for debugging
@@ -231,7 +233,7 @@ class InfoQuestClient:
 
         return clean_results
 
-    def web_search(
+    async def web_search(
         self,
         query: str,
         site: str = "",
@@ -250,7 +252,7 @@ class InfoQuestClient:
 
         try:
             logger.debug("InfoQuest Web-Search - Executing search with parameters")
-            raw_results = self.web_search_raw_results(
+            raw_results = await self.web_search_raw_results(
                 query,
                 site,
                 output_format,
@@ -312,7 +314,7 @@ class InfoQuestClient:
 
         return clean_results
 
-    def image_search_raw_results(
+    async def image_search_raw_results(
         self,
         query: str,
         site: str = "",
@@ -339,7 +341,8 @@ class InfoQuestClient:
         elif self.image_size:
             logger.warning(f"image_size {self.image_size} is not valid, must be 'l', 'm', or 'i'")
 
-        response = requests.post("https://search.infoquest.bytepluses.com", headers=headers, json=params)
+        async with httpx.AsyncClient() as client:
+            response = await client.post("https://search.infoquest.bytepluses.com", headers=headers, json=params)
         response.raise_for_status()
 
         # Print partial response for debugging
@@ -350,7 +353,7 @@ class InfoQuestClient:
 
         return response_json
 
-    def image_search(
+    async def image_search(
         self,
         query: str,
         site: str = "",
@@ -370,7 +373,7 @@ class InfoQuestClient:
 
         try:
             logger.info("InfoQuest Image Search - Executing search with parameters")
-            raw_results = self.image_search_raw_results(
+            raw_results = await self.image_search_raw_results(
                 query,
                 site,
                 output_format,
