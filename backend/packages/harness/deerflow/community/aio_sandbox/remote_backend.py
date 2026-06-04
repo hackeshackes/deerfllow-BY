@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 
-import requests
+import httpx
 
 from .backend import SandboxBackend
 from .sandbox_info import SandboxInfo
@@ -48,6 +48,7 @@ class RemoteSandboxBackend(SandboxBackend):
                              (e.g., ``http://provisioner:8002``).
         """
         self._provisioner_url = provisioner_url.rstrip("/")
+        self._client = httpx.AsyncClient()
 
     @property
     def provisioner_url(self) -> str:
@@ -55,7 +56,7 @@ class RemoteSandboxBackend(SandboxBackend):
 
     # ── SandboxBackend interface ──────────────────────────────────────────
 
-    def create(
+    async def create(
         self,
         thread_id: str,
         sandbox_id: str,
@@ -66,30 +67,30 @@ class RemoteSandboxBackend(SandboxBackend):
         Calls ``POST /api/sandboxes`` which creates a dedicated Pod +
         NodePort Service in k3s.
         """
-        return self._provisioner_create(thread_id, sandbox_id, extra_mounts)
+        return await self._provisioner_create(thread_id, sandbox_id, extra_mounts)
 
-    def destroy(self, info: SandboxInfo) -> None:
+    async def destroy(self, info: SandboxInfo) -> None:
         """Destroy a sandbox Pod + Service via the provisioner."""
-        self._provisioner_destroy(info.sandbox_id)
+        await self._provisioner_destroy(info.sandbox_id)
 
-    def is_alive(self, info: SandboxInfo) -> bool:
+    async def is_alive(self, info: SandboxInfo) -> bool:
         """Check whether the sandbox Pod is running."""
-        return self._provisioner_is_alive(info.sandbox_id)
+        return await self._provisioner_is_alive(info.sandbox_id)
 
-    def discover(self, sandbox_id: str) -> SandboxInfo | None:
+    async def discover(self, sandbox_id: str) -> SandboxInfo | None:
         """Discover an existing sandbox via the provisioner.
 
         Calls ``GET /api/sandboxes/{sandbox_id}`` and returns info if
         the Pod exists.
         """
-        return self._provisioner_discover(sandbox_id)
+        return await self._provisioner_discover(sandbox_id)
 
     # ── Provisioner API calls ─────────────────────────────────────────────
 
-    def _provisioner_create(self, thread_id: str, sandbox_id: str, extra_mounts: list[tuple[str, str, bool]] | None = None) -> SandboxInfo:
+    async def _provisioner_create(self, thread_id: str, sandbox_id: str, extra_mounts: list[tuple[str, str, bool]] | None = None) -> SandboxInfo:
         """POST /api/sandboxes → create Pod + Service."""
         try:
-            resp = requests.post(
+            resp = await self._client.post(
                 f"{self._provisioner_url}/api/sandboxes",
                 json={
                     "sandbox_id": sandbox_id,
@@ -104,42 +105,42 @@ class RemoteSandboxBackend(SandboxBackend):
                 sandbox_id=sandbox_id,
                 sandbox_url=data["sandbox_url"],
             )
-        except requests.RequestException as exc:
+        except httpx.RequestError as exc:
             logger.error(f"Provisioner create failed for {sandbox_id}: {exc}")
             raise RuntimeError(f"Provisioner create failed: {exc}") from exc
 
-    def _provisioner_destroy(self, sandbox_id: str) -> None:
+    async def _provisioner_destroy(self, sandbox_id: str) -> None:
         """DELETE /api/sandboxes/{sandbox_id} → destroy Pod + Service."""
         try:
-            resp = requests.delete(
+            resp = await self._client.delete(
                 f"{self._provisioner_url}/api/sandboxes/{sandbox_id}",
                 timeout=15,
             )
-            if resp.ok:
+            if resp.is_success:
                 logger.info(f"Provisioner destroyed sandbox {sandbox_id}")
             else:
                 logger.warning(f"Provisioner destroy returned {resp.status_code}: {resp.text}")
-        except requests.RequestException as exc:
+        except httpx.RequestError as exc:
             logger.warning(f"Provisioner destroy failed for {sandbox_id}: {exc}")
 
-    def _provisioner_is_alive(self, sandbox_id: str) -> bool:
+    async def _provisioner_is_alive(self, sandbox_id: str) -> bool:
         """GET /api/sandboxes/{sandbox_id} → check Pod phase."""
         try:
-            resp = requests.get(
+            resp = await self._client.get(
                 f"{self._provisioner_url}/api/sandboxes/{sandbox_id}",
                 timeout=10,
             )
-            if resp.ok:
+            if resp.is_success:
                 data = resp.json()
                 return data.get("status") == "Running"
             return False
-        except requests.RequestException:
+        except httpx.RequestError:
             return False
 
-    def _provisioner_discover(self, sandbox_id: str) -> SandboxInfo | None:
+    async def _provisioner_discover(self, sandbox_id: str) -> SandboxInfo | None:
         """GET /api/sandboxes/{sandbox_id} → discover existing sandbox."""
         try:
-            resp = requests.get(
+            resp = await self._client.get(
                 f"{self._provisioner_url}/api/sandboxes/{sandbox_id}",
                 timeout=10,
             )
@@ -151,6 +152,6 @@ class RemoteSandboxBackend(SandboxBackend):
                 sandbox_id=sandbox_id,
                 sandbox_url=data["sandbox_url"],
             )
-        except requests.RequestException as exc:
+        except httpx.RequestError as exc:
             logger.debug(f"Provisioner discover failed for {sandbox_id}: {exc}")
             return None

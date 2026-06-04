@@ -6,14 +6,14 @@ import logging
 import time
 from abc import ABC, abstractmethod
 
-import requests
+import httpx
 
 from .sandbox_info import SandboxInfo
 
 logger = logging.getLogger(__name__)
 
 
-def wait_for_sandbox_ready(sandbox_url: str, timeout: int = 30) -> bool:
+async def wait_for_sandbox_ready(sandbox_url: str, timeout: int = 30) -> bool:
     """Poll sandbox health endpoint until ready or timeout.
 
     Args:
@@ -23,15 +23,18 @@ def wait_for_sandbox_ready(sandbox_url: str, timeout: int = 30) -> bool:
     Returns:
         True if sandbox is ready, False otherwise.
     """
+    import asyncio
+
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            response = requests.get(f"{sandbox_url}/v1/sandbox", timeout=5)
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{sandbox_url}/v1/sandbox", timeout=5)
             if response.status_code == 200:
                 return True
-        except requests.exceptions.RequestException:
+        except httpx.RequestError:
             pass
-        time.sleep(1)
+        await asyncio.sleep(1)
     return False
 
 
@@ -44,7 +47,7 @@ class SandboxBackend(ABC):
     """
 
     @abstractmethod
-    def create(self, thread_id: str, sandbox_id: str, extra_mounts: list[tuple[str, str, bool]] | None = None) -> SandboxInfo:
+    async def create(self, thread_id: str, sandbox_id: str, extra_mounts: list[tuple[str, str, bool]] | None = None) -> SandboxInfo:
         """Create/provision a new sandbox.
 
         Args:
@@ -59,7 +62,7 @@ class SandboxBackend(ABC):
         ...
 
     @abstractmethod
-    def destroy(self, info: SandboxInfo) -> None:
+    async def destroy(self, info: SandboxInfo) -> None:
         """Destroy/cleanup a sandbox and release its resources.
 
         Args:
@@ -68,7 +71,7 @@ class SandboxBackend(ABC):
         ...
 
     @abstractmethod
-    def is_alive(self, info: SandboxInfo) -> bool:
+    async def is_alive(self, info: SandboxInfo) -> bool:
         """Quick check whether a sandbox is still alive.
 
         This should be a lightweight check (e.g., container inspect)
@@ -83,7 +86,7 @@ class SandboxBackend(ABC):
         ...
 
     @abstractmethod
-    def discover(self, sandbox_id: str) -> SandboxInfo | None:
+    async def discover(self, sandbox_id: str) -> SandboxInfo | None:
         """Try to discover an existing sandbox by its deterministic ID.
 
         Used for cross-process recovery: when another process started a sandbox,

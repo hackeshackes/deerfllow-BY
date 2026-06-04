@@ -10,6 +10,7 @@ The provider itself handles:
 - Mount computation (thread-specific, skills)
 """
 
+import asyncio
 import atexit
 import hashlib
 import logging
@@ -308,7 +309,7 @@ class AioSandboxProvider(SandboxProvider):
         # Destroy warm-pool sandboxes (already removed from _warm_pool under lock above)
         for sandbox_id, info in warm_to_destroy:
             try:
-                self._backend.destroy(info)
+                asyncio.run(self._backend.destroy(info))
                 logger.info(f"Destroyed idle warm-pool sandbox {sandbox_id}")
             except Exception as e:
                 logger.error(f"Failed to destroy idle warm-pool sandbox {sandbox_id}: {e}")
@@ -448,7 +449,7 @@ class AioSandboxProvider(SandboxProvider):
                         return sandbox_id
 
                 # Backend discovery: another process may have created the container.
-                discovered = self._backend.discover(sandbox_id)
+                discovered = asyncio.run(self._backend.discover(sandbox_id))
                 if discovered is not None:
                     sandbox = AioSandbox(id=discovered.sandbox_id, base_url=discovered.sandbox_url)
                     with self._lock:
@@ -477,7 +478,7 @@ class AioSandboxProvider(SandboxProvider):
             info, _ = self._warm_pool.pop(oldest_id)
 
         try:
-            self._backend.destroy(info)
+            asyncio.run(self._backend.destroy(info))
             logger.info(f"Destroyed warm-pool sandbox {oldest_id}")
         except Exception as e:
             logger.error(f"Failed to destroy warm-pool sandbox {oldest_id}: {e}")
@@ -514,11 +515,11 @@ class AioSandboxProvider(SandboxProvider):
                 # that is actively serving a thread.
                 logger.warning(f"All {replicas} replica slots are in active use; creating sandbox {sandbox_id} beyond the soft limit")
 
-        info = self._backend.create(thread_id, sandbox_id, extra_mounts=extra_mounts or None)
+        info = asyncio.run(self._backend.create(thread_id, sandbox_id, extra_mounts=extra_mounts or None))
 
         # Wait for sandbox to be ready
-        if not wait_for_sandbox_ready(info.sandbox_url, timeout=60):
-            self._backend.destroy(info)
+        if not asyncio.run(wait_for_sandbox_ready(info.sandbox_url, timeout=60)):
+            asyncio.run(self._backend.destroy(info))
             raise RuntimeError(f"Sandbox {sandbox_id} failed to become ready within timeout at {info.sandbox_url}")
 
         sandbox = AioSandbox(id=sandbox_id, base_url=info.sandbox_url)
@@ -599,7 +600,7 @@ class AioSandboxProvider(SandboxProvider):
                 self._warm_pool.pop(sandbox_id, None)
 
         if info:
-            self._backend.destroy(info)
+            asyncio.run(self._backend.destroy(info))
             logger.info(f"Destroyed sandbox {sandbox_id}")
 
     def shutdown(self) -> None:
@@ -622,13 +623,13 @@ class AioSandboxProvider(SandboxProvider):
 
         for sandbox_id in sandbox_ids:
             try:
-                self.destroy(sandbox_id)
+                asyncio.run(self.destroy(sandbox_id))
             except Exception as e:
                 logger.error(f"Failed to destroy sandbox {sandbox_id} during shutdown: {e}")
 
         for sandbox_id, (info, _) in warm_items:
             try:
-                self._backend.destroy(info)
+                asyncio.run(self._backend.destroy(info))
                 logger.info(f"Destroyed warm-pool sandbox {sandbox_id} during shutdown")
             except Exception as e:
                 logger.error(f"Failed to destroy warm-pool sandbox {sandbox_id} during shutdown: {e}")
