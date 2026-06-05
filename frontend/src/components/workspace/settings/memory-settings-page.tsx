@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  DownloadIcon,
-  PlusIcon,
-  UploadIcon,
-} from "lucide-react";
 import { useDeferredValue, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useI18n } from "@/core/i18n/hooks";
 import { exportMemory } from "@/core/memory/api";
 import {
@@ -33,6 +25,7 @@ import { FactEditorDialog } from "./memory/fact-editor-dialog";
 import { FactsList } from "./memory/facts-list";
 import { MemoryClearDialog } from "./memory/memory-clear-dialog";
 import { MemoryImportDialog } from "./memory/memory-import-dialog";
+import { MemoryToolbar } from "./memory/memory-toolbar";
 import {
   DEFAULT_FACT_FORM_STATE,
   type FactFormState,
@@ -83,7 +76,6 @@ export function MemorySettingsPage() {
     t.settings.memory.clearAllSuccess ?? "All memory cleared";
   const factDeleteSuccess =
     t.settings.memory.factDeleteSuccess ?? "Fact deleted";
-  const addFactLabel = t.settings.memory.addFact;
   const addFactSuccess = t.settings.memory.addFactSuccess;
   const editFactSuccess = t.settings.memory.editFactSuccess;
   const factValidationContent = t.settings.memory.factValidationContent;
@@ -92,16 +84,9 @@ export function MemorySettingsPage() {
   const summaryReadOnly = t.settings.memory.summaryReadOnly;
   const memoryFullyEmpty =
     t.settings.memory.memoryFullyEmpty ?? "No memory saved yet.";
-  const searchPlaceholder =
-    t.settings.memory.searchPlaceholder ?? "Search memory";
-  const filterAll = t.settings.memory.filterAll ?? "All";
-  const filterFacts = t.settings.memory.filterFacts ?? "Facts";
-  const filterSummaries = t.settings.memory.filterSummaries ?? "Summaries";
   const noMatches = t.settings.memory.noMatches ?? "No matching memory found";
-  const exportButton = t.settings.memory.exportButton ?? t.common.export;
   const exportSuccess =
     t.settings.memory.exportSuccess ?? t.common.exportSuccess;
-  const importButton = t.settings.memory.importButton ?? t.common.import;
   const importSuccess = t.settings.memory.importSuccess ?? "Memory imported";
 
   const sectionGroups = memory ? buildMemorySectionGroups(memory, t) : [];
@@ -334,67 +319,20 @@ export function MemorySettingsPage() {
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={searchPlaceholder}
-                  className="sm:max-w-xs"
-                />
-                <ToggleGroup
-                  type="single"
-                  value={filter}
-                  onValueChange={(value) => {
-                    if (value) setFilter(value as MemoryViewFilter);
-                  }}
-                  variant="outline"
-                >
-                  <ToggleGroupItem value="all">{filterAll}</ToggleGroupItem>
-                  <ToggleGroupItem value="facts">{filterFacts}</ToggleGroupItem>
-                  <ToggleGroupItem value="summaries">
-                    {filterSummaries}
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json,application/json"
-                  className="hidden"
-                  onChange={(event) => void handleImportFileSelection(event)}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={importMemoryMutation.isPending}
-                >
-                  <UploadIcon className="mr-2 h-4 w-4" />
-                  {importButton}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void handleExportMemory()}
-                  disabled={isExporting}
-                >
-                  <DownloadIcon className="mr-2 h-4 w-4" />
-                  {isExporting ? t.common.loading : exportButton}
-                </Button>
-                <Button variant="outline" onClick={openCreateFactDialog}>
-                  <PlusIcon className="mr-2 h-4 w-4" />
-                  {addFactLabel}
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setClearDialogOpen(true)}
-                  disabled={clearMemory.isPending}
-                >
-                  {clearMemory.isPending ? t.common.loading : clearAllLabel}
-                </Button>
-              </div>
-            </div>
+            <MemoryToolbar
+              query={query}
+              onQueryChange={setQuery}
+              filter={filter}
+              onFilterChange={setFilter}
+              fileInputRef={fileInputRef}
+              onImportFile={handleImportFileSelection}
+              isImporting={importMemoryMutation.isPending}
+              isExporting={isExporting}
+              onExport={() => void handleExportMemory()}
+              onAddFact={openCreateFactDialog}
+              isClearing={clearMemory.isPending}
+              onClear={() => setClearDialogOpen(true)}
+            />
 
             {!hasMatchingVisibleContent && normalizedQuery ? (
               <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
