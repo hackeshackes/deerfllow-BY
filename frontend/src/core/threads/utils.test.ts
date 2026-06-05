@@ -1,5 +1,4 @@
 import type { Message } from "@langchain/langgraph-sdk";
-
 import { describe, it, expect } from "vitest";
 
 import type { AgentThread } from "./types";

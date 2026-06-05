@@ -1,9 +1,9 @@
 import type { ToolCall } from "@langchain/core/messages";
 import type { AIMessage } from "@langchain/langgraph-sdk";
-
 import { describe, it, expect } from "vitest";
 
 import { enUS } from "../i18n/locales/en-US";
+
 import { explainLastToolCall, explainToolCall } from "./utils";
 
 const t = enUS;
