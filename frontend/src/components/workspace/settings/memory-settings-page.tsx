@@ -10,14 +10,6 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useI18n } from "@/core/i18n/hooks";
@@ -35,11 +27,12 @@ import type {
   MemoryFactPatchInput,
 } from "@/core/memory/types";
 import { streamdownPlugins } from "@/core/streamdown/plugins";
-import { formatTimeAgo } from "@/core/utils/datetime";
 
 import { FactDeleteDialog } from "./memory/fact-delete-dialog";
 import { FactEditorDialog } from "./memory/fact-editor-dialog";
 import { FactsList } from "./memory/facts-list";
+import { MemoryClearDialog } from "./memory/memory-clear-dialog";
+import { MemoryImportDialog } from "./memory/memory-import-dialog";
 import {
   DEFAULT_FACT_FORM_STATE,
   type FactFormState,
@@ -444,30 +437,15 @@ export function MemorySettingsPage() {
         )}
       </SettingsSection>
 
-      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{clearAllConfirmTitle}</DialogTitle>
-            <DialogDescription>{clearAllConfirmDescription}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setClearDialogOpen(false)}
-              disabled={clearMemory.isPending}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => void handleClearMemory()}
-              disabled={clearMemory.isPending}
-            >
-              {clearMemory.isPending ? t.common.loading : clearAllLabel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MemoryClearDialog
+        open={clearDialogOpen}
+        isPending={clearMemory.isPending}
+        confirmTitle={clearAllConfirmTitle}
+        confirmDescription={clearAllConfirmDescription}
+        confirmLabel={clearAllLabel}
+        onOpenChange={setClearDialogOpen}
+        onConfirm={() => void handleClearMemory()}
+      />
 
       <FactEditorDialog
         open={factEditorOpen}
@@ -496,64 +474,16 @@ export function MemorySettingsPage() {
         onConfirm={() => void handleDeleteFact()}
       />
 
-      <Dialog
-        open={pendingImport !== null}
+      <MemoryImportDialog
+        pendingImport={pendingImport}
+        isPending={importMemoryMutation.isPending}
         onOpenChange={(open) => {
           if (!open) {
             setPendingImport(null);
           }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t.settings.memory.importConfirmTitle}</DialogTitle>
-            <DialogDescription>
-              {t.settings.memory.importConfirmDescription}
-            </DialogDescription>
-          </DialogHeader>
-          {pendingImport ? (
-            <div className="bg-muted rounded-md border p-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">
-                  {t.settings.memory.importFileLabel}:
-                </span>{" "}
-                {pendingImport.fileName}
-              </div>
-              <div>
-                <span className="text-muted-foreground">
-                  {t.settings.memory.markdown.facts}:
-                </span>{" "}
-                {pendingImport.memory.facts.length}
-              </div>
-              <div>
-                <span className="text-muted-foreground">
-                  {t.common.lastUpdated}:
-                </span>{" "}
-                {pendingImport.memory.lastUpdated
-                  ? formatTimeAgo(pendingImport.memory.lastUpdated)
-                  : "-"}
-              </div>
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setPendingImport(null)}
-              disabled={importMemoryMutation.isPending}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              onClick={() => void handleConfirmImport()}
-              disabled={importMemoryMutation.isPending}
-            >
-              {importMemoryMutation.isPending
-                ? t.common.loading
-                : t.common.import}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onConfirm={() => void handleConfirmImport()}
+      />
     </>
   );
 }
