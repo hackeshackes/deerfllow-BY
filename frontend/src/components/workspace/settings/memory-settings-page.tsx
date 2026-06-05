@@ -37,6 +37,7 @@ import type {
 import { streamdownPlugins } from "@/core/streamdown/plugins";
 import { formatTimeAgo } from "@/core/utils/datetime";
 
+import { FactDeleteDialog } from "./memory/fact-delete-dialog";
 import { FactEditorDialog } from "./memory/fact-editor-dialog";
 import { FactsList } from "./memory/facts-list";
 import {
@@ -51,7 +52,6 @@ import {
   isImportedMemory,
   isMemorySummaryEmpty,
   summariesToMarkdown,
-  truncateFactPreview,
 } from "./memory/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -88,11 +88,6 @@ export function MemorySettingsPage() {
     "This will remove all saved summaries and facts. This action cannot be undone.";
   const clearAllSuccess =
     t.settings.memory.clearAllSuccess ?? "All memory cleared";
-  const factDeleteConfirmTitle =
-    t.settings.memory.factDeleteConfirmTitle ?? "Delete this fact?";
-  const factDeleteConfirmDescription =
-    t.settings.memory.factDeleteConfirmDescription ??
-    "This fact will be removed from memory immediately. This action cannot be undone.";
   const factDeleteSuccess =
     t.settings.memory.factDeleteSuccess ?? "Fact deleted";
   const addFactLabel = t.settings.memory.addFact;
@@ -104,8 +99,6 @@ export function MemorySettingsPage() {
   const summaryReadOnly = t.settings.memory.summaryReadOnly;
   const memoryFullyEmpty =
     t.settings.memory.memoryFullyEmpty ?? "No memory saved yet.";
-  const factPreviewLabel =
-    t.settings.memory.factPreviewLabel ?? "Fact to delete";
   const searchPlaceholder =
     t.settings.memory.searchPlaceholder ?? "Search memory";
   const filterAll = t.settings.memory.filterAll ?? "All";
@@ -492,49 +485,16 @@ export function MemorySettingsPage() {
         onSave={() => void handleSaveFact()}
       />
 
-      <Dialog
-        open={factToDelete !== null}
+      <FactDeleteDialog
+        factToDelete={factToDelete}
+        isPending={deleteMemoryFact.isPending}
         onOpenChange={(open) => {
           if (!open) {
             setFactToDelete(null);
           }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{factDeleteConfirmTitle}</DialogTitle>
-            <DialogDescription>
-              {factDeleteConfirmDescription}
-            </DialogDescription>
-          </DialogHeader>
-          {factToDelete ? (
-            <div className="bg-muted rounded-md border p-3 text-sm">
-              <div className="text-muted-foreground mb-1 font-medium">
-                {factPreviewLabel}
-              </div>
-              <p className="break-words">
-                {truncateFactPreview(factToDelete.content)}
-              </p>
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setFactToDelete(null)}
-              disabled={deleteMemoryFact.isPending}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => void handleDeleteFact()}
-              disabled={deleteMemoryFact.isPending}
-            >
-              {deleteMemoryFact.isPending ? t.common.loading : t.common.delete}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onConfirm={() => void handleDeleteFact()}
+      />
 
       <Dialog
         open={pendingImport !== null}
