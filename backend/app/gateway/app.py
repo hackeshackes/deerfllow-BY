@@ -11,6 +11,7 @@ from app.gateway.auth import get_default_workspace_id_for_user, get_workspace_me
 from app.gateway.auth_context import current_user_email, current_user_id, current_user_role, current_workspace_id, current_workspace_role
 from app.gateway.config import get_gateway_config
 from app.gateway.deps import langgraph_runtime
+from app.gateway.rate_limit import RateLimitMiddleware
 from app.gateway.routers import (
     admin_config,
     admin_knowledge,
@@ -210,6 +211,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Request ID middleware for tracing
     app.add_middleware(RequestIDMiddleware)
+
+    # Per-IP rate limit (in-memory, sliding window). 120 req/min default.
+    app.add_middleware(RateLimitMiddleware, max_requests=120, window_seconds=60)
 
     @app.middleware("http")
     async def attach_current_user(request, call_next):
