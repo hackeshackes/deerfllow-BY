@@ -2,7 +2,6 @@
 
 import { useDeferredValue, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Streamdown } from "streamdown";
 
 import { useI18n } from "@/core/i18n/hooks";
 import { exportMemory } from "@/core/memory/api";
@@ -18,13 +17,13 @@ import type {
   MemoryFactInput,
   MemoryFactPatchInput,
 } from "@/core/memory/types";
-import { streamdownPlugins } from "@/core/streamdown/plugins";
 
 import { FactDeleteDialog } from "./memory/fact-delete-dialog";
 import { FactEditorDialog } from "./memory/fact-editor-dialog";
-import { FactsList } from "./memory/facts-list";
 import { MemoryClearDialog } from "./memory/memory-clear-dialog";
+import { MemoryFactsBlock } from "./memory/memory-facts-block";
 import { MemoryImportDialog } from "./memory/memory-import-dialog";
+import { MemorySummaryView } from "./memory/memory-summary-view";
 import { MemoryToolbar } from "./memory/memory-toolbar";
 import {
   DEFAULT_FACT_FORM_STATE,
@@ -37,7 +36,6 @@ import {
   buildMemorySectionGroups,
   isImportedMemory,
   isMemorySummaryEmpty,
-  summariesToMarkdown,
 } from "./memory/utils";
 import { SettingsSection } from "./settings-section";
 
@@ -81,7 +79,6 @@ export function MemorySettingsPage() {
   const factValidationContent = t.settings.memory.factValidationContent;
   const factValidationConfidence = t.settings.memory.factValidationConfidence;
   const noFacts = t.settings.memory.noFacts ?? "No saved facts yet.";
-  const summaryReadOnly = t.settings.memory.summaryReadOnly;
   const memoryFullyEmpty =
     t.settings.memory.memoryFullyEmpty ?? "No memory saved yet.";
   const noMatches = t.settings.memory.noMatches ?? "No matching memory found";
@@ -341,35 +338,21 @@ export function MemorySettingsPage() {
             ) : null}
 
             {shouldRenderSummariesBlock ? (
-              <div className="rounded-lg border p-4">
-                <div className="text-muted-foreground mb-4 text-sm">
-                  {summaryReadOnly}
-                </div>
-                <Streamdown
-                  className="size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-                  {...streamdownPlugins}
-                >
-                  {summariesToMarkdown(memory, filteredSectionGroups, t)}
-                </Streamdown>
-              </div>
+              <MemorySummaryView
+                memory={memory}
+                filteredSectionGroups={filteredSectionGroups}
+              />
             ) : null}
 
             {shouldRenderFactsBlock ? (
-              <div className="rounded-lg border p-4">
-                <div className="mb-4">
-                  <h3 className="text-base font-medium">
-                    {t.settings.memory.markdown.facts}
-                  </h3>
-                </div>
-                <FactsList
-                  facts={filteredFacts}
-                  noMatches={noMatches}
-                  noFacts={noFacts}
-                  normalizedQuery={normalizedQuery}
-                  onEdit={openEditFactDialog}
-                  onDelete={setFactToDelete}
-                />
-              </div>
+              <MemoryFactsBlock
+                facts={filteredFacts}
+                noMatches={noMatches}
+                noFacts={noFacts}
+                normalizedQuery={normalizedQuery}
+                onEdit={openEditFactDialog}
+                onDelete={setFactToDelete}
+              />
             ) : null}
           </div>
         )}
