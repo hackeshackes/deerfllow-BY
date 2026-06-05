@@ -72,7 +72,6 @@ describe("detectLocale", () => {
   it("returns the default locale when window is undefined (server context)", () => {
     // happy-dom defines window, so simulate SSR by stubbing undefined behavior.
     const originalWindow = globalThis.window;
-    // @ts-expect-error – intentionally removing window for the test
     delete (globalThis as { window?: unknown }).window;
     try {
       expect(detectLocale()).toBe(DEFAULT_LOCALE);
