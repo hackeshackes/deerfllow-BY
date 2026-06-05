@@ -2,12 +2,9 @@
 
 import {
   DownloadIcon,
-  PenLineIcon,
   PlusIcon,
-  Trash2Icon,
   UploadIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useDeferredValue, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -37,241 +34,26 @@ import {
 import type {
   MemoryFactInput,
   MemoryFactPatchInput,
-  UserMemory,
 } from "@/core/memory/types";
 import { streamdownPlugins } from "@/core/streamdown/plugins";
-import { pathOfThread } from "@/core/threads/utils";
 import { formatTimeAgo } from "@/core/utils/datetime";
 
+import { FactsList } from "./memory/facts-list";
+import {
+  DEFAULT_FACT_FORM_STATE,
+  type FactFormState,
+  type MemoryFact,
+  type MemoryViewFilter,
+  type PendingImport,
+} from "./memory/types";
+import {
+  buildMemorySectionGroups,
+  isImportedMemory,
+  isMemorySummaryEmpty,
+  summariesToMarkdown,
+  truncateFactPreview,
+} from "./memory/utils";
 import { SettingsSection } from "./settings-section";
-
-type MemoryViewFilter = "all" | "facts" | "summaries";
-type MemoryFact = UserMemory["facts"][number];
-
-type MemorySection = {
-  title: string;
-  summary: string;
-  updatedAt?: string;
-};
-
-type MemorySectionGroup = {
-  title: string;
-  sections: MemorySection[];
-};
-
-type PendingImport = {
-  fileName: string;
-  memory: UserMemory;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isMemorySection(value: unknown): value is {
-  summary: string;
-  updatedAt: string;
-} {
-  return (
-    isRecord(value) &&
-    typeof value.summary === "string" &&
-    typeof value.updatedAt === "string"
-  );
-}
-
-function isMemoryFact(value: unknown): value is UserMemory["facts"][number] {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.content === "string" &&
-    typeof value.category === "string" &&
-    typeof value.confidence === "number" &&
-    Number.isFinite(value.confidence) &&
-    typeof value.createdAt === "string" &&
-    typeof value.source === "string"
-  );
-}
-
-function isImportedMemory(value: unknown): value is UserMemory {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  if (
-    typeof value.version !== "string" ||
-    typeof value.lastUpdated !== "string" ||
-    !isRecord(value.user) ||
-    !isRecord(value.history) ||
-    !Array.isArray(value.facts)
-  ) {
-    return false;
-  }
-
-  return (
-    isMemorySection(value.user.workContext) &&
-    isMemorySection(value.user.personalContext) &&
-    isMemorySection(value.user.topOfMind) &&
-    isMemorySection(value.history.recentMonths) &&
-    isMemorySection(value.history.earlierContext) &&
-    isMemorySection(value.history.longTermBackground) &&
-    value.facts.every(isMemoryFact)
-  );
-}
-
-type FactFormState = {
-  content: string;
-  category: string;
-  confidence: string;
-};
-
-const DEFAULT_FACT_FORM_STATE: FactFormState = {
-  content: "",
-  category: "context",
-  confidence: "0.8",
-};
-
-function confidenceToLevelKey(confidence: unknown): {
-  key: "veryHigh" | "high" | "normal" | "unknown";
-  value?: number;
-} {
-  if (typeof confidence !== "number" || !Number.isFinite(confidence)) {
-    return { key: "unknown" };
-  }
-
-  const value = Math.min(1, Math.max(0, confidence));
-  if (value >= 0.85) return { key: "veryHigh", value };
-  if (value >= 0.65) return { key: "high", value };
-  return { key: "normal", value };
-}
-
-function formatMemorySection(
-  section: MemorySection,
-  t: ReturnType<typeof useI18n>["t"],
-): string {
-  const content =
-    section.summary.trim() ||
-    `<span class="text-muted-foreground">${t.settings.memory.markdown.empty}</span>`;
-  return [
-    `### ${section.title}`,
-    content,
-    "",
-    section.updatedAt &&
-      `> ${t.settings.memory.markdown.updatedAt}: \`${formatTimeAgo(section.updatedAt)}\``,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-function buildMemorySectionGroups(
-  memory: UserMemory,
-  t: ReturnType<typeof useI18n>["t"],
-): MemorySectionGroup[] {
-  return [
-    {
-      title: t.settings.memory.markdown.userContext,
-      sections: [
-        {
-          title: t.settings.memory.markdown.work,
-          summary: memory.user.workContext.summary,
-          updatedAt: memory.user.workContext.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.personal,
-          summary: memory.user.personalContext.summary,
-          updatedAt: memory.user.personalContext.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.topOfMind,
-          summary: memory.user.topOfMind.summary,
-          updatedAt: memory.user.topOfMind.updatedAt,
-        },
-      ],
-    },
-    {
-      title: t.settings.memory.markdown.historyBackground,
-      sections: [
-        {
-          title: t.settings.memory.markdown.recentMonths,
-          summary: memory.history.recentMonths.summary,
-          updatedAt: memory.history.recentMonths.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.earlierContext,
-          summary: memory.history.earlierContext.summary,
-          updatedAt: memory.history.earlierContext.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.longTermBackground,
-          summary: memory.history.longTermBackground.summary,
-          updatedAt: memory.history.longTermBackground.updatedAt,
-        },
-      ],
-    },
-  ];
-}
-
-function summariesToMarkdown(
-  memory: UserMemory,
-  sectionGroups: MemorySectionGroup[],
-  t: ReturnType<typeof useI18n>["t"],
-) {
-  const parts: string[] = [];
-
-  parts.push(`## ${t.settings.memory.markdown.overview}`);
-  parts.push(
-    `- **${t.common.lastUpdated}**: \`${formatTimeAgo(memory.lastUpdated)}\``,
-  );
-
-  for (const group of sectionGroups) {
-    parts.push(`\n## ${group.title}`);
-    for (const section of group.sections) {
-      parts.push(formatMemorySection(section, t));
-    }
-  }
-
-  const markdown = parts.join("\n\n");
-  const lines = markdown.split("\n");
-  const out: string[] = [];
-  let i = 0;
-  for (const line of lines) {
-    i++;
-    if (i !== 1 && line.startsWith("## ")) {
-      if (out.length === 0 || out[out.length - 1] !== "---") {
-        out.push("---");
-      }
-    }
-    out.push(line);
-  }
-
-  return out.join("\n");
-}
-
-function isMemorySummaryEmpty(memory: UserMemory) {
-  return (
-    memory.user.workContext.summary.trim() === "" &&
-    memory.user.personalContext.summary.trim() === "" &&
-    memory.user.topOfMind.summary.trim() === "" &&
-    memory.history.recentMonths.summary.trim() === "" &&
-    memory.history.earlierContext.summary.trim() === "" &&
-    memory.history.longTermBackground.summary.trim() === ""
-  );
-}
-
-function truncateFactPreview(content: string, maxLength = 140) {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-  const ellipsis = "...";
-  if (maxLength <= ellipsis.length) {
-    return normalized.slice(0, maxLength);
-  }
-  return `${normalized.slice(0, maxLength - ellipsis.length)}${ellipsis}`;
-}
-
-function upperFirst(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
 
 export function MemorySettingsPage() {
   const { t } = useI18n();
@@ -668,94 +450,14 @@ export function MemorySettingsPage() {
                     {t.settings.memory.markdown.facts}
                   </h3>
                 </div>
-
-                {filteredFacts.length === 0 ? (
-                  <div className="text-muted-foreground text-sm">
-                    {normalizedQuery ? noMatches : noFacts}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredFacts.map((fact) => {
-                      const { key } = confidenceToLevelKey(fact.confidence);
-                      const confidenceText =
-                        t.settings.memory.markdown.table.confidenceLevel[key];
-
-                      return (
-                        <div
-                          key={fact.id}
-                          className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-start sm:justify-between"
-                        >
-                          <div className="min-w-0 space-y-2">
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                              <span>
-                                <span className="text-muted-foreground">
-                                  {t.settings.memory.markdown.table.category}:
-                                </span>{" "}
-                                {upperFirst(fact.category)}
-                              </span>
-                              <span>
-                                <span className="text-muted-foreground">
-                                  {t.settings.memory.markdown.table.confidence}:
-                                </span>{" "}
-                                {confidenceText}
-                              </span>
-                              <span>
-                                <span className="text-muted-foreground">
-                                  {t.settings.memory.markdown.table.createdAt}:
-                                </span>{" "}
-                                {formatTimeAgo(fact.createdAt)}
-                              </span>
-                              <span>
-                                <span className="text-muted-foreground">
-                                  {t.settings.memory.markdown.table.source}:
-                                </span>{" "}
-                                {fact.source === "manual" ? (
-                                  t.settings.memory.manualFactSource
-                                ) : (
-                                  <Link
-                                    href={pathOfThread(fact.source)}
-                                    className="text-primary underline-offset-4 hover:underline"
-                                  >
-                                    {t.settings.memory.markdown.table.view}
-                                  </Link>
-                                )}
-                              </span>
-                            </div>
-                            <p className="text-sm break-words">
-                              {fact.content}
-                            </p>
-                          </div>
-
-                          <div className="flex shrink-0 items-center gap-1 self-start sm:ml-3">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0"
-                              onClick={() => openEditFactDialog(fact)}
-                              disabled={deleteMemoryFact.isPending}
-                              title={t.common.edit}
-                              aria-label={t.common.edit}
-                            >
-                              <PenLineIcon className="h-4 w-4" />
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive shrink-0"
-                              onClick={() => setFactToDelete(fact)}
-                              disabled={deleteMemoryFact.isPending}
-                              title={t.common.delete}
-                              aria-label={t.common.delete}
-                            >
-                              <Trash2Icon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <FactsList
+                  facts={filteredFacts}
+                  noMatches={noMatches}
+                  noFacts={noFacts}
+                  normalizedQuery={normalizedQuery}
+                  onEdit={openEditFactDialog}
+                  onDelete={setFactToDelete}
+                />
               </div>
             ) : null}
           </div>
