@@ -57,6 +57,11 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 | **模型加载稳定性修复** | ❌ | ✅ **v1.5.1 修复** |
 | **Admin 页面全量 i18n 本地化** | ❌ | ✅ **v1.5.2 新增** |
 | **中英文切换完整支持** | ❌ | ✅ **v1.5.2 新增** |
+| **凭据泄露修复 + Git 历史清理** | ❌ | ✅ **v1.5.3 安全** |
+| **后端异步化 (memory/sandbox/community)** | ❌ | ✅ **v1.5.3 性能** |
+| **Per-IP Rate Limit 中间件** | ❌ | ✅ **v1.5.3 新增** |
+| **前端 Vitest 测试框架** | ❌ | ✅ **v1.5.3 新增** |
+| **`memory-settings-page` 拆分重构** | ❌ | ✅ **v1.5.3 重构** |
 
 ---
 

@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-06-08
+
+### Security
+
+#### 凭据泄露修复与历史清理
+- `docker/e2e-test-micx.js` 及其他 6 个 e2e 测试脚本中硬编码的 `BY_ADMIN_PASSWORD` / `BETTER_AUTH_EMAIL` 改为从 `E2E_EMAIL` / `E2E_PASSWORD` 环境变量读取
+- `.env` 中真实 `BETTER_AUTH_SECRET` 和 `BY_ADMIN_PASSWORD` 已轮换为新随机值
+- `git filter-repo` 重写 v1.5.0 起的所有 commit,彻底从 git 历史中清除泄露的凭据。推送到远端新分支 `force-v1.5.3-clean`,`main` 保留原历史不动
+- `.gitignore` 扩展,覆盖 `docker/node_modules/`、`docker/test-results/`、`docker/e2e-tests/`,共 untrack 423 个误追踪文件(~44M)
+
+### Changed
+
+#### 后端异步化 (Async refactor)
+- `memory/updater.py` `model.invoke` → `await model.ainvoke`,相关函数改 `async def`;caller `queue.py` 用 `asyncio.run` 适配 threading.Timer
+- `sandbox/local/local_sandbox.py` 同步 `subprocess.run` → `asyncio.create_subprocess_shell` / `create_subprocess_exec`,超 10 处相关调用点和测试同步更新
+- `community/infoquest` / `community/aio_sandbox` 3 个文件:同步 `requests` → `httpx.AsyncClient`
+- `bash_tool` 改 `async def` 并 `await sandbox.execute_command`
+
+### Added
+
+#### 后端 rate limit 中间件
+- 新增 `app/gateway/rate_limit.py`,基于 `BaseHTTPMiddleware` 的 per-IP 滑动窗口限流,默认 120 req/min
+- 在 `app.py` 注册,超出限制返回 429 + `Retry-After` 头
+
+#### 前端测试基础设施
+- 添加 Vitest 2.1.9 + happy-dom 测试框架
+- `package.json` 新增 `test` / `test:watch` 脚本,`check` 脚本现在包含 `vitest run`
+- 首批 6 个 `core/` 纯函数文件添加测试,共 44 个 vitest 测试全部通过
+
+#### 前端代码组织
+- `memory-settings-page.tsx` 从 1006 行拆分为 11 个子组件 / hook(225 行父文件),消除超大文件违规
+
 ## [1.5.2] - 2026-05-28
 
 ### Added
