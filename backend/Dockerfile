@@ -5,6 +5,8 @@
 
 # UV source image (override for restricted networks that cannot reach ghcr.io)
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.7.20
+# HuggingFace endpoint (override for restricted networks, e.g. HF_ENDPOINT=https://hf-mirror.com)
+ARG HF_ENDPOINT=https://huggingface.co
 FROM ${UV_IMAGE} AS uv-source
 
 # ── Stage 1: Builder ──────────────────────────────────────────────────────────
@@ -13,6 +15,7 @@ FROM python:3.12-slim-bookworm AS builder
 ARG NODE_MAJOR=22
 ARG APT_MIRROR
 ARG UV_INDEX_URL
+ARG HF_ENDPOINT
 
 # Optionally override apt mirror for restricted networks (e.g. APT_MIRROR=mirrors.aliyun.com)
 RUN if [ -n "${APT_MIRROR}" ]; then \
@@ -67,6 +70,9 @@ CMD ["sh", "-c", "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app 
 # Clean image without build-essential — reduces size (~200 MB) and attack surface.
 FROM python:3.12-slim-bookworm AS runtime
 
+# Re-declare HF_ENDPOINT so the variable is available in this stage's RUN commands
+ARG HF_ENDPOINT
+
 # Copy Node.js runtime from builder (provides npx for MCP servers)
 COPY --from=builder /usr/bin/node /usr/bin/node
 COPY --from=builder /usr/lib/node_modules /usr/lib/node_modules
@@ -86,7 +92,7 @@ WORKDIR /app
 COPY --from=builder /app/backend ./backend
 
 # Pre-download faster-whisper models for STT
-RUN cd backend && UV_INDEX_URL=${UV_INDEX_URL:-https://pypi.org/simple} uv run python -c "from faster_whisper import WhisperModel; print('Downloading whisper small model...'); WhisperModel('small', device='cpu', compute_type='int8'); print('Model download complete')"
+RUN cd backend && UV_INDEX_URL=${UV_INDEX_URL:-https://pypi.org/simple} HF_ENDPOINT=${HF_ENDPOINT:-https://huggingface.co} uv run python -c "from faster_whisper import WhisperModel; print('Downloading whisper small model...'); WhisperModel('small', device='cpu', compute_type='int8'); print('Model download complete')"
 
 # Expose ports (gateway: 8001, langgraph: 2024)
 EXPOSE 8001 2024
