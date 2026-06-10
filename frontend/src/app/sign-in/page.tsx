@@ -134,7 +134,7 @@ export default function SignInPage() {
                 </div>
               )}
 
-              <Button className="h-11 w-full rounded-xl" disabled={loading}>
+              <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
                 {loading ? t.signIn.loggingIn : t.signIn.login}
                 {!loading && <ArrowRightIcon className="size-4" />}
               </Button>
