@@ -13,6 +13,34 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 
 > **注意**: 本项目已与原版 DeerFlow 有显著差异，请勿直接使用原版文档参考本项目。
 
+## 🎉 v1.5.3 已发布(2026-06-10)
+
+### 本版本核心变更
+
+v1.5.3 是一次**安全 + 性能 + 质量**三线并进的迭代:
+
+- **🔐 安全修复** — 修复 v1.5.0 起 e2e 脚本中硬编码的 `BY_ADMIN_PASSWORD` / `BETTER_AUTH_SECRET` 泄露,真实凭据全部轮换,git 历史用 `filter-repo` 改写并推送到独立分支 `force-v1.5.3-clean`,主 `main` 保留原历史不动。
+- **⚡ 后端异步化** — `memory/updater.py` `model.invoke` → `await model.ainvoke`、`local_sandbox.py` 同步 `subprocess.run` → `asyncio.create_subprocess_shell`、`community/` 下 3 个工具从 `requests` 改 `httpx.AsyncClient`,彻底消除 event loop 阻塞。
+- **🛡️ Per-IP 限流** — 新增 `RateLimitMiddleware`(滑动窗口,默认 120 req/min),超出返 429 + `Retry-After`。
+- **🧪 前端测试基础设施** — 引入 Vitest 2 + happy-dom,新增 47 个单元测试,`pnpm check` 现在包含 `vitest run`。
+- **🧹 代码清理** — `memory-settings-page.tsx` 从 1006 行拆为 11 个子组件 / hook(225 行父文件)。
+
+完整 16/16 页面 ✅,核心 Chat E2E ✅,0 控制台错误。
+
+### 如何升级
+
+```bash
+cd deerfllow-BY
+git fetch origin
+git checkout force-v1.5.3-clean   # 注意:不是 main!这是重写历史的分支
+# 或: git checkout v1.5.3
+docker compose -f docker/docker-compose.yaml down
+docker compose -f docker/docker-compose.yaml build
+docker compose -f docker/docker-compose.yaml up -d
+```
+
+详细变更见 [CHANGELOG.md](./CHANGELOG.md)。
+
 ---
 
 ## 版本对比：MicX vs DeerFlow 原版
@@ -57,6 +85,12 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 | **模型加载稳定性修复** | ❌ | ✅ **v1.5.1 修复** |
 | **Admin 页面全量 i18n 本地化** | ❌ | ✅ **v1.5.2 新增** |
 | **中英文切换完整支持** | ❌ | ✅ **v1.5.2 新增** |
+| **凭据泄露修复 + Git 历史清理** | ❌ | ✅ **v1.5.3 安全** |
+| **后端异步化(memory/sandbox/community)** | ❌ | ✅ **v1.5.3 性能** |
+| **Per-IP Rate Limit 中间件** | ❌ | ✅ **v1.5.3 新增** |
+| **前端 Vitest 测试框架** | ❌ | ✅ **v1.5.3 新增** |
+| **`memory-settings-page` 拆分重构** | ❌ | ✅ **v1.5.3 重构** |
+| **改密码 UI 在 SettingsDialog 内** | ❌ | ✅ **v1.5.3 修复** |
 | **凭据泄露修复 + Git 历史清理** | ❌ | ✅ **v1.5.3 安全** |
 | **后端异步化 (memory/sandbox/community)** | ❌ | ✅ **v1.5.3 性能** |
 | **Per-IP Rate Limit 中间件** | ❌ | ✅ **v1.5.3 新增** |
@@ -625,6 +659,36 @@ make dev          # 启动所有服务 (开发模式)
 
 MicX is an enhanced version of [DeerFlow](https://github.com/HACKESHACKES/deerflow), focused on multi-user collaboration, scheduled tasks, enterprise security, and Chinese localization.
 
+> **Note**: This project has diverged significantly from upstream DeerFlow. Do not reference upstream DeerFlow documentation when using MicX.
+
+## 🎉 v1.5.3 Released (2026-06-10)
+
+### Core Changes in This Release
+
+v1.5.3 is a **security + performance + quality** triplet:
+
+- **🔐 Security fix** — Hardcoded `BY_ADMIN_PASSWORD` / `BETTER_AUTH_SECRET` leaked in v1.5.0 e2e scripts are now environment-driven; real secrets are rotated; git history rewritten with `filter-repo` and pushed to a separate branch `force-v1.5.3-clean` (main's original history preserved).
+- **⚡ Backend async refactor** — `memory/updater.py` `model.invoke` → `await model.ainvoke`, `local_sandbox.py` `subprocess.run` → `asyncio.create_subprocess_shell`, 3 community tools migrated from `requests` to `httpx.AsyncClient`. No more event-loop blocking.
+- **🛡️ Per-IP rate limit** — New `RateLimitMiddleware` (sliding window, 120 req/min default), returns 429 + `Retry-After` on overflow.
+- **🧪 Frontend test infrastructure** — Vitest 2 + happy-dom, 47 new unit tests, `pnpm check` now runs `vitest run`.
+- **🧹 Code cleanup** — `memory-settings-page.tsx` decomposed from 1006 lines into 11 sub-components / hooks (225-line parent file).
+
+Full 16/16 pages ✅, core Chat E2E ✅, zero console errors.
+
+### How to Upgrade
+
+```bash
+cd deerfllow-BY
+git fetch origin
+git checkout force-v1.5.3-clean   # NOTE: not main! History-rewritten branch
+# or: git checkout v1.5.3
+docker compose -f docker/docker-compose.yaml down
+docker compose -f docker/docker-compose.yaml build
+docker compose -f docker/docker-compose.yaml up -d
+```
+
+See [CHANGELOG.md](./CHANGELOG.md) for full changes.
+
 ---
 
 ## MicX vs DeerFlow Comparison
@@ -660,6 +724,12 @@ MicX is an enhanced version of [DeerFlow](https://github.com/HACKESHACKES/deerfl
 | **Bug Fix Release** | ❌ | ✅ **v1.4.8 New** |
 | **Admin Pages Full i18n Localization** | ❌ | ✅ **v1.5.2 New** |
 | **Complete Chinese/English Language Switch** | ❌ | ✅ **v1.5.2 New** |
+| **Credential Leak Fix + Git History Rewrite** | ❌ | ✅ **v1.5.3 Security** |
+| **Backend Async Refactor (memory/sandbox/community)** | ❌ | ✅ **v1.5.3 Performance** |
+| **Per-IP Rate Limit Middleware** | ❌ | ✅ **v1.5.3 New** |
+| **Frontend Vitest Test Framework** | ❌ | ✅ **v1.5.3 New** |
+| **`memory-settings-page` Decomposition Refactor** | ❌ | ✅ **v1.5.3 Refactor** |
+| **Change-Password UI Inside SettingsDialog** | ❌ | ✅ **v1.5.3 Fix** |
 
 ---
 

@@ -5,37 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.3] - 2026-06-08
+## [1.5.3] - 2026-06-10
 
 ### Security
 
 #### 凭据泄露修复与历史清理
-- `docker/e2e-test-micx.js` 及其他 6 个 e2e 测试脚本中硬编码的 `BY_ADMIN_PASSWORD` / `BETTER_AUTH_EMAIL` 改为从 `E2E_EMAIL` / `E2E_PASSWORD` 环境变量读取
-- `.env` 中真实 `BETTER_AUTH_SECRET` 和 `BY_ADMIN_PASSWORD` 已轮换为新随机值
-- `git filter-repo` 重写 v1.5.0 起的所有 commit,彻底从 git 历史中清除泄露的凭据。推送到远端新分支 `force-v1.5.3-clean`,`main` 保留原历史不动
+- `docker/e2e-test-micx.js` 及其他 6 个 e2e 测试脚本中硬编码的 `BY_ADMIN_PASSWORD` / `BETTER_AUTH_SECRET` 改为从 `E2E_EMAIL` / `E2E_PASSWORD` 环境变量读取
+- `.env` 中真实 `BETTER_AUTH_SECRET` 和 `BY_ADMIN_PASSWORD` 已轮换为新随机值,同步更新 3 个 `.env` 文件(根、`docker/`、`frontend/`)
+- `git filter-repo` 重写 v1.5.0 起的所有 commit,彻底从 git 历史中清除泄露的凭据
+- 推送到远端新分支 `force-v1.5.3-clean`(独立分支,`main` 保留原历史不动)
 - `.gitignore` 扩展,覆盖 `docker/node_modules/`、`docker/test-results/`、`docker/e2e-tests/`,共 untrack 423 个误追踪文件(~44M)
+- `secrets.enc` vault 用新 `BETTER_AUTH_SECRET` 重新加密,所有 LLM API key 保留,owner 用户用 PBKDF2-HMAC-SHA256 120000 轮重新 hash
 
 ### Changed
 
 #### 后端异步化 (Async refactor)
 - `memory/updater.py` `model.invoke` → `await model.ainvoke`,相关函数改 `async def`;caller `queue.py` 用 `asyncio.run` 适配 threading.Timer
-- `sandbox/local/local_sandbox.py` 同步 `subprocess.run` → `asyncio.create_subprocess_shell` / `create_subprocess_exec`,超 10 处相关调用点和测试同步更新
+- `sandbox/local/local_sandbox.py` 同步 `subprocess.run` → `asyncio.create_subprocess_shell` / `create_subprocess_exec`,abstract `Sandbox.execute_command` 与 `bash_tool` 同步改 async,超 10 处相关调用点和测试同步更新
 - `community/infoquest` / `community/aio_sandbox` 3 个文件:同步 `requests` → `httpx.AsyncClient`
-- `bash_tool` 改 `async def` 并 `await sandbox.execute_command`
+- 整体上消除后端 event loop 阻塞,支持并发 LLM 调用与并发的沙箱命令
+
+#### 构建基础设施
+- `backend/Dockerfile` 新增 `HF_ENDPOINT` ARG,支持受限网络(中国/受限地区)从 `hf-mirror.com` 镜像下载 faster-whisper 模型
+- `docker/docker-compose.yaml` gateway / langgraph 服务传递 `HF_ENDPOINT` 到 build args
 
 ### Added
 
 #### 后端 rate limit 中间件
 - 新增 `app/gateway/rate_limit.py`,基于 `BaseHTTPMiddleware` 的 per-IP 滑动窗口限流,默认 120 req/min
 - 在 `app.py` 注册,超出限制返回 429 + `Retry-After` 头
+- 使用 PEP 585 内置泛型(`dict[str, deque[float]]`),通过 ruff 静态检查
 
 #### 前端测试基础设施
 - 添加 Vitest 2.1.9 + happy-dom 测试框架
 - `package.json` 新增 `test` / `test:watch` 脚本,`check` 脚本现在包含 `vitest run`
-- 首批 6 个 `core/` 纯函数文件添加测试,共 44 个 vitest 测试全部通过
+- 首批 6 个 `core/` 纯函数文件添加测试,共 47 个 vitest 测试全部通过(markdown / json / threads / messages / tools / i18n / knowledge)
+- 修复 Vitest 配置与 vite 版本冲突(移除 `@vitejs/plugin-react`,项目 vite 7 与 vitest 2 内部 vite 5 类型冲突)
 
 #### 前端代码组织
 - `memory-settings-page.tsx` 从 1006 行拆分为 11 个子组件 / hook(225 行父文件),消除超大文件违规
+  - 子组件:`FactsList`、`FactEditorDialog`、`FactDeleteDialog`、`MemoryImportDialog`、`MemoryClearDialog`、`MemoryToolbar`、`MemorySummaryView`、`MemoryFactsBlock`
+  - Hook:`useMemoryActions`(state + handlers)
+  - 共享:`memory/types.ts`、`memory/utils.ts`
+
+### Fixed
+
+#### 用户改密码入口可达性
+- 抽取 `change-password-form.tsx` 独立组件,POST `/api/account/change-password` 表单(带 `type=submit` 按钮)
+- `settings-dialog.tsx` 添加 `account` section(中英 i18n key `t.settings.sections.account`),用户可在 SettingsDialog 内改密码
+- `nginx.conf` 新增 `location /api/account { proxy_pass http://$gateway_backend; }`,修复之前 404 导致改密 API 不可用
+- `account-page.tsx` 重构复用 ChangePasswordForm,独立页面 `/workspace/account` 仍可用
+
+#### 登录体验
+- 登录按钮添加 `type="submit"`,鼠标点击可触发(之前只能按 Enter 提交)
+
+#### 应用稳定性
+- 修复 `n.filter is not a function` 崩溃:`/api/users/me` / `loadKnowledgeBases` 401 时不再把 `undefined` 塞进 state
+- 加 3 个缺失路由:`/workspace/admin/dashboard`、`/workspace/admin/channels`、`/workspace/settings/memory`
+
+### Deployment
+
+- v1.5.3 完整部署到本地 docker(4 个核心服务:v1.5.3 baked-in 镜像)
+- 16/16 页面 ✅,核心 Chat E2E ✅(真实 AI 回复),0 console 错误
+- 凭据已通过 SettingsDialog UI 可改
 
 ## [1.5.2] - 2026-05-28
 
