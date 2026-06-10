@@ -32,11 +32,22 @@ export function ChatStartPanel() {
   useEffect(() => {
     Promise.all([
       loadKnowledgeBases(),
-      fetch("/api/users/me").then((response) => response.json()),
+      fetch("/api/users/me")
+        .then((response) => (response.ok ? response.json() : null))
+        .catch(() => null),
     ])
       .then(([kbs, user]) => {
-        setKnowledgeBases(kbs.slice(0, 4));
-        setCurrentUser(user as CurrentUser);
+        // Defensive: backend may return 401 when the session is invalid.
+        // Treat `kbs` as empty list and `user` as null instead of letting
+        // an error envelope flow into `setKnowledgeBases(...).slice(0, 4)`,
+        // which would crash on `n.filter is not a function`.
+        const safeKbs = Array.isArray(kbs) ? kbs.slice(0, 4) : [];
+        setKnowledgeBases(safeKbs);
+        setCurrentUser(
+          user && typeof user === "object" && "active_workspace_name" in user
+            ? (user as CurrentUser)
+            : null,
+        );
       })
       .catch(() => {
         // The start panel should never block plain chat.
