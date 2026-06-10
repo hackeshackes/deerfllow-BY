@@ -654,6 +654,7 @@ export const enUS: Translations = {
       skills: "Skills",
       knowledge: "Knowledge",
       notification: "Notification",
+      account: "Account & Security",
       about: "About",
     },
     memory: {

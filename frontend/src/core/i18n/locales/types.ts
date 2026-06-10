@@ -584,6 +584,7 @@ export interface Translations {
       skills: string;
       knowledge: string;
       notification: string;
+      account: string;
       about: string;
     };
     memory: {

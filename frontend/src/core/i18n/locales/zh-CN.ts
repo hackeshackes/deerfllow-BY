@@ -639,6 +639,7 @@ export const zhCN: Translations = {
       skills: "技能",
       knowledge: "知识库",
       notification: "通知",
+      account: "账号与安全",
       about: "关于",
     },
     memory: {
