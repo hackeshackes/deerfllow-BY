@@ -53,11 +53,19 @@ export default function KnowledgePage() {
     document.title = `资料库 - ${t.pages.appName}`;
     Promise.all([
       loadKnowledgeBases(),
-      fetch("/api/users/me").then((r) => r.json()),
+      fetch("/api/users/me")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
     ])
       .then(([kbs, user]) => {
-        setKnowledgeBases(kbs);
-        setCurrentUser(user);
+        // Defensive: when /api/users/me returns 401 we set `user` to null
+        // instead of an error envelope so later filter callbacks stay safe.
+        setKnowledgeBases(Array.isArray(kbs) ? kbs : []);
+        setCurrentUser(
+          user && typeof user === "object" && "id" in user
+            ? (user as CurrentUser)
+            : null,
+        );
       })
       .catch(console.error)
       .finally(() => setLoading(false));

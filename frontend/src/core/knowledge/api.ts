@@ -44,7 +44,13 @@ export interface SearchResponse {
 
 export async function loadKnowledgeBases(): Promise<KnowledgeBase[]> {
   const response = await fetch(`${getBackendBaseURL()}/api/knowledge`);
-  return response.json();
+  if (!response.ok) {
+    // Degrade gracefully on auth/permission errors so consumers can keep an
+    // empty list in state instead of crashing on `n.filter is not a function`.
+    return [];
+  }
+  const data = (await response.json()) as KnowledgeBase[] | unknown;
+  return Array.isArray(data) ? (data as KnowledgeBase[]) : [];
 }
 
 export async function getKnowledgeBase(kbId: string): Promise<KnowledgeBase> {

@@ -48,11 +48,20 @@ export function UserKnowledgePage() {
   useEffect(() => {
     Promise.all([
       loadKnowledgeBases(),
-      fetch("/api/users/me").then((r) => r.json()),
+      fetch("/api/users/me")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
     ])
       .then(([kbs, user]) => {
-        setKnowledgeBases(kbs);
-        setCurrentUser(user);
+        // Defensive: when /api/users/me returns 401, treat `user` as null
+        // and guarantee `kbs` is an array so downstream `.filter` calls
+        // never crash with `n.filter is not a function`.
+        setKnowledgeBases(Array.isArray(kbs) ? kbs : []);
+        setCurrentUser(
+          user && typeof user === "object" && "id" in user
+            ? (user as CurrentUser)
+            : null,
+        );
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -61,7 +70,7 @@ export function UserKnowledgePage() {
   const handleRefresh = async () => {
     try {
       const kbs = await loadKnowledgeBases();
-      setKnowledgeBases(kbs);
+      setKnowledgeBases(Array.isArray(kbs) ? kbs : []);
     } catch (err) {
       console.error("Failed to refresh knowledge bases:", err);
     }
