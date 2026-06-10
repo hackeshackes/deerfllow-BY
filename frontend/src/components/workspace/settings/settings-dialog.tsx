@@ -7,6 +7,7 @@ import {
   PaletteIcon,
   BlocksIcon,
   DatabaseIcon,
+  ShieldCheckIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -19,6 +20,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AboutSettingsPage } from "@/components/workspace/settings/about-settings-page";
 import { AppearanceSettingsPage } from "@/components/workspace/settings/appearance-settings-page";
+import { ChangePasswordForm } from "@/components/workspace/settings/change-password-form";
 import { MemorySettingsPage } from "@/components/workspace/settings/memory-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
 import { UserKnowledgePage } from "@/components/workspace/settings/user-knowledge-page";
@@ -32,6 +34,7 @@ type SettingsSection =
   | "notification"
   | "skills"
   | "knowledge"
+  | "account"
   | "about";
 
 type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
@@ -79,6 +82,11 @@ export function SettingsDialog(props: SettingsDialogProps) {
         label: t.settings.sections.knowledge,
         icon: DatabaseIcon,
       },
+      {
+        id: "account",
+        label: t.settings.sections.account,
+        icon: ShieldCheckIcon,
+      },
       { id: "about", label: t.settings.sections.about, icon: InfoIcon },
     ],
     [
@@ -87,6 +95,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       t.settings.sections.notification,
       t.settings.sections.skills,
       t.settings.sections.knowledge,
+      t.settings.sections.account,
       t.settings.sections.about,
     ],
   );
@@ -137,6 +146,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
               {activeSection === "notification" && <NotificationSettingsPage />}
               {activeSection === "skills" && <UserSkillsPage />}
               {activeSection === "knowledge" && <UserKnowledgePage />}
+              {activeSection === "account" && <ChangePasswordForm />}
               {activeSection === "about" && <AboutSettingsPage />}
             </div>
           </ScrollArea>
