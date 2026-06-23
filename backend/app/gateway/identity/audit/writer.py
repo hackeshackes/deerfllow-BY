@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -23,7 +24,11 @@ class AuditWriter:
         self._batch_size = batch_size
         self._flush_interval = flush_interval
         self._buffer: list[AuditEvent] = []
-        self._lock = asyncio.Lock()
+        # threading.Lock so the writer is safe to share across the event
+        # loops used by TestClient (anyio portal) and the pytest-asyncio
+        # test loop. asyncio.Lock would bind to whichever loop creates it
+        # and fail when re-entered from a different loop.
+        self._lock = threading.Lock()
         self._closed = False
         self._init_db()
         self._task: asyncio.Task | None = None
@@ -51,16 +56,18 @@ class AuditWriter:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_workspace_time ON audit_events(workspace_id, occurred_at)")
 
     async def write(self, event: AuditEvent) -> None:
-        async with self._lock:
+        with self._lock:
             self._buffer.append(event)
-            if len(self._buffer) >= self._batch_size:
-                await self._flush_locked()
+            should_flush = len(self._buffer) >= self._batch_size
+        if should_flush:
+            await self.flush()
 
     async def _flush_locked(self) -> None:
-        if not self._buffer:
-            return
-        events = self._buffer[:]
-        self._buffer = []
+        with self._lock:
+            if not self._buffer:
+                return
+            events = self._buffer[:]
+            self._buffer = []
         await asyncio.get_event_loop().run_in_executor(None, self._insert_batch, events)
 
     def _insert_batch(self, events: list[AuditEvent]) -> None:
@@ -79,8 +86,7 @@ class AuditWriter:
                 )
 
     async def flush(self) -> None:
-        async with self._lock:
-            await self._flush_locked()
+        await self._flush_locked()
 
     async def close(self) -> None:
         await self.flush()
