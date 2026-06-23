@@ -312,6 +312,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     # Stateless Runs API (stream/wait without a pre-existing thread)
     app.include_router(runs.router)
 
+    # OIDC identity routes (login/callback/logout)
+    from app.gateway.identity.routers.oidc import router as oidc_router
+
+    app.include_router(oidc_router)
+
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
         """Health check endpoint.
