@@ -31,3 +31,17 @@ _executor_mock.MAX_CONCURRENT_SUBAGENTS = 3
 _executor_mock.get_background_task_result = MagicMock()
 
 sys.modules["deerflow.subagents.executor"] = _executor_mock
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def identity_env(monkeypatch):
+    """Set required env vars for identity subsystem tests."""
+    monkeypatch.setenv("MICX_SECRET_ENCRYPTION_KEY", "test-key-must-be-at-least-32-bytes-long!")
+    # Force config singleton to re-evaluate
+    from app.gateway.identity import config as cfg_mod
+    cfg_mod.get_identity_config.cache_clear()
+    yield
+    cfg_mod.get_identity_config.cache_clear()
