@@ -1,0 +1,6 @@
+p, role:admin, *, *, allow
+p, role:member, workspace/*, read, allow
+p, role:member, thread/*, read, allow
+p, role:member, thread/*, create, allow
+p, role:member, thread/*, update, allow
+p, role:guest, workspace/*, read, deny
