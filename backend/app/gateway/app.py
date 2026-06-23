@@ -322,6 +322,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     app.include_router(rbac_router)
 
+    # Audit query & export API
+    from app.gateway.identity.routers.audit import router as audit_router
+
+    app.include_router(audit_router)
+
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
         """Health check endpoint.

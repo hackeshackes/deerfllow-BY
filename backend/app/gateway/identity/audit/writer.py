@@ -123,3 +123,21 @@ class AuditWriter:
             ip_address=row[8], user_agent=row[9], metadata=json.loads(row[10] or "{}"),
             success=bool(row[11]),
         )
+
+
+_audit_writer: AuditWriter | None = None
+
+
+def get_audit_writer() -> AuditWriter:
+    """Process-wide singleton accessor for AuditWriter.
+
+    Honors IdentityConfig.audit_async_batch_size. Tests that need an
+    isolated database can construct their own AuditWriter directly
+    without going through this helper.
+    """
+    global _audit_writer
+    if _audit_writer is None:
+        from ..config import get_identity_config
+        cfg = get_identity_config()
+        _audit_writer = AuditWriter(batch_size=cfg.audit_async_batch_size)
+    return _audit_writer
