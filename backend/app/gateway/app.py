@@ -317,6 +317,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     app.include_router(oidc_router)
 
+    # RBAC admin API (role CRUD)
+    from app.gateway.identity.routers.rbac import router as rbac_router
+
+    app.include_router(rbac_router)
+
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
         """Health check endpoint.
