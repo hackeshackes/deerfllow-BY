@@ -351,6 +351,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     app.include_router(audit_router)
 
+    # SCIM admin API
+    from app.gateway.identity.routers.scim import router as scim_router
+
+    app.include_router(scim_router)
+
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
         """Health check endpoint.
