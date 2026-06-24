@@ -215,6 +215,30 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     # Per-IP rate limit (in-memory, sliding window). 120 req/min default.
     app.add_middleware(RateLimitMiddleware, max_requests=120, window_seconds=60)
 
+    # Audit middleware — auto-emit events for write requests. Skipped when
+    # the audit subsystem is disabled in config. Idempotent: only added
+    # once per process even if create_app() is called repeatedly (e.g. in
+    # tests that build multiple FastAPI clients).
+    from app.gateway.identity.audit.middleware import AuditMiddleware
+    from app.gateway.identity.audit.models import ActorType
+    from app.gateway.identity.audit.writer import get_audit_writer
+    from app.gateway.identity.config import get_identity_config
+
+    if get_identity_config().audit_enabled and not getattr(app.state, "audit_middleware_added", False):
+
+        def _actor_resolver(request):
+            user = getattr(request.state, "current_user", None)
+            if user is None:
+                return ("anonymous", ActorType.USER)
+            return (str(user.id), ActorType.USER)
+
+        app.add_middleware(
+            AuditMiddleware,
+            writer=get_audit_writer(),
+            actor_resolver=_actor_resolver,
+        )
+        app.state.audit_middleware_added = True
+
     @app.middleware("http")
     async def attach_current_user(request, call_next):
         payload = session_payload_from_request(request)
@@ -311,6 +335,26 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Stateless Runs API (stream/wait without a pre-existing thread)
     app.include_router(runs.router)
+
+    # OIDC identity routes (login/callback/logout)
+    from app.gateway.identity.routers.oidc import router as oidc_router
+
+    app.include_router(oidc_router)
+
+    # RBAC admin API (role CRUD)
+    from app.gateway.identity.routers.rbac import router as rbac_router
+
+    app.include_router(rbac_router)
+
+    # Audit query & export API
+    from app.gateway.identity.routers.audit import router as audit_router
+
+    app.include_router(audit_router)
+
+    # SCIM admin API
+    from app.gateway.identity.routers.scim import router as scim_router
+
+    app.include_router(scim_router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:

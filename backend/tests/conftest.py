@@ -31,3 +31,35 @@ _executor_mock.MAX_CONCURRENT_SUBAGENTS = 3
 _executor_mock.get_background_task_result = MagicMock()
 
 sys.modules["deerflow.subagents.executor"] = _executor_mock
+
+# Stub the missing voice_config module so app.gateway.app can be imported by
+# tests that use TestClient(create_app()). Production code expects this
+# module to live at backend/app/gateway/data/voice_config.py but the file is
+# absent from this commit (pre-existing repo state). Until the missing module
+# is added, this stub lets downstream tests collect and run.
+_voice_config_mock = MagicMock()
+_voice_config_mock.get_voice_config = MagicMock(return_value={})
+_voice_config_mock.upsert_voice_config = MagicMock(return_value={})
+
+_data_pkg = sys.modules.get("app.gateway.data")
+if _data_pkg is None:
+    import types
+
+    _data_pkg = types.ModuleType("app.gateway.data")
+    sys.modules["app.gateway.data"] = _data_pkg
+_data_pkg.voice_config = _voice_config_mock  # type: ignore[attr-defined]
+sys.modules["app.gateway.data.voice_config"] = _voice_config_mock
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def identity_env(monkeypatch):
+    """Set required env vars for identity subsystem tests."""
+    monkeypatch.setenv("MICX_SECRET_ENCRYPTION_KEY", "test-key-must-be-at-least-32-bytes-long!")
+    # Force config singleton to re-evaluate
+    from app.gateway.identity import config as cfg_mod
+    cfg_mod.get_identity_config.cache_clear()
+    yield
+    cfg_mod.get_identity_config.cache_clear()
