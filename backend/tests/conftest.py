@@ -11,6 +11,16 @@ from unittest.mock import MagicMock
 # Make 'app' and 'deerflow' importable from any working directory
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Live/e2e tests require running infrastructure (Redis, langgraph dev server)
+# and hang indefinitely without it. Excluded from default test runs; run
+# manually when infrastructure is available. Paths are relative to this
+# conftest.py's directory (tests/).
+collect_ignore = [
+    "test_client_e2e.py",
+    "test_client_live.py",
+    "test_create_deerflow_agent_live.py",
+]
+
 # Break the circular import chain that exists in production code:
 #   deerflow.subagents.__init__
 #     -> .executor (SubagentExecutor, SubagentResult)
