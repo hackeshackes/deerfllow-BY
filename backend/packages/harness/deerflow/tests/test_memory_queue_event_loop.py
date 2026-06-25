@@ -19,7 +19,6 @@ preserving the original intent.
 from __future__ import annotations
 
 import asyncio
-import time
 from unittest.mock import patch
 
 from deerflow.agents.memory.queue import ConversationContext, MemoryUpdateQueue
@@ -82,10 +81,7 @@ def test_queue_processes_multiple_contexts_in_single_event_loop_pass():
     real_asyncio_run = asyncio.run
 
     def tracking_run(coro):
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
+        loop = asyncio.new_event_loop()
         loops_created.append(id(loop))
         return real_asyncio_run(coro)
 
