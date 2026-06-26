@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3.1] - 2026-06-26 (Hotfix)
+
+### Fixed
+
+#### Event loop closed in memory update queue
+- `MemoryUpdateQueue._process_queue()` was using `threading.Thread` + `asyncio.run()` per memory update, which created and destroyed a new event loop for each call. This broke httpx/openai async client state cached against the event loop.
+- Fix: replace `asyncio.run()` per-context with a single `asyncio.run(_process_batch_async(...))` for the entire batch. Also: `time.sleep(0.5)` → `await asyncio.sleep(0.5)`.
+
+#### BlockingError: os.mkdir in async LangGraph context
+- `FileMemoryStorage.save()` was calling `os.mkdir()` + `open()` + `json.dump()` synchronously inside an async function. LangGraph's blockbuster library detected and rejected this.
+- Fix: split `save()` into async wrapper that calls `_sync_save()` via `asyncio.to_thread`.
+- Also fixed 3 upstream callers in `updater.py` that were calling `.save()` without `await` (silent coroutine discard): `_save_memory_to_file` (sync wrapper), `import_memory_data` (sync), `update_memory` (async).
+
+### Verified (no fix needed)
+
+#### /mnt/user-data permission (P2) — misreport
+- User reported "Permission denied: /mnt/user-data". Reproduction script (committed as `backend/scripts/repro_mnt_user_data_permission.py`) shows all writes succeed in the running gateway container. Path is provided by the gateway image and is writable by root (uid 0).
+
+#### Feishu WebSocket reconnect (P3) — misreport
+- User reported "Invalid access token". Container logs show WebSocket reconnect loops, not token expiration. Lark SDK auto-reconnects without re-authenticating. Documented in `test_feishu_reconnect_preserves_token.py`.
+
 ## [1.5.3] - 2026-06-10
 
 ### Security
