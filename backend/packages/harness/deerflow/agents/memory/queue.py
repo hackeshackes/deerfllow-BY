@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import threading
-import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -109,10 +108,14 @@ class MemoryUpdateQueue:
         logger.debug("Memory update timer set for %ss", config.debounce_seconds)
 
     def _process_queue(self) -> None:
-        """Process all queued conversation contexts."""
-        # Import here to avoid circular dependency
-        from deerflow.agents.memory.updater import MemoryUpdater
+        """Process all queued conversation contexts.
 
+        Calls asyncio.run() exactly once to drive the entire batch through a
+        single event loop. This avoids the per-context event loop churn that
+        breaks httpx/openai async client state (they cache event loop
+        references, so a closed-and-replaced loop surfaces as
+        ``Event loop is closed`` on the next request).
+        """
         with self._lock:
             if self._processing:
                 # Already processing, reschedule
@@ -130,38 +133,50 @@ class MemoryUpdateQueue:
         logger.info("Processing %d queued memory updates", len(contexts_to_process))
 
         try:
-            updater = MemoryUpdater()
-
-            for context in contexts_to_process:
-                try:
-                    logger.info("Updating memory for thread %s", context.thread_id)
-                    # updater.update_memory is async (uses ainvoke) — the queue worker
-                    # runs in a background thread without an event loop, so we drive the
-                    # coroutine here via asyncio.run() per update.
-                    success = asyncio.run(
-                        updater.update_memory(
-                            messages=context.messages,
-                            thread_id=context.thread_id,
-                            agent_name=context.agent_name,
-                            user_id=context.user_id,
-                            correction_detected=context.correction_detected,
-                            reinforcement_detected=context.reinforcement_detected,
-                        )
-                    )
-                    if success:
-                        logger.info("Memory updated successfully for thread %s", context.thread_id)
-                    else:
-                        logger.warning("Memory update skipped/failed for thread %s", context.thread_id)
-                except Exception as e:
-                    logger.error("Error updating memory for thread %s: %s", context.thread_id, e)
-
-                # Small delay between updates to avoid rate limiting
-                if len(contexts_to_process) > 1:
-                    time.sleep(0.5)
-
+            # Drive the entire batch through a single event loop. The async
+            # helper below awaits each update and sleeps between updates, so
+            # we no longer need time.sleep() (which would block the loop) or
+            # a fresh asyncio.run() per context (which would tear down the
+            # loop's async client state).
+            asyncio.run(self._process_batch_async(contexts_to_process))
         finally:
             with self._lock:
                 self._processing = False
+
+    async def _process_batch_async(self, contexts: list[ConversationContext]) -> None:
+        """Process a batch of conversation contexts inside a single event loop.
+
+        All contexts share one event loop, so async clients (httpx, openai,
+        etc.) created during ``update_memory`` keep a valid loop reference for
+        the entire batch.
+        """
+        # Import here to avoid circular dependency
+        from deerflow.agents.memory.updater import MemoryUpdater
+
+        updater = MemoryUpdater()
+
+        for context in contexts:
+            try:
+                logger.info("Updating memory for thread %s", context.thread_id)
+                success = await updater.update_memory(
+                    messages=context.messages,
+                    thread_id=context.thread_id,
+                    agent_name=context.agent_name,
+                    user_id=context.user_id,
+                    correction_detected=context.correction_detected,
+                    reinforcement_detected=context.reinforcement_detected,
+                )
+                if success:
+                    logger.info("Memory updated successfully for thread %s", context.thread_id)
+                else:
+                    logger.warning("Memory update skipped/failed for thread %s", context.thread_id)
+            except Exception as e:
+                logger.error("Error updating memory for thread %s: %s", context.thread_id, e)
+
+            # Small delay between updates to avoid rate limiting. Must be
+            # awaited (not time.sleep) so we don't block the event loop.
+            if len(contexts) > 1:
+                await asyncio.sleep(0.5)
 
     def flush(self) -> None:
         """Force immediate processing of the queue.

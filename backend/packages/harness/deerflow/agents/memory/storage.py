@@ -1,6 +1,7 @@
 """Memory storage providers."""
 
 import abc
+import asyncio
 import json
 import logging
 import threading
@@ -143,8 +144,19 @@ class FileMemoryStorage(MemoryStorage):
         self._memory_cache[cache_key] = (memory_data, mtime)
         return memory_data
 
-    def save(self, memory_data: dict[str, Any], agent_name: str | None = None, user_id: str | None = None) -> bool:
-        """Save memory data to file and update cache."""
+    async def save(self, memory_data: dict[str, Any], agent_name: str | None = None, user_id: str | None = None) -> bool:
+        """Save memory data to file (async, non-blocking).
+
+        Wraps _sync_save() via asyncio.to_thread to avoid blocking the event
+        loop. This is critical for LangGraph context which uses blockbuster
+        to detect and reject sync blocking calls in async functions.
+        """
+        return await asyncio.to_thread(
+            self._sync_save, memory_data, agent_name, user_id
+        )
+
+    def _sync_save(self, memory_data: dict[str, Any], agent_name: str | None = None, user_id: str | None = None) -> bool:
+        """Save memory data to file and update cache (sync). Used internally by save()."""
         file_path = self._get_memory_file_path(agent_name, user_id)
         cache_key = (agent_name, user_id)
 

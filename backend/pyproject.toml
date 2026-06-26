@@ -50,6 +50,9 @@ dev = ["pytest>=8.0.0", "pytest-asyncio>=0.24.0", "ruff>=0.14.11", "respx>=0.21.
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# tests/ subdir is auto-discovered; live/e2e tests are excluded via
+# tests/conftest.py's collect_ignore (see comment there).
+testpaths = ["tests"]
 
 [tool.uv.workspace]
 members = ["packages/harness"]
