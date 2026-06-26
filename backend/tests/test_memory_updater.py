@@ -295,14 +295,14 @@ def test_import_memory_data_saves_and_returns_imported_memory() -> None:
         ]
     )
     mock_storage = MagicMock()
-    mock_storage.save.return_value = True
+    mock_storage._sync_save.return_value = True
     mock_storage.load.return_value = imported_memory
 
     with patch("deerflow.agents.memory.updater.get_memory_storage", return_value=mock_storage):
         result = import_memory_data(imported_memory)
 
-    mock_storage.save.assert_called_once_with(imported_memory, None)
-    mock_storage.load.assert_called_once_with(None)
+    mock_storage._sync_save.assert_called_once_with(imported_memory, None, user_id=None)
+    mock_storage.load.assert_called_once_with(None, user_id=None)
     assert result == imported_memory
 
 
@@ -534,7 +534,7 @@ class TestUpdateMemoryStructuredResponse:
             patch.object(updater, "_get_model", return_value=self._make_mock_model(valid_json)),
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
-            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=AsyncMock(return_value=True))),
         ):
             msg = MagicMock()
             msg.type = "human"
@@ -559,7 +559,7 @@ class TestUpdateMemoryStructuredResponse:
             patch.object(updater, "_get_model", return_value=self._make_mock_model(list_content)),
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
-            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=AsyncMock(return_value=True))),
         ):
             msg = MagicMock()
             msg.type = "human"
@@ -583,7 +583,7 @@ class TestUpdateMemoryStructuredResponse:
             patch.object(updater, "_get_model", return_value=model),
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
-            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=AsyncMock(return_value=True))),
         ):
             msg = MagicMock()
             msg.type = "human"
@@ -610,7 +610,7 @@ class TestUpdateMemoryStructuredResponse:
             patch.object(updater, "_get_model", return_value=model),
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
-            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=AsyncMock(return_value=True))),
         ):
             msg = MagicMock()
             msg.type = "human"
@@ -714,7 +714,7 @@ class TestReinforcementHint:
             patch.object(updater, "_get_model", return_value=model),
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
-            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=AsyncMock(return_value=True))),
         ):
             msg = MagicMock()
             msg.type = "human"
@@ -741,7 +741,7 @@ class TestReinforcementHint:
             patch.object(updater, "_get_model", return_value=model),
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
-            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=AsyncMock(return_value=True))),
         ):
             msg = MagicMock()
             msg.type = "human"
@@ -768,7 +768,7 @@ class TestReinforcementHint:
             patch.object(updater, "_get_model", return_value=model),
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
-            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=AsyncMock(return_value=True))),
         ):
             msg = MagicMock()
             msg.type = "human"

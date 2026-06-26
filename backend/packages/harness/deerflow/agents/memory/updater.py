@@ -28,8 +28,14 @@ def _create_empty_memory() -> dict[str, Any]:
 
 
 def _save_memory_to_file(memory_data: dict[str, Any], agent_name: str | None = None, user_id: str | None = None) -> bool:
-    """Backward-compatible wrapper around the configured memory storage save path."""
-    return get_memory_storage().save(memory_data, agent_name, user_id=user_id)
+    """Backward-compatible wrapper around the configured memory storage save path.
+
+    Calls the underlying ``_sync_save`` directly to preserve the sync contract
+    expected by other sync wrappers (``import_memory_data``, ``create_memory_fact``,
+    etc.) and their FastAPI/``DeerFlowClient`` callers. The async ``save()``
+    is reserved for async code paths (see ``MemoryUpdater.update_memory``).
+    """
+    return get_memory_storage()._sync_save(memory_data, agent_name, user_id=user_id)
 
 
 def get_memory_data(agent_name: str | None = None, user_id: str | None = None) -> dict[str, Any]:
@@ -57,7 +63,7 @@ def import_memory_data(memory_data: dict[str, Any], agent_name: str | None = Non
         OSError: If persisting the imported memory fails.
     """
     storage = get_memory_storage()
-    if not storage.save(memory_data, agent_name, user_id=user_id):
+    if not storage._sync_save(memory_data, agent_name, user_id=user_id):
         raise OSError("Failed to save imported memory data")
     return storage.load(agent_name, user_id=user_id)
 
@@ -358,7 +364,7 @@ class MemoryUpdater:
             updated_memory = _strip_upload_mentions_from_memory(updated_memory)
 
             # Save
-            return get_memory_storage().save(updated_memory, agent_name, user_id=user_id)
+            return await get_memory_storage().save(updated_memory, agent_name, user_id=user_id)
 
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse LLM response for memory update: %s", e)
