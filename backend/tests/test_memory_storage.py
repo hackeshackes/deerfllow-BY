@@ -93,7 +93,8 @@ class TestFileMemoryStorage:
                 assert isinstance(memory, dict)
                 assert memory["version"] == "1.0"
 
-    def test_save_writes_to_file(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_save_writes_to_file(self, tmp_path):
         """Should save memory data to file."""
         memory_file = tmp_path / "memory.json"
 
@@ -106,7 +107,7 @@ class TestFileMemoryStorage:
             with patch("deerflow.agents.memory.storage.get_memory_config", return_value=MemoryConfig(storage_path="")):
                 storage = FileMemoryStorage()
                 test_memory = {"version": "1.0", "facts": [{"content": "test fact"}]}
-                result = storage.save(test_memory)
+                result = await storage.save(test_memory)
                 assert result is True
                 assert memory_file.exists()
 
