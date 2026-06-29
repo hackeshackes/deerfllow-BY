@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.7] - 2026-XX-XX
+
+### Fixed (from v1.5.5 gray)
+- 飞书 / 钉钉 / 企微 4 个连接器 token 之前无限缓存(生产 2h 后会 401);现改用 `CachedToken` + 2h TTL,15min 提前刷新,401 后自动 invalidate 强制下次重取
+- `CachedToken` 单飞(single-flight)保证:多个并发请求看到过期 token 时只触发 1 次网络取数,避免雪崩
+
+### Added
+- `connectors/persistence/sqlite_dlq.py` — DLQ 持久化(SQLite,跨重启);`flush_to_sqlite()` 把 in-memory 积压一次性写盘
+- `connectors/token_refresh.py` — 可复用的 token 缓存原语,带 TTL + invalidate + 单飞
+- lifespan 启动时从 `MICX_CONNECTORS` 环境变量(YAML body)自动注册内置连接器;空 env → 空注册表(dev 默认)
+
+### Test
+- `test_connectors_token_refresh.py` — 6 个:TTL 行为、并发序列化、单飞
+- `test_connectors_persistence.py` — 7 个:DLQ push/list/delete/clear、跨实例持久化、flush round-trip
+- `test_app_lifespan.py` — 3 个:env→registry 路径、空 env 行为、API regression guard
+
+### Out of scope (deferred to v1.6+)
+- Subscription store 持久化(InMemory 仍可用,等真实用户流量再加 Postgres)
+- 401 触发自动 retry(v1.5.7 改 invalidate,下次调用会拿到新 token,等同隐式 retry 1 次)
+- Async SQLite(aiosqlite);当前用 stdlib sqlite3 同步路径,生产前切换
+
 ## [1.5.5] - 2026-XX-XX
 
 ### Added
