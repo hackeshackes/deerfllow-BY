@@ -1,0 +1,10 @@
+name: dingtalk-prod
+type: dingtalk
+enabled: true
+credentials:
+  client_id: dingxxxxxxx
+  client_secret: your_client_secret
+routes:
+  - pattern: "thread.created"
+    target:
+      chat_id: cidxxxxxxx
