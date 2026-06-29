@@ -36,9 +36,10 @@ export default function ChatsPage() {
     return (threads ?? []).map((thread) => ({
       id: thread.thread_id,
       title: titleOfThread(thread),
-      // Default unknown / older threads to `manual` so the partition UI
-      // still has somewhere to put them.
-      source: (thread.source ?? DEFAULT_SOURCE) as ThreadSource,
+      // `source` is part of the v1.5.5 thread state; default older
+      // threads (persisted before the cutover) to `manual` so the
+      // partition UI still has somewhere to put them.
+      source: ((thread as { source?: ThreadSource }).source ?? DEFAULT_SOURCE) as ThreadSource,
       updatedAt: thread.updated_at ?? "",
     }));
   }, [threads]);

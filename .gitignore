@@ -69,4 +69,6 @@ config.yaml.bak
 .gstack/
 .worktrees
 skills/ppt-master/
-frontend/src/lib/api/
+# frontend/src/lib/api/ is no longer generated — voice + future API
+# clients live here. (Originally ignored when the directory held an
+# auto-generated client SDK; that workflow is gone.)

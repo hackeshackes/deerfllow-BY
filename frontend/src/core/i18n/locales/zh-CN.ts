@@ -397,6 +397,9 @@ export const zhCN: Translations = {
   // Chats
   chats: {
     searchChats: "搜索对话",
+    newChatTitle: "开启新对话",
+    newChatSubtitle: "选择场景以开始",
+    start: "开始",
   },
 
   // Page titles (document title)
