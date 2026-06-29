@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 2026-XX-XX
+
+### Added
+
+#### 业务系统连接器 (4 个内置)
+- 抽出 `connectors/` 子系统,统一 `Connector` 协议(YAML 声明式配置)
+- 连接器统一运行时:重试(默认 2 次) + 死信队列
+- Webhook 双向桥(常量时间比较 secret)
+- 飞书连接器:群消息发送 + URL 验证 + 文本事件解析(respx mock 测试)
+- 钉钉连接器:群消息 + 机器人(accessToken 缓存)
+- 企微连接器:群消息 + 应用消息(gettoken 缓存)
+- 邮件连接器:SMTP 发件(aiosmtplib),IMAP 收件接口留 poller
+- 内置连接器 YAML 注册(`integrations/builtin.py`)
+- 连接器 admin API:`GET /api/connectors`、`/api/connectors/dlq`、`/api/connectors/{name}/webhook`
+
+#### 空间化协作 (兑现 v1.4.4 路线图核心)
+- 一级空间切换器 `WorkspaceSwitcher`(cookie 持久化 + `router.refresh()`)
+- `useCurrentSpace` / `useSpaces` hooks 配合后端 `X-MicX-Space` header
+- 对话按来源分区 `PartitionedChatList`(All / Manual / Automation / Channel)
+- 新建对话场景化 `SceneSelector`(Free / Q&A / Document / Analyze / Automate)
+- @提及自动补全 `MentionInput`
+- Thread 数据模型扩展:`space_type` / `source` / `published_from_thread_id` 字段
+- 订阅模型 + `@mention` 触发服务 + 通知 fan-out
+- 订阅 API:`POST /api/subscriptions`、`DELETE /api/subscriptions/{kind}/{id}`、count 查询
+- 空间 API:`GET /api/spaces`、`/api/spaces/current`、`/api/spaces/{id}`
+
+#### SAML 2.0 支持 (补全 v1.5.4 推后的工作)
+- `python3-saml` wrapper(SAMLConfig + SAMLProvider + SP metadata)
+- 支持 ADFS / Shibboleth / 其他 SAML 2.0 IdP
+
+### Changed
+- 前端 workspace layout 注入 WorkspaceSwitcher
+- 后端新增 `connectors/` / `spaces/` / `subscriptions/` / `threads/` 子系统
+- 后端新增 `identity/auth/saml/` 模块
+
 ## [1.5.3] - 2026-06-10
 
 ### Security
