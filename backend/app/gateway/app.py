@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -82,6 +83,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         raise RuntimeError(error_msg) from e
     config = get_gateway_config()
     logger.info(f"Starting API Gateway on {config.host}:{config.port}")
+
+    # v1.5.7: Auto-register connectors from MICX_CONNECTORS env (YAML body).
+    # The env variable holds the same shape as the connector YAML files in
+    # `app/gateway/connectors/*/yaml/*.example.yaml`. When the env is unset
+    # or empty, no connectors are registered — the admin UI will simply
+    # show an empty list, which is the right behavior for dev environments.
+    try:
+        import yaml
+        from app.gateway.connectors.integrations.builtin import (
+            register_builtin_connectors,
+        )
+        from app.gateway.connectors.registry import get_registry
+        connectors_yaml = os.environ.get("MICX_CONNECTORS", "").strip()
+        if connectors_yaml:
+            parsed = yaml.safe_load(connectors_yaml) or {}
+            register_builtin_connectors(
+                registry=get_registry(),
+                config=parsed,
+            )
+            logger.info(
+                "Connectors registered: %s", get_registry().list_names()
+            )
+    except Exception:
+        logger.exception("Failed to register connectors at startup")
 
     # Initialize LangGraph runtime components (StreamBridge, RunManager, checkpointer, store)
     async with langgraph_runtime(app):
