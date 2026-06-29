@@ -108,12 +108,14 @@ def search_knowledge_base(
     Returns:
         KnowledgeSearchResult with matched chunks, or None if access denied.
     """
-    # Import here to avoid circular imports and keep this service usable without FastAPI
-    try:
-        from app.gateway.embedding_service import _cosine_similarity, _generate_embedding
-    except ImportError:
-        logger.warning("Cannot import embedding service; KB search unavailable")
-        return None
+    # Import from the same harness package — the pure-function helpers
+    # used to live in `app.gateway.embedding_service`, which would have
+    # crossed the harness → app boundary. They were lifted to
+    # `deerflow.knowledge.embeddings` so this service can stay clean.
+    from deerflow.knowledge.embeddings import (
+        _cosine_similarity,
+        _generate_embedding,
+    )
 
     conn = _get_db()
     try:
