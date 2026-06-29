@@ -356,6 +356,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     app.include_router(scim_router)
 
+    # Connectors unified API (v1.5.5)
+    from app.gateway.connectors.routers.connectors import router as connectors_router
+
+    app.include_router(connectors_router)
+
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
         """Health check endpoint.
