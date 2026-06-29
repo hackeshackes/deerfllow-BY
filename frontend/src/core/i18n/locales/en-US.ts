@@ -409,6 +409,9 @@ export const enUS: Translations = {
   // Chats
   chats: {
     searchChats: "Search chats",
+    newChatTitle: "Start a new chat",
+    newChatSubtitle: "Pick a scene to begin",
+    start: "Start",
   },
 
   // Page titles (document title)

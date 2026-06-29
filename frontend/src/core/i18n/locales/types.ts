@@ -341,6 +341,9 @@ export interface Translations {
   // Chats
   chats: {
     searchChats: string;
+    newChatTitle: string;
+    newChatSubtitle: string;
+    start: string;
   };
 
   // Page titles (document title)
