@@ -4,9 +4,9 @@ Implements `BaseConnector` against the Feishu Open Platform:
 - Outbound: send text message to a chat (oc_*) or user (ou_*)
 - Inbound: receive event webhook payloads, including URL verification
 
-The token is cached in-memory for the process lifetime; the OpenAPI TTL is
-typically 2 hours, but for the MVP we don't refresh proactively — the next
-send will surface an auth error and a higher-level reload will reset.
+The access token is cached via `CachedToken` with a 2-hour TTL
+(slightly less than the OpenAPI 2h to refresh before expiry). On 401
+during `send()`, the cache is invalidated so the next call refetches.
 """
 from __future__ import annotations
 
@@ -16,8 +16,12 @@ from typing import Any
 import httpx
 
 from ..base import BaseConnector, ConnectorMessage, ConnectorResponse
+from ..token_refresh import CachedToken
 
 FEISHU_BASE = "https://open.feishu.cn/open-apis"
+
+# Feishu tokens last 2h; refresh 15min early.
+_FEISHU_TOKEN_TTL_SECONDS = 5400
 
 
 def _extract_message_text(event: dict) -> str:
@@ -46,12 +50,10 @@ class FeishuConnector(BaseConnector):
         self._app_id = app_id
         self._app_secret = app_secret
         self._timeout = timeout
-        self._token: str | None = None
+        self._token_cache: CachedToken | None = None
 
     # --------------------------------------------------------------------- auth
-    async def _get_token(self) -> str:
-        if self._token:
-            return self._token
+    async def _fetch_token(self) -> str:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(
                 f"{FEISHU_BASE}/auth/v3/tenant_access_token/internal",
@@ -62,8 +64,15 @@ class FeishuConnector(BaseConnector):
                 raise RuntimeError(
                     f"feishu token error: code={data.get('code')} msg={data.get('msg')}"
                 )
-            self._token = data["tenant_access_token"]
-            return self._token
+            return data["tenant_access_token"]
+
+    async def _get_token(self) -> str:
+        if self._token_cache is None:
+            self._token_cache = CachedToken(
+                fetcher=self._fetch_token,
+                ttl_seconds=_FEISHU_TOKEN_TTL_SECONDS,
+            )
+        return await self._token_cache.get()
 
     # -------------------------------------------------------------------- send
     async def send(self, message: ConnectorMessage) -> ConnectorResponse:

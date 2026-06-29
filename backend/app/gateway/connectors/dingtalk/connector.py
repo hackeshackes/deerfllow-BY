@@ -15,6 +15,7 @@ import json
 import httpx
 
 from ..base import BaseConnector, ConnectorMessage, ConnectorResponse
+from ..token_refresh import CachedToken
 
 DINGTALK_BASE = "https://api.dingtalk.com"
 
@@ -29,11 +30,17 @@ class DingTalkConnector(BaseConnector):
         self._client_id = client_id
         self._client_secret = client_secret
         self._timeout = timeout
-        self._token: str | None = None
+        self._token_cache: CachedToken | None = None
 
     async def _get_token(self) -> str:
-        if self._token:
-            return self._token
+        if self._token_cache is None:
+            self._token_cache = CachedToken(
+                fetcher=self._fetch_token,
+                ttl_seconds=5400,
+            )
+        return await self._token_cache.get()
+
+    async def _fetch_token(self) -> str:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(
                 f"{DINGTALK_BASE}/v1.0/oauth2/accessToken",
@@ -43,8 +50,7 @@ class DingTalkConnector(BaseConnector):
             token = data.get("accessToken")
             if not token:
                 raise RuntimeError(f"dingtalk token error: {data}")
-            self._token = token
-            return self._token
+            return token
 
     async def send(self, message: ConnectorMessage) -> ConnectorResponse:
         try:

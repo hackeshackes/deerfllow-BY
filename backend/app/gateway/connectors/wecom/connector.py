@@ -13,6 +13,7 @@ from __future__ import annotations
 import httpx
 
 from ..base import BaseConnector, ConnectorMessage, ConnectorResponse
+from ..token_refresh import CachedToken
 
 WECOM_BASE = "https://qyapi.weixin.qq.com/cgi-bin"
 
@@ -27,11 +28,9 @@ class WeComConnector(BaseConnector):
         self._bot_id = bot_id
         self._bot_secret = bot_secret
         self._timeout = timeout
-        self._token: str | None = None
+        self._token_cache: CachedToken | None = None
 
-    async def _get_token(self) -> str:
-        if self._token:
-            return self._token
+    async def _fetch_token(self) -> str:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.get(
                 f"{WECOM_BASE}/gettoken",
@@ -45,8 +44,15 @@ class WeComConnector(BaseConnector):
             token = data.get("access_token")
             if not token:
                 raise RuntimeError(f"wecom token missing in response: {data}")
-            self._token = token
-            return self._token
+            return token
+
+    async def _get_token(self) -> str:
+        if self._token_cache is None:
+            self._token_cache = CachedToken(
+                fetcher=self._fetch_token,
+                ttl_seconds=5400,
+            )
+        return await self._token_cache.get()
 
     async def send(self, message: ConnectorMessage) -> ConnectorResponse:
         try:

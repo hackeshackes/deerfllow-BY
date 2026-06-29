@@ -109,6 +109,26 @@ async def test_feishu_send_token_cached(connector):
     assert token_route.call_count == 1
 
 
+@respx.mock
+@pytest.mark.asyncio
+async def test_feishu_token_cache_ttl_is_5400s(connector):
+    """Feishu tokens last 2h; we refresh at 5400s (15min early).
+
+    Verified by triggering a token fetch and inspecting the cache's
+    remaining TTL. A regression here would either blow the upstream
+    rate limit (too aggressive) or produce 401s (too lazy).
+    """
+    import time
+    _token_mock()
+    respx.post(f"{FEISHU_BASE}/im/v1/messages").mock(
+        return_value=Response(200, json={"code": 0, "data": {"message_id": "om-ttl"}})
+    )
+    await connector.send(ConnectorMessage(text="x", target={"chat_id": "c1"}))
+
+    assert connector._token_cache is not None  # noqa: SLF001
+    remaining = connector._token_cache._expires_at - time.monotonic()  # noqa: SLF001
+    assert 5300 <= remaining <= 5400
+
 @pytest.mark.asyncio
 async def test_feishu_webhook_url_verification_returns_empty():
     c = FeishuConnector(app_id="x", app_secret="y")
