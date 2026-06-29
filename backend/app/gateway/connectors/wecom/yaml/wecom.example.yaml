@@ -1,0 +1,10 @@
+name: wecom-prod
+type: wecom
+enabled: true
+credentials:
+  bot_id: wwcxxxxx
+  bot_secret: your_bot_secret
+routes:
+  - pattern: "thread.created"
+    target:
+      user_id: UserID
