@@ -43,6 +43,7 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",  # JWS 验签
     "cryptography>=43.0.0",    # 证书处理
     "tenacity>=9.0.0",         # SCIM 重试
+    "PyYAML>=6.0.2",           # connector YAML 配置
 ]
 
 [dependency-groups]
