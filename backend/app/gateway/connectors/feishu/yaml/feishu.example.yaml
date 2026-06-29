@@ -1,0 +1,10 @@
+name: feishu-prod
+type: feishu
+enabled: true
+credentials:
+  app_id: cli_xxxxxxxxxxxx
+  app_secret: your_app_secret_here
+routes:
+  - pattern: "thread.created"
+    target:
+      chat_id: oc_xxxxxxxxxxxx
