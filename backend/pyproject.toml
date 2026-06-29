@@ -45,6 +45,7 @@ dependencies = [
     "tenacity>=9.0.0",         # SCIM 重试
     "PyYAML>=6.0.2",           # connector YAML 配置
     "aiosmtplib>=3.0.1",       # 邮件连接器(SMTP)
+    "python3-saml>=1.16.0",     # SAML 2.0 IdP 适配
 ]
 
 [dependency-groups]
