@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.8] - 2026-XX-XX
+
+### Added
+
+#### 多租户 + 资源治理(原 v1.6.0 范围下放)
+- `multitenancy/models.py` — Tenant / Workspace / Project / ResourceQuota 域模型(frozen dataclass)
+- `multitenancy/quota.py` + `usage_tracker.py` — Token 配额 + RPM 限流(advisory 模式,默认 0 = 禁用)
+- `multitenancy/router_service.py` + `cost_calculator.py` — 多模型路由(cost/quality/speed 三策略)
+- `multitenancy/cost_dashboard.py` — 按 tenant/user/model 聚合
+
+#### 可观测性补完
+- `observability/tracing.py` — OTel 抽象,disabled-by-default no-op
+- `observability/langfuse_exporter.py` — Langfuse export config surface
+- `observability/metrics.py` — Counter / Gauge 线程安全原语
+
+#### 新连接器
+- `connectors/jira/` — Jira Cloud REST v3(create_issue / transition / comment,Basic auth)
+- `connectors/linear/` — Linear GraphQL API(issueCreate / commentCreate mutations)
+
+#### 共享对话评论(协作闭环最后一块)
+- `comments/` — Thread comments + @mention 提取(lookbehind 排除邮箱)
+
+#### 画布骨架
+- `/workspace/canvas` — 5 节点画布(agent / tool / prompt / branch / loop)
+- 节点 + 边渲染、调色板、增删;完整编辑 + LangGraph 执行留给 v1.5.9
+
+### Changed
+- v1.6.0(原 6-7 周大版本)拆解为 v1.5.8 + v1.5.9 + v1.6+ 三段
+- 文档:`docs/superpowers/plans/2026-06-22-micx-v1.6.0-multitenant-canvas.md` 标记为 deferred
+
+### Test
+- 多租户模型:9 个
+- Token 配额:6 个
+- 模型路由:8 个
+- 成本看板:6 个
+- 可观测性:9 个
+- Jira 连接器:9 个
+- Linear 连接器:8 个
+- 评论服务:13 个
+- **后端合计**:68 个新测试通过
+- 画布前端:8 个
+- MentionInput async:6 个(usersApi 5 个)
+- **前端合计**:+13 新测试
+
 ## [1.5.7] - 2026-XX-XX
 
 ### Fixed (from v1.5.5 gray)
