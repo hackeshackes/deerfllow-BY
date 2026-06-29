@@ -13,7 +13,15 @@ import {
 import { useI18n } from "@/core/i18n/hooks";
 import { useThreads } from "@/core/threads/hooks";
 import { pathOfThread, titleOfThread } from "@/core/threads/utils";
+import type { ThreadSource } from "@/core/threads/source";
 import { formatTimeAgo } from "@/core/utils/datetime";
+
+import {
+  PartitionedChatList,
+  type ChatItem,
+} from "./components/PartitionedChatList";
+
+const DEFAULT_SOURCE: ThreadSource = "manual";
 
 export default function ChatsPage() {
   const { t } = useI18n();
@@ -24,11 +32,23 @@ export default function ChatsPage() {
     document.title = `${t.pages.chats} - ${t.pages.appName}`;
   }, [t.pages.chats, t.pages.appName]);
 
-  const filteredThreads = useMemo(() => {
-    return threads?.filter((thread) => {
-      return titleOfThread(thread).toLowerCase().includes(search.toLowerCase());
-    });
-  }, [threads, search]);
+  const chatItems: ChatItem[] = useMemo(() => {
+    return (threads ?? []).map((thread) => ({
+      id: thread.thread_id,
+      title: titleOfThread(thread),
+      // Default unknown / older threads to `manual` so the partition UI
+      // still has somewhere to put them.
+      source: (thread.source ?? DEFAULT_SOURCE) as ThreadSource,
+      updatedAt: thread.updated_at ?? "",
+    }));
+  }, [threads]);
+
+  const filteredItems = useMemo(() => {
+    if (!search) return chatItems;
+    const q = search.toLowerCase();
+    return chatItems.filter((c) => c.title.toLowerCase().includes(q));
+  }, [chatItems, search]);
+
   return (
     <WorkspaceContainer>
       <WorkspaceHeader></WorkspaceHeader>
@@ -47,23 +67,22 @@ export default function ChatsPage() {
           <main className="min-h-0 flex-1">
             <ScrollArea className="size-full py-4">
               <div className="mx-auto flex size-full max-w-(--container-width-md) flex-col">
-                {filteredThreads?.map((thread) => (
-                  <Link
-                    key={thread.thread_id}
-                    href={pathOfThread(thread.thread_id)}
-                  >
-                    <div className="flex flex-col gap-2 border-b p-4">
-                      <div>
-                        <div>{titleOfThread(thread)}</div>
+                <PartitionedChatList
+                  chats={filteredItems}
+                  renderItem={(item) => (
+                    <Link href={pathOfThread(item.id)}>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium">{item.title}</span>
+                        <span className="text-muted-foreground text-xs">
+                          [{item.source}]
+                          {item.updatedAt
+                            ? ` · ${formatTimeAgo(item.updatedAt)}`
+                            : ""}
+                        </span>
                       </div>
-                      {thread.updated_at && (
-                        <div className="text-muted-foreground text-sm">
-                          {formatTimeAgo(thread.updated_at)}
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  )}
+                />
               </div>
             </ScrollArea>
           </main>
