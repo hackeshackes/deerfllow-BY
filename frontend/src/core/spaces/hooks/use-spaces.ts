@@ -7,7 +7,7 @@ import type { Space } from "../types";
 
 interface UseSpacesResult {
   spaces: Space[];
-  loading: boolean;
+  isLoading: boolean;
   error: string | null;
 }
 
@@ -37,5 +37,5 @@ export function useSpaces(): UseSpacesResult {
     };
   }, []);
 
-  return { spaces, loading, error };
+  return { spaces, isLoading: loading, error };
 }
