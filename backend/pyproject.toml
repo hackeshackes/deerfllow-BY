@@ -44,6 +44,7 @@ dependencies = [
     "cryptography>=43.0.0",    # 证书处理
     "tenacity>=9.0.0",         # SCIM 重试
     "PyYAML>=6.0.2",           # connector YAML 配置
+    "aiosmtplib>=3.0.1",       # 邮件连接器(SMTP)
 ]
 
 [dependency-groups]

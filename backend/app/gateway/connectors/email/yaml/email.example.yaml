@@ -1,0 +1,16 @@
+name: email-prod
+type: email
+enabled: true
+credentials:
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  smtp_user: bot@yourdomain.com
+  smtp_password: app_specific_password
+  imap_host: imap.gmail.com
+  imap_port: 993
+  from_address: bot@yourdomain.com
+routes:
+  - pattern: "automation.result"
+    target:
+      to: "team@yourdomain.com"
+      subject: "MicX automation result"
