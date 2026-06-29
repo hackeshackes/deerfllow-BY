@@ -7,6 +7,8 @@ import { CommandPalette } from "@/components/workspace/command-palette";
 import { WorkspaceSidebar } from "@/components/workspace/workspace-sidebar";
 import { requireSession } from "@/server/auth/session";
 
+import { WorkspaceSwitcher } from "./components/WorkspaceSwitcher";
+
 function parseSidebarOpenCookie(
   value: string | undefined,
 ): boolean | undefined {
@@ -23,19 +25,27 @@ export default async function WorkspaceLayout({
   const initialSidebarOpen = parseSidebarOpenCookie(
     cookieStore.get("sidebar_state")?.value,
   );
+  const currentSpaceId = cookieStore.get("micx_space")?.value;
 
   return (
     <QueryClientProvider>
       <SidebarProvider className="h-screen" defaultOpen={initialSidebarOpen}>
-        <WorkspaceSidebar
-          sessionEmail={session.email}
-          sessionRole={session.role}
-          activeWorkspaceName={session.active_workspace_name ?? "Personal"}
-        />
-        <SidebarInset className="min-w-0">{children}</SidebarInset>
+        <div className="flex h-full w-full flex-col">
+          <div className="border-b px-4 py-3">
+            <WorkspaceSwitcher currentSpaceId={currentSpaceId} />
+          </div>
+          <div className="flex min-h-0 flex-1">
+            <WorkspaceSidebar
+              sessionEmail={session.email}
+              sessionRole={session.role}
+              activeWorkspaceName={session.active_workspace_name ?? "Personal"}
+            />
+            <SidebarInset className="min-w-0">{children}</SidebarInset>
+          </div>
+        </div>
+        <CommandPalette />
+        <Toaster position="top-center" />
       </SidebarProvider>
-      <CommandPalette />
-      <Toaster position="top-center" />
     </QueryClientProvider>
   );
 }
