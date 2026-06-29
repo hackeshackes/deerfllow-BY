@@ -361,6 +361,18 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     app.include_router(connectors_router)
 
+    # Subscriptions API (v1.5.5)
+    from app.gateway.subscriptions.routers.subscriptions import (
+        router as subscriptions_router,
+    )
+
+    app.include_router(subscriptions_router)
+
+    # Spaces API (v1.5.5)
+    from app.gateway.spaces.api import router as spaces_router
+
+    app.include_router(spaces_router)
+
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
         """Health check endpoint.
