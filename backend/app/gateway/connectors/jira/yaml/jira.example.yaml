@@ -1,0 +1,13 @@
+name: jira-prod
+type: jira
+enabled: true
+credentials:
+  base_url: https://acme.atlassian.net/rest/api/3
+  email: bot@acme.com
+  api_token: your_jira_api_token_here
+routes:
+  - pattern: "automation.result"
+    target:
+      action: "create_issue"
+      project: "OPS"
+      issue_type: "Task"
