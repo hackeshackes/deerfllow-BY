@@ -39,7 +39,7 @@ describe("spaces + chat list integration", () => {
     );
 
     // Switcher is present and lists both spaces
-    const switcher = screen.getByTestId("workspace-switcher") as HTMLSelectElement;
+    const switcher = screen.getByTestId("workspace-switcher");
     expect(switcher).toBeInTheDocument();
     expect(screen.getByText("Personal")).toBeInTheDocument();
     expect(screen.getByText("Engineering")).toBeInTheDocument();
