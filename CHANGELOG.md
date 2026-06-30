@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+#### 凭据轮换与历史清理 (P0)
+- 紧急 rotate: `BY_ADMIN_PASSWORD` 和 `BETTER_AUTH_SECRET` 已在 v1.5.0 提交到公共仓库的 e2e 测试脚本中,即便后续 commit 修复,git 历史仍可访问
+- 行动: 仓库所有者应立即重置 admin 密码和 session secret
+- 修复: e2e 脚本改为从 `E2E_EMAIL` / `E2E_PASSWORD` 环境变量读取 (commit `614a84fcd`)
+- 历史重写: `git filter-repo` 已从历史中删除 e2e 凭据脚本 (commit `026ce066` 起)
+
 ## [1.5.8] - 2026-XX-XX
 
 ### Added
