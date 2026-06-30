@@ -1,0 +1,11 @@
+name: linear-prod
+type: linear
+enabled: true
+credentials:
+  api_token: your_linear_personal_api_token
+  team_id: your_team_id_uuid
+routes:
+  - pattern: "automation.result"
+    target:
+      action: "create_issue"
+      team_id: "your_team_id_uuid"
