@@ -398,6 +398,16 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     app.include_router(spaces_router)
 
+    # Comments HTTP API (v1.5.8)
+    from app.gateway.comments.routers.comments import router as comments_router
+
+    app.include_router(comments_router)
+    # Wire a singleton store for the app's lifetime. Tests can swap this
+    # out via app.state.comments_store before the first request arrives.
+    from app.gateway.comments.service import InMemoryCommentStore
+
+    app.state.comments_store = InMemoryCommentStore()
+
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
         """Health check endpoint.
