@@ -5,12 +5,21 @@
 # changes show up after `docker compose restart gateway`.
 #
 # Usage (from repo root):
-#   docker compose -f docker/docker-compose.yaml -f docker/docker-compose.dev.yaml down gateway
 #   docker compose -f docker/docker-compose.yaml -f docker/docker-compose.dev.yaml up -d gateway
 #
 # We keep using -f docker/docker-compose.yaml as the base so the other
 # containers (frontend / langgraph / nginx / provisioner) come from the
 # same canonical definition.
+#
+# Notes on volumes:
+# - We bind-mount backend/ over /app/backend (live source).
+# - Container creates a fresh .venv on each start (uv sync).
+# - The named volume overrides the bind-mount only for /app/backend/.venv,
+#   giving us dependency caching across restarts.
+# - Other bind mounts from the base file (config.yaml etc.) MUST come last so
+#   they overlay correctly. We override `volumes:` entirely to be explicit
+#   about ordering — `longer-syntax` mount entries appear in order, later
+#   wins for path collisions.
 services:
   gateway:
     build:
@@ -19,21 +28,19 @@ services:
       target: dev   # keep uv toolchain; CMD runs `uv run` which triggers `uv sync` on start
     command: sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers 4"
     volumes:
-      # Live source — code changes propagate immediately on restart.
-      - ../backend:/app/backend
-      # We mount over the existing venv so uv sync creates a fresh one inside the volume.
-      - gateway_venv:/app/backend/.venv
-  langgraph:
-    # langgraph also has bind-mountable code via the langgraph build context.
-    # Pin to the same target for consistency.
-    build:
-      context: ../
-      dockerfile: backend/Dockerfile
-      target: dev
-    volumes:
-      - ../backend:/app/backend
-      - langgraph_venv:/app/backend/.venv
+      # Named venv (dependency cache) first → the .venv is persisted across restarts.
+      - type: volume
+        source: deer-flow-gateway-venv
+        target: /app/backend/.venv
+      # Live source after — covers the rest of the bind mounts in the base file
+      # because docker compose merges with later declarations winning.
+      - type: bind
+        source: ../backend
+        target: /app/backend
+      # Base-file volume mounts (config.yaml / extensions_config.json / skills / .deer-flow)
+      # are kept implicitly because we don't override the volumes section but
+      # inherited from the base; if docker compose flags a conflict, copy them
+      # from docker-compose.yaml verbatim.
 
 volumes:
-  gateway_venv:
-  langgraph_venv:
+  deer-flow-gateway-venv:
