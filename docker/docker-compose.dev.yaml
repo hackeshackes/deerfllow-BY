@@ -1,0 +1,39 @@
+# Dev override for backend gateway.
+# Uses the `dev` target of backend/Dockerfile (retains builder toolchain so
+# `uv sync` can install source distributions at container start) and bind
+# mounts the live backend/ source from the host into the container. Code
+# changes show up after `docker compose restart gateway`.
+#
+# Usage (from repo root):
+#   docker compose -f docker/docker-compose.yaml -f docker/docker-compose.dev.yaml down gateway
+#   docker compose -f docker/docker-compose.yaml -f docker/docker-compose.dev.yaml up -d gateway
+#
+# We keep using -f docker/docker-compose.yaml as the base so the other
+# containers (frontend / langgraph / nginx / provisioner) come from the
+# same canonical definition.
+services:
+  gateway:
+    build:
+      context: ../
+      dockerfile: backend/Dockerfile
+      target: dev   # keep uv toolchain; CMD runs `uv run` which triggers `uv sync` on start
+    command: sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers 4"
+    volumes:
+      # Live source — code changes propagate immediately on restart.
+      - ../backend:/app/backend
+      # We mount over the existing venv so uv sync creates a fresh one inside the volume.
+      - gateway_venv:/app/backend/.venv
+  langgraph:
+    # langgraph also has bind-mountable code via the langgraph build context.
+    # Pin to the same target for consistency.
+    build:
+      context: ../
+      dockerfile: backend/Dockerfile
+      target: dev
+    volumes:
+      - ../backend:/app/backend
+      - langgraph_venv:/app/backend/.venv
+
+volumes:
+  gateway_venv:
+  langgraph_venv:
