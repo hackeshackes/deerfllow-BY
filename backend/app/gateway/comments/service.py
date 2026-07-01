@@ -78,3 +78,26 @@ class InMemoryCommentStore:
 
     def delete(self, comment_id: str) -> bool:
         return self._items.pop(comment_id, None) is not None
+
+
+def get_comment_store():
+    """Resolve the comment store based on the MICX_COMMENTS_STORE env.
+
+    Returns ``InMemoryCommentStore`` by default (v1.5.8 behaviour, dev
+    cold-start friendly). Set ``MICX_COMMENTS_STORE=sqlite`` to switch
+    to ``SqliteCommentStore``; the DB path defaults to
+    ``backend/.deer-flow/comments.db`` and can be overridden by
+    ``MICX_COMMENTS_DB``.
+
+    Reads env vars fresh on each invocation so test fixtures that set
+    the env mid-process pick up the right backend.
+    """
+    import os
+
+    backend = os.environ.get("MICX_COMMENTS_STORE", "memory").lower()
+    if backend == "sqlite":
+        from .sqlite_store import SqliteCommentStore
+
+        db_path = os.environ.get("MICX_COMMENTS_DB", ".deer-flow/comments.db")
+        return SqliteCommentStore(db_path)
+    return InMemoryCommentStore()

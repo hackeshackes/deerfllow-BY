@@ -27,6 +27,12 @@ services:
       dockerfile: backend/Dockerfile
       target: dev   # keep uv toolchain; CMD runs `uv run` which triggers `uv sync` on start
     command: sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers 4"
+    environment:
+      # v1.5.9: opt into SQLite-backed comment persistence.
+      # Accepted values: "memory" (default in v1.5.8) or "sqlite".
+      # When "sqlite", MICX_COMMENTS_DB controls the path (default
+      # `.deer-flow/comments.db`, which is bind-mounted to host).
+      MICX_COMMENTS_STORE: ${MICX_COMMENTS_STORE:-memory}
     volumes:
       # Named venv (dependency cache) first → the .venv is persisted across restarts.
       - type: volume

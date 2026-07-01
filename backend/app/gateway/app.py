@@ -402,11 +402,13 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     from app.gateway.comments.routers.comments import router as comments_router
 
     app.include_router(comments_router)
-    # Wire a singleton store for the app's lifetime. Tests can swap this
-    # out via app.state.comments_store before the first request arrives.
-    from app.gateway.comments.service import InMemoryCommentStore
+    # Wire a singleton store for the app's lifetime. Backend selected
+    # by MICX_COMMENTS_STORE env (memory | sqlite). Tests can still
+    # swap this out via app.state.comments_store before the first
+    # request arrives — see ``service.get_comment_store``.
+    from app.gateway.comments.service import get_comment_store
 
-    app.state.comments_store = InMemoryCommentStore()
+    app.state.comments_store = get_comment_store()
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
