@@ -13,30 +13,35 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 
 > **注意**: 本项目已与原版 DeerFlow 有显著差异，请勿直接使用原版文档参考本项目。
 
-## 🎉 v1.5.3 已发布(2026-06-10)
+## 🎉 v1.5.5 已发布 (2026-07-01)
 
 ### 本版本核心变更
 
-v1.5.3 是一次**安全 + 性能 + 质量**三线并进的迭代:
+v1.5.5 是一次**真实部署验证 + 用户体验还原 + 基础设施加固**的迭代:
 
-- **🔐 安全修复** — 修复 v1.5.0 起 e2e 脚本中硬编码的 `BY_ADMIN_PASSWORD` / `BETTER_AUTH_SECRET` 泄露,真实凭据全部轮换,git 历史用 `filter-repo` 改写并推送到独立分支 `force-v1.5.3-clean`,主 `main` 保留原历史不动。
-- **⚡ 后端异步化** — `memory/updater.py` `model.invoke` → `await model.ainvoke`、`local_sandbox.py` 同步 `subprocess.run` → `asyncio.create_subprocess_shell`、`community/` 下 3 个工具从 `requests` 改 `httpx.AsyncClient`,彻底消除 event loop 阻塞。
-- **🛡️ Per-IP 限流** — 新增 `RateLimitMiddleware`(滑动窗口,默认 120 req/min),超出返 429 + `Retry-After`。
-- **🧪 前端测试基础设施** — 引入 Vitest 2 + happy-dom,新增 47 个单元测试,`pnpm check` 现在包含 `vitest run`。
-- **🧹 代码清理** — `memory-settings-page.tsx` 从 1006 行拆为 11 个子组件 / hook(225 行父文件)。
+- **🚀 全栈真实部署验证完成** — 端到端 7/7 smoke 通过 (`/health`、`/api/connectors`、`/api/connectors/dlq`、`/api/spaces`、`/api/spaces/current`、`DELETE /api/subscriptions/...`、`/api/connectors` 全部 200/204),Rate Limit 124 req/min 命中返回 429 + `Retry-After` header 经验证可恢复,前端 5 个核心 UI 路径(landing、sign-in、workspace 路由、Next.js 静态资源)全部正常。
+- **🚪 New Chat 交互还原** — 移除 `SceneSelector` 选择页,点击 "New Chat" 直接进入 **Welcome + Composer**(与 v1.5.x 原始体验一致),删除 199 行 SceneSelector 组件 + tests + scene selector 页面。
+- **🔌 v1.5.5+ nginx 路由补齐** — 新增 `/api/connectors`、`/api/spaces`、`/api/subscriptions` nginx location 块(原配置漏配),`/api/users/*` 改为带 trailing slash 覆盖 `users/search` 子路径。
+- **🐳 Backend dev 镜像构建** — 新增 `docker-gateway:dev` 镜像 (基于 `backend/Dockerfile` 的 `dev` target) + `docker-compose.dev.yaml` override,bind-mount 主机 `backend/` 到容器,后续代码改动 `uv sync` 即可生效 (秒级),无需每次 5 分钟级镜像 rebuild。
+- **🔧 缺失模块修复** — `backend/app/gateway/data/voice_config.py` 模块在 filter-repo 历史重写 + cherry-pick 中丢失,已恢复并强制追踪 (该模块被 `voice.py` 路由 import,gateway 不修复无法启动)。
+- **🔐 PR-#6 收尾** — 14/14 fix-legacy-issues 任务全部完成并推送至 [PR #6](https://github.com/hackeshackes/deerfllow-BY/pull/6),包含 v1.5.0 泄露密码 `MicxLocal123!` 从 git history 的 `filter-repo` 清除。
 
-完整 16/16 页面 ✅,核心 Chat E2E ✅,0 控制台错误。
+完整 7/7 后端 smoke 测试 ✅、前端 `pnpm check` (eslint + tsc + vitest) 通过 ✅、Rate Limit 实测命中恢复 ✅。
 
 ### 如何升级
 
 ```bash
 cd deerfllow-BY
 git fetch origin
-git checkout force-v1.5.3-clean   # 注意:不是 main!这是重写历史的分支
-# 或: git checkout v1.5.3
-docker compose -f docker/docker-compose.yaml down
-docker compose -f docker/docker-compose.yaml build
-docker compose -f docker/docker-compose.yaml up -d
+git checkout v1.5.5
+docker compose -f docker/docker-compose.yaml -f docker/docker-compose.dev.yaml up -d
+```
+
+或者用传统 runtime stage:
+
+```bash
+docker compose -f docker/docker-compose.yaml down gateway
+docker compose -f docker/docker-compose.yaml up -d --build gateway
 ```
 
 详细变更见 [CHANGELOG.md](./CHANGELOG.md)。
@@ -91,11 +96,23 @@ docker compose -f docker/docker-compose.yaml up -d
 | **前端 Vitest 测试框架** | ❌ | ✅ **v1.5.3 新增** |
 | **`memory-settings-page` 拆分重构** | ❌ | ✅ **v1.5.3 重构** |
 | **改密码 UI 在 SettingsDialog 内** | ❌ | ✅ **v1.5.3 修复** |
+| **New Chat 直接进入 Welcome + Composer (撤销 SceneSelector)** | ❌ | ✅ **v1.5.5 还原** |
+| **v1.5.5+ nginx 路由补齐 (connectors/spaces/subscriptions)** | ❌ | ✅ **v1.5.5 修复** |
+| **Backend dev 镜像 + bind-mount (uv sync 秒级生效)** | ❌ | ✅ **v1.5.5 基础设施** |
+| **voice_config.py 模块丢失修复** | ❌ | ✅ **v1.5.5 修复** |
+| **真实部署端到端 smoke 测试 7/7 通过** | ❌ | ✅ **v1.5.5 验证** |
+| **改密码 UI 在 SettingsDialog 内** | ❌ | ✅ **v1.5.3 修复** |
 | **凭据泄露修复 + Git 历史清理** | ❌ | ✅ **v1.5.3 安全** |
 | **后端异步化 (memory/sandbox/community)** | ❌ | ✅ **v1.5.3 性能** |
 | **Per-IP Rate Limit 中间件** | ❌ | ✅ **v1.5.3 新增** |
 | **前端 Vitest 测试框架** | ❌ | ✅ **v1.5.3 新增** |
 | **`memory-settings-page` 拆分重构** | ❌ | ✅ **v1.5.3 重构** |
+| **改密码 UI 在 SettingsDialog 内** | ❌ | ✅ **v1.5.3 修复** |
+| **New Chat 直接进入 Welcome + Composer (撤销 SceneSelector)** | ❌ | ✅ **v1.5.5 还原** |
+| **v1.5.5+ nginx 路由补齐 (connectors/spaces/subscriptions)** | ❌ | ✅ **v1.5.5 修复** |
+| **Backend dev 镜像 + bind-mount (uv sync 秒级生效)** | ❌ | ✅ **v1.5.5 基础设施** |
+| **voice_config.py 模块丢失修复** | ❌ | ✅ **v1.5.5 修复** |
+| **真实部署端到端 smoke 测试 7/7 通过** | ❌ | ✅ **v1.5.5 验证** |
 
 ---
 

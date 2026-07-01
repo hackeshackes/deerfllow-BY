@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 修复: e2e 脚本改为从 `E2E_EMAIL` / `E2E_PASSWORD` 环境变量读取 (commit `614a84fcd`)
 - 历史重写: `git filter-repo` 已从历史中删除 e2e 凭据脚本 (commit `026ce066` 起)
 
+## [1.5.5] - 2026-07-01
+
+### Reverted
+
+- **前端 New Chat 体验还原** — 移除 `SceneSelector` 选择页,点击 "New Chat" 直接进入 Welcome + Composer。删除 `frontend/src/app/workspace/chats/components/SceneSelector.tsx`、`chats/new/page.tsx` 与对应 tests (199 行删除, 0 行新增)。`/workspace/chats/new` 现在被 `[thread_id]/page.tsx` 接管,`isNewThread=true` 立即渲染。
+
+### Fixed
+
+- **v1.5.5+ nginx 路由补齐** (`docker/nginx/nginx.conf`) — 新增 `/api/connectors`、`/api/spaces`、`/api/subscriptions` 三个 location 块,这些路由已在 `app.py` 注册但 nginx 中漏配,导致请求 fall through 到前端 404 HTML。
+- **voice_config.py 模块丢失修复** (`backend/app/gateway/data/voice_config.py`) — 该模块被 `routers/voice.py` import,但在 `git filter-repo` 历史重写 + 后续 cherry-pick 中丢失。无法启动 gateway (ModuleNotFoundError)。强制追踪例外 bypass `.gitignore` 中的 `backend/app/gateway/data/` (该路径下通常是数据库文件)。
+
+### Infrastructure
+
+- **dev 镜像 + bind-mount override** (`docker-compose.dev.yaml`) — 新增 dev override,使用 `backend/Dockerfile` 的 `dev` target (保留 build-essential + uv toolchain) + bind mount `backend/` 到容器。后续代码改动 `docker compose restart gateway` 即生效 (uv sync 秒级)。无需每次 5 分钟级镜像 rebuild。
+- **`docker-gateway:dev` 镜像构建** (5.11 GB) — 基于 dev target,生产用 `docker-gateway:latest`。
+
 ## [1.5.8] - 2026-XX-XX
 
 ### Added
