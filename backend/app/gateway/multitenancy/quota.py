@@ -93,3 +93,53 @@ class QuotaService:
             remaining_rpm=remaining_rpm,
             warnings=warnings,
         )
+
+    async def check_only(
+        self,
+        tenant_id: str,
+        tokens: int,
+    ) -> QuotaDecision:
+        """Check quota WITHOUT recording usage.
+
+        Useful for admin UIs (preview the impact of a request) and for
+        the v1.5.10 cost dashboard. Does NOT mutate the usage tracker.
+        Honors `enforce_mode`:
+        - "advisory": always allowed, warning only
+        - "soft":     always allowed, warning only (same as advisory)
+        - "hard":     denied when overage, warning + allowed=False
+
+        Returns a QuotaDecision with `allowed` reflecting the enforce_mode.
+        """
+        now = time.time()
+        warnings: list[str] = []
+        if self._quota.period.value == "monthly":
+            window_start = now - 30 * 86400
+        else:
+            window_start = now - 86400
+        used = await self._usage.tokens_in_window(
+            tenant_id, window_start=window_start, window_end=now + 1
+        )
+        rpm_used = await self._usage.current_rpm(tenant_id)
+
+        token_overage = (used + tokens) > self._quota.max_tokens > 0
+        rpm_overage = rpm_used >= self._quota.max_rpm > 0
+
+        if token_overage:
+            warnings.append("token_quota_exceeded")
+        if rpm_overage:
+            warnings.append("rpm_limit_reached")
+
+        # Default: advisory / soft → always allow
+        allowed = True
+        if self._quota.enforce_mode == "hard" and (token_overage or rpm_overage):
+            allowed = False
+
+        remaining_tokens = max(0, self._quota.max_tokens - used - tokens)
+        remaining_rpm = max(0, self._quota.max_rpm - rpm_used)
+
+        return QuotaDecision(
+            allowed=allowed,
+            remaining_tokens=remaining_tokens,
+            remaining_rpm=remaining_rpm,
+            warnings=warnings,
+        )

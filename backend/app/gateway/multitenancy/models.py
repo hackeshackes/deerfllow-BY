@@ -48,21 +48,29 @@ class Project:
 
 @dataclass(frozen=True)
 class ResourceQuota:
-    """Advisory quota applied to a tenant.
+    """Advisory / soft / hard quota applied to a tenant.
 
-    v1.5.8 is advisory-only: when the limit is exceeded, callers receive
-    a warning in the response but the operation is still allowed. The
-    `enforce` flag is reserved for v1.5.9 when we have 1+ month of
-    production telemetry to set sensible hard limits.
+    v1.5.8 was advisory-only. v1.5.10 adds `enforce_mode`:
+
+    - "advisory" (default): overage produces warnings but does not block.
+    - "soft":              same as advisory today; reserved for a future
+                           differentiation (e.g. budget-driven auto-throttle).
+    - "hard":              overage produces `QuotaDecision.allowed=False`.
+
+    `max_tokens=0` / `max_rpm=0` means "unlimited" — overage warnings never
+    fire, regardless of `enforce_mode`.
     """
 
     tenant_id: str
     period: QuotaPeriod
     max_tokens: int
     max_rpm: int  # requests per minute
+    enforce_mode: str = "advisory"  # "advisory" | "soft" | "hard"
 
     def __post_init__(self) -> None:
         if self.max_tokens < 0:
             raise ValueError("max_tokens must be >= 0")
         if self.max_rpm < 0:
             raise ValueError("max_rpm must be >= 0")
+        if self.enforce_mode not in {"advisory", "soft", "hard"}:
+            raise ValueError("enforce_mode must be advisory|soft|hard")

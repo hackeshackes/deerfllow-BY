@@ -175,16 +175,15 @@ async def set_quota(
         )
     if payload.period not in {"monthly", "daily"}:
         raise HTTPException(status_code=422, detail="period must be monthly|daily")
-    # v1.5.10 Task 1: ``enforce_mode`` is validated above and echoed via
-    # ``QuotaOut``, but the v1.5.8 ``ResourceQuota`` dataclass does not yet
-    # carry the field (Task 2 adds it with a ``__post_init__`` validator).
-    # We persist an updated quota without ``enforce_mode``; once Task 2
-    # lands, this construct call can be extended in place.
+    # v1.5.10 Task 2: ResourceQuota now carries `enforce_mode` (validated
+    # above), so we pass it through directly. The field has a default of
+    # "advisory" if a caller ever constructs ResourceQuota without it.
     new_quota = ResourceQuota(
         tenant_id=tenant_id,
         period=QuotaPeriod(payload.period),
         max_tokens=payload.max_tokens,
         max_rpm=payload.max_rpm,
+        enforce_mode=payload.enforce_mode,
     )
     # Mutate service's quota in-place (service is a singleton). This
     # works because ResourceQuota is frozen but we replace the field
