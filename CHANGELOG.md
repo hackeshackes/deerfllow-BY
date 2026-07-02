@@ -26,8 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 原 `check_and_record` 签名保留,v1.5.8 所有 caller 不破坏
 
 #### 可观测性
-- `observability/routers/metrics.py` — Prometheus `/metrics` 端点
+- `observability/routers/metrics.py` — Prometheus `/api/metrics` 端点(prefix `/api`,与项目其他路由规范一致)
 - `observability/metrics.py` 暴露 `render_prometheus()` — 走现有 in-process `_counters` / `_gauges` 字典,无 prometheus-client 依赖
+- `docker/nginx/nginx.conf` 加 `location /api/metrics` block(从私有网络 scrape,无 auth 限制)
 - LangfuseExporter 配置 surface 沿用 v1.5.8(`MICX_LANGFUSE_ENABLED=true` + `export_span`),**真实 SDK 推迟 v1.6.0**
 
 #### 前端成本看板
@@ -35,11 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `core/multitenancy/api.ts` + `hooks/use-cost-summary.ts`
 
 ### Test
-- 多租户 admin API:~6 个集成测试
-- 配额 soft-enforce:5 个(advisory / soft / hard / disabled / check_only 不写入)
-- Prometheus metrics:3 个(counter / gauge / endpoint)
-- 成本看板前端:3 个
-- **合计:** ~17 个新测试
+- 多租户 admin API:8 个集成测试(Task 1)
+- 配额 soft-enforce:5 个(advisory / soft / hard / disabled / check_only 不写入)(Task 2)
+- Prometheus metrics:3 个(counter / gauge / endpoint)(Task 3)
+- 成本看板前端:6 个(3 api + 3 page)(Task 4)
+- **合计:** 22 个新测试
 
 ### Out of scope (deferred to v1.6.0)
 - Langfuse 真实 export SDK

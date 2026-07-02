@@ -10,7 +10,7 @@ from fastapi import APIRouter, Response
 
 from app.gateway.observability.metrics import render_prometheus
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 @router.get("/metrics", include_in_schema=False)

@@ -34,6 +34,6 @@ def test_metrics_endpoint():
     app = FastAPI()
     app.include_router(router)
     client = TestClient(app)
-    r = client.get("/metrics")
+    r = client.get("/api/metrics")
     assert r.status_code == 200
     assert "text/plain" in r.headers["content-type"]
