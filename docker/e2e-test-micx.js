@@ -36,6 +36,9 @@ async function run() {
     return path;
   }
 
+  // Aggregate results across the whole run.
+  const results = { passed: [], failed: [], screenshots: [] };
+
   async function testPage(name, url, checkFn) {
     try {
       console.log(`\n[TEST] ${name} (${url})`);
@@ -95,6 +98,137 @@ async function run() {
   await testPage('Admin Memory', '/workspace/admin/memory');
   await testPage('Admin Users', '/workspace/admin/users');
   await testPage('Admin Audit', '/workspace/admin/audit');
+
+  // 2b. v1.5.10 — cost dashboard
+  // The new /workspace/admin/governance/cost page should render with
+  // the v1.5.10 testids. We check all four key elements are visible.
+  console.log('\n=== v1.5.10 COST DASHBOARD ===');
+  try {
+    console.log('[TEST] Cost Dashboard (v1.5.10)');
+    await page.goto(`${BASE_URL}/workspace/admin/governance/cost`, {
+      waitUntil: 'networkidle',
+      timeout: 30000,
+    });
+    await page.waitForTimeout(2000);
+    await screenshot('v1_5_10_cost_dashboard');
+
+    for (const testid of [
+      'cost-dashboard',
+      'cost-tenant-input',
+      'cost-quota-reload',
+      'cost-enforce-mode',
+      'cost-quota-save',
+    ]) {
+      const visible = await page.getByTestId(testid).isVisible().catch(() => false);
+      if (!visible) {
+        throw new Error(`testid "${testid}" not visible on cost dashboard`);
+      }
+    }
+    results.passed.push('Cost Dashboard (v1.5.10) renders all 5 testids');
+    console.log('  PASS: all 5 v1.5.10 testids visible');
+  } catch (err) {
+    results.failed.push({
+      name: 'Cost Dashboard (v1.5.10)',
+      url: '/workspace/admin/governance/cost',
+      error: err.message,
+    });
+    console.log(`  FAIL: ${err.message}`);
+    await screenshot('v1_5_10_cost_dashboard_error');
+  }
+
+  // 2c. v1.5.10 — Prometheus /api/metrics reachable
+  // Use page.request to hit the gateway endpoint through the nginx proxy
+  // (the page shares cookies with the request context).
+  console.log('\n=== v1.5.10 /api/metrics ===');
+  try {
+    const metricsResp = await page.request.get(`${BASE_URL}/api/metrics`);
+    if (metricsResp.status() !== 200) {
+      throw new Error(`/api/metrics returned ${metricsResp.status()}`);
+    }
+    const contentType = metricsResp.headers()['content-type'] || '';
+    if (!contentType.includes('text/plain')) {
+      throw new Error(`/api/metrics content-type was "${contentType}"`);
+    }
+    const body = await metricsResp.text();
+    if (body.length === 0) {
+      throw new Error('/api/metrics returned empty body');
+    }
+    results.passed.push('Prometheus /api/metrics (v1.5.10)');
+    console.log(`  PASS: 200 OK, content-type ${contentType}, body ${body.length} bytes`);
+  } catch (err) {
+    results.failed.push({
+      name: 'Prometheus /api/metrics (v1.5.10)',
+      url: '/api/metrics',
+      error: err.message,
+    });
+    console.log(`  FAIL: ${err.message}`);
+  }
+
+  // 2d. v1.5.10 — admin API reachable (cost summary + quota round-trip)
+  console.log('\n=== v1.5.10 ADMIN API ===');
+  try {
+    const costResp = await page.request.get(
+      `${BASE_URL}/api/admin/cost/summary?tenant_id=default`,
+    );
+    if (costResp.status() !== 200) {
+      throw new Error(`cost summary returned ${costResp.status()}`);
+    }
+    const costBody = await costResp.json();
+    if (!('by_tenant' in costBody) || !('by_model' in costBody)) {
+      throw new Error('cost summary missing by_tenant / by_model');
+    }
+    results.passed.push('Admin API: cost summary (v1.5.10)');
+    console.log('  PASS: cost summary returns 200 with by_tenant + by_model');
+
+    // Quota round-trip: PUT hard, GET back, then revert to advisory
+    const putResp = await page.request.put(
+      `${BASE_URL}/api/admin/quota/ws-owner`,
+      {
+        data: {
+          max_tokens: 7777,
+          max_rpm: 30,
+          period: 'monthly',
+          enforce_mode: 'hard',
+        },
+      },
+    );
+    if (putResp.status() !== 200) {
+      throw new Error(`quota PUT returned ${putResp.status()}`);
+    }
+    const putBody = await putResp.json();
+    if (putBody.enforce_mode !== 'hard' || putBody.max_tokens !== 7777) {
+      throw new Error(
+        `quota PUT did not persist: ${JSON.stringify(putBody)}`,
+      );
+    }
+    const getResp = await page.request.get(
+      `${BASE_URL}/api/admin/quota/ws-owner`,
+    );
+    const getBody = await getResp.json();
+    if (getBody.enforce_mode !== 'hard' || getBody.max_tokens !== 7777) {
+      throw new Error(
+        `quota GET did not round-trip: ${JSON.stringify(getBody)}`,
+      );
+    }
+    results.passed.push('Admin API: quota PUT/GET round-trip (v1.5.10)');
+    console.log('  PASS: quota PUT 7777/hard → GET 7777/hard');
+
+    // Revert so other tests / dev env unaffected
+    await page.request.put(`${BASE_URL}/api/admin/quota/ws-owner`, {
+      data: {
+        max_tokens: 0,
+        max_rpm: 0,
+        period: 'monthly',
+        enforce_mode: 'advisory',
+      },
+    });
+  } catch (err) {
+    results.failed.push({
+      name: 'Admin API: cost/quota (v1.5.10)',
+      error: err.message,
+    });
+    console.log(`  FAIL: ${err.message}`);
+  }
 
   // 3. Workspace pages
   console.log('\n=== WORKSPACE PAGES ===');
