@@ -130,6 +130,41 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception:
             logger.exception("Failed to start scheduler or load tasks")
 
+        # v1.5.10 — wire multitenancy singletons + router.
+        # Provides /api/admin/cost/summary, /api/admin/usage/{tenant_id},
+        # and /api/admin/quota/{tenant_id} using the v1.5.8 data layer.
+        try:
+            from app.gateway.multitenancy.models import ResourceQuota, QuotaPeriod
+            from app.gateway.multitenancy.quota import QuotaService
+            from app.gateway.multitenancy.routers.api import (
+                configure as configure_mt,
+            )
+            from app.gateway.multitenancy.routers.api import (
+                router as multitenancy_router,
+            )
+            from app.gateway.multitenancy.usage_tracker import (
+                InMemoryUsageTracker,
+            )
+
+            # Use a default quota for the dev tenant. Production reads from
+            # a tenant-aware quota store (v1.6.0 work).
+            default_quota = ResourceQuota(
+                tenant_id="default",
+                period=QuotaPeriod.MONTHLY,
+                max_tokens=0,   # 0 = unlimited (advisory)
+                max_rpm=0,
+            )
+            tracker = InMemoryUsageTracker()
+            quota_svc = QuotaService(usage=tracker, quota=default_quota)
+            configure_mt(tracker=tracker, quota_service=quota_svc)
+            app.include_router(multitenancy_router)
+            logger.info("Multitenancy admin router mounted")
+        except Exception:
+            logger.exception(
+                "Failed to mount multitenancy admin router; "
+                "admin endpoints will return 503"
+            )
+
         yield
 
         # Stop channel service on shutdown
