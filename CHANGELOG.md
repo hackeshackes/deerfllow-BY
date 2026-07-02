@@ -7,13 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security
+## [1.5.10] - 2026-XX-XX
 
-#### 凭据轮换与历史清理 (P0)
-- 紧急 rotate: `BY_ADMIN_PASSWORD` 和 `BETTER_AUTH_SECRET` 已在 v1.5.0 提交到公共仓库的 e2e 测试脚本中,即便后续 commit 修复,git 历史仍可访问
-- 行动: 仓库所有者应立即重置 admin 密码和 session secret
-- 修复: e2e 脚本改为从 `E2E_EMAIL` / `E2E_PASSWORD` 环境变量读取 (commit `614a84fcd`)
-- 历史重写: `git filter-repo` 已从历史中删除 e2e 凭据脚本 (commit `026ce066` 起)
+> **范围:** 把 v1.5.8/v1.5.9 留下的 P0 缺口"收口"。v1.6.0 大版本留作 5-7 周的画布 + 协作完整化。
+> 详细实施计划:`docs/superpowers/plans/2026-07-02-micx-v1.5.10-multitenancy-closure.md`
+
+### Added
+
+#### 多租户收口(基于 v1.5.8 数据层 → 真实可用)
+- `multitenancy/routers/api.py` — `/api/admin/cost/summary`、`/api/admin/quota/{tenant_id}`、`/api/admin/usage/{tenant_id}` 路由
+- `app.py` 注册 `multitenancy_router` + 注入 singleton(`InMemoryUsageTracker` + `QuotaService`)
+- 严格基于 v1.5.8 现有类(`InMemoryUsageTracker` / `aggregate_costs` / `ResourceQuota` / `QuotaService.check_and_record`),不引入新数据模型
+
+#### 配额 enforce modes
+- `ResourceQuota.enforce_mode` 字段(frozen dataclass,默认 `"advisory"`,在 `__post_init__` 校验)
+- `QuotaService.check_only(tenant_id, tokens)` 新增方法 — 不写入 tracker,只判断
+- 三模式:`advisory`(默认,只警告)/ `soft`(只警告)/ `hard`(超额阻断,`allowed=False`)
+- 原 `check_and_record` 签名保留,v1.5.8 所有 caller 不破坏
+
+#### 可观测性
+- `observability/routers/metrics.py` — Prometheus `/metrics` 端点
+- `observability/metrics.py` 暴露 `render_prometheus()` — 走现有 in-process `_counters` / `_gauges` 字典,无 prometheus-client 依赖
+- LangfuseExporter 配置 surface 沿用 v1.5.8(`MICX_LANGFUSE_ENABLED=true` + `export_span`),**真实 SDK 推迟 v1.6.0**
+
+#### 前端成本看板
+- `/workspace/admin/governance/cost` — 月度 usage summary、模型分布、配额编辑器
+- `core/multitenancy/api.ts` + `hooks/use-cost-summary.ts`
+
+### Test
+- 多租户 admin API:~6 个集成测试
+- 配额 soft-enforce:5 个(advisory / soft / hard / disabled / check_only 不写入)
+- Prometheus metrics:3 个(counter / gauge / endpoint)
+- 成本看板前端:3 个
+- **合计:** ~17 个新测试
+
+### Out of scope (deferred to v1.6.0)
+- Langfuse 真实 export SDK
+- Workspace 级别 breakdown(UsageRecord 暂无 `workspace_id` 字段)
+- Per-tenant 用户/模型维度的精确隔离(`aggregate_costs(group_by="user_id")` 当前返回全租户)
+- 模型路由 admin API(`router_service.py` 已有,UI 一起做)
+
+---
+
+## [1.6.0] - 2026-XX-XX
+
+> **范围:** 战略 spec §4.3 完整版 — 画布(后端 + 前端编辑)+ 跨部门发布 + Slack 连接器 + ABAC 简化版 + 资源隔离(workspace 实际接入 LangGraph runtime)。**v1.5.x 系列里唯一大版本**,带架构变化。
+> 详细大纲计划:`docs/superpowers/plans/2026-07-02-micx-v1.6.0-canvas-completion.md`
+
+### Added(规划)
+
+#### 画布后端
+- `canvas/models.py` — Workflow / WorkflowNode / WorkflowEdge(5 节点:AGENT/TOOL/PROMPT/BRANCH/LOOP)
+- `canvas/store.py` — InMemoryWorkflowStore + SQLite 持久化(可选)
+- `canvas/versions.py` — VersionManager(commit / list / rollback)
+- `canvas/executor.py` — WorkflowExecutor(顺序拓扑 + branch/loop 路由)
+- `canvas/nodes/{agent,tool,prompt,branch,loop}.py` — 5 类节点执行器
+- `canvas/routers/workflows.py` — CRUD + execute + versions + rollback API
+
+#### 画布前端
+- `/workspace/workflows` — 列表 / 新建 / 详情 / 编辑 4 个页面
+- `NodeInspector` + `NodePalette` + `EdgeConnector` + `WorkflowToolbar`
+- React Flow 完整化(已在 v1.5.9 引入,本版本加属性面板 / 保存 / 运行 / 撤销重做)
+
+#### 协作收尾
+- `collaboration/publish.py` — PublishService(链式保留 original_thread_id)
+- `core/collaboration/PublishButton.tsx` — Thread 详情页发布入口
+
+#### 连接器
+- `connectors/slack/` — Slack 连接器(chat.postMessage + Webhook)
+
+#### ABAC 简化版(战略 spec P2)
+- `abac/evaluator.py` + `policies.py` — Subject / Resource / Action / AttributePolicy
+- 示例策略:部门匹配 + admin override
+- 接入点:thread 访问 + workflow 执行前(补充 RBAC,不替换)
+
+#### 资源隔离
+- LangGraph agent 启动时检查 workspace_id
+- workflow execution 强制要求 user 在 workspace 内
+- 配额 soft-enforce 与 workflow 关联
+
+### 验收
+- 3 个部门试点,资源完全隔离
+- 配额超限自动降级或阻断
+- Langfuse trace 覆盖率 ≥ 95%
+- 非工程师能独立配置 5 节点工作流
+- 5+ 个连接器全部可用
+- P95 响应延迟 < 2s(50+ 并发用户)
+
+### Changed
+- v1.5.8 中标注的"v1.6.0 拆解为三段"完成 — v1.5.8 收口 60% / v1.5.10 收口 P0 / v1.6.0 完成剩余 P1/P2
+
+---
 
 ## [1.5.5] - 2026-07-01
 
