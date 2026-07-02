@@ -5,6 +5,7 @@ Production swap: replace these with `prometheus_client.Counter` /
 in-process variants keep tests deterministic — no Prometheus registry
 to clean up between tests.
 """
+
 from __future__ import annotations
 
 import threading
@@ -66,3 +67,26 @@ class Gauge:
     def reset(self) -> None:
         with _metrics_lock:
             _gauges.pop(self._name, None)
+
+
+def render_prometheus() -> str:
+    """Render all registered metrics in Prometheus text exposition format.
+
+    We use the in-process _counters / _gauges dicts (no prometheus_client
+    dependency) so the v1.5.10 build stays slim. The format is the
+    subset Prometheus scrapers need:
+      # HELP <name> <help>
+      # TYPE <name> counter|gauge
+      <name> <value>
+    """
+    with _metrics_lock:
+        lines: list[str] = []
+        for name, value in sorted(_counters.items()):
+            lines.append(f"# HELP {name} counter")
+            lines.append(f"# TYPE {name} counter")
+            lines.append(f"{name} {value}")
+        for name, value in sorted(_gauges.items()):
+            lines.append(f"# HELP {name} gauge")
+            lines.append(f"# TYPE {name} gauge")
+            lines.append(f"{name} {value}")
+        return "\n".join(lines) + "\n"

@@ -95,6 +95,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             register_builtin_connectors,
         )
         from app.gateway.connectors.registry import get_registry
+
         connectors_yaml = os.environ.get("MICX_CONNECTORS", "").strip()
         if connectors_yaml:
             parsed = yaml.safe_load(connectors_yaml) or {}
@@ -102,9 +103,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 registry=get_registry(),
                 config=parsed,
             )
-            logger.info(
-                "Connectors registered: %s", get_registry().list_names()
-            )
+            logger.info("Connectors registered: %s", get_registry().list_names())
     except Exception:
         logger.exception("Failed to register connectors at startup")
 
@@ -151,19 +150,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             default_quota = ResourceQuota(
                 tenant_id="default",
                 period=QuotaPeriod.MONTHLY,
-                max_tokens=0,   # 0 = unlimited (advisory)
+                max_tokens=0,  # 0 = unlimited (advisory)
                 max_rpm=0,
             )
             tracker = InMemoryUsageTracker()
             quota_svc = QuotaService(usage=tracker, quota=default_quota)
             configure_mt(tracker=tracker, quota_service=quota_svc)
             app.include_router(multitenancy_router)
+
+            # v1.5.10 — Prometheus /metrics endpoint. Exposes the
+            # in-process Counter / Gauge registry in text exposition
+            # format. No prometheus-client dependency.
+            from app.gateway.observability.routers.metrics import (
+                router as metrics_router,
+            )
+
+            app.include_router(metrics_router)
             logger.info("Multitenancy admin router mounted")
         except Exception:
-            logger.exception(
-                "Failed to mount multitenancy admin router; "
-                "admin endpoints will return 503"
-            )
+            logger.exception("Failed to mount multitenancy admin router; admin endpoints will return 503")
 
         yield
 
