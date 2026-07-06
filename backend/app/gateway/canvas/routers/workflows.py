@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -286,7 +285,7 @@ class _ExecuteBody(BaseModel):
 
 
 @router.post("/{workflow_id}/execute")
-def execute_workflow(
+async def execute_workflow(
     workflow_id: str,
     body: _ExecuteBody,
     user: AuthUser = Depends(require_user),
@@ -320,7 +319,7 @@ def execute_workflow(
     if _executor is None:
         raise HTTPException(status_code=503, detail="executor not configured")
 
-    execution = asyncio.run(_executor.execute(wf, body.inputs))
+    execution = await _executor.execute(wf, body.inputs)
     return {
         "workflow_id": execution.workflow_id,
         "workflow_version": execution.workflow_version,
