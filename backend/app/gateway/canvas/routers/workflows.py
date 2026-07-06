@@ -20,6 +20,7 @@ from app.gateway.canvas.models import (
 )
 from app.gateway.canvas.store import WorkflowStore
 from app.gateway.canvas.versions import VersionManager
+from app.gateway.multitenancy.quota import QuotaService
 
 router = APIRouter(prefix="/api/workflows", tags=["canvas"])
 
@@ -27,20 +28,35 @@ router = APIRouter(prefix="/api/workflows", tags=["canvas"])
 _store: WorkflowStore | None = None
 _version_mgr: VersionManager | None = None
 _executor: WorkflowExecutor | None = None
+_quota_service: QuotaService | None = None
 
 
-def configure(store: WorkflowStore, version_mgr: VersionManager, executor: WorkflowExecutor | None = None) -> None:
-    global _store, _version_mgr, _executor
+def configure(
+    store: WorkflowStore,
+    version_mgr: VersionManager,
+    executor: WorkflowExecutor | None = None,
+    quota_service: QuotaService | None = None,
+) -> None:
+    global _store, _version_mgr, _executor, _quota_service
     _store = store
     _version_mgr = version_mgr
     _executor = executor
+    _quota_service = quota_service
+    # Resource isolation (Task A9): mirror the configured quota onto the
+    # underlying usage tracker so ``tracker.quota_pre_check`` can answer
+    # the sync pre-execution gate. The tracker stores ``_fallback_quota``
+    # so the canvas router does not need a direct reference to the
+    # ResourceQuota — only the QuotaService.
+    if quota_service is not None:
+        quota_service._usage.set_quota(quota_service._quota)  # type: ignore[attr-defined]
 
 
 def reset_for_tests() -> None:
-    global _store, _version_mgr, _executor
+    global _store, _version_mgr, _executor, _quota_service
     _store = None
     _version_mgr = None
     _executor = None
+    _quota_service = None
 
 
 def _dep_store() -> WorkflowStore:
@@ -263,6 +279,10 @@ class _ExecuteBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     inputs: dict[str, Any] = Field(default_factory=dict)
     workspace_id: str
+    # Token estimate used by the quota pre-check (Task A9). Defaults to
+    # a small fixed value so existing callers and tests (which never
+    # configure a quota service) keep working unchanged.
+    estimated_tokens: int = 100
 
 
 @router.post("/{workflow_id}/execute")
@@ -277,6 +297,26 @@ def execute_workflow(
         raise HTTPException(status_code=404, detail="workflow not found")
     if wf.workspace_id != body.workspace_id:
         raise HTTPException(status_code=403, detail={"error": {"code": "NOT_WORKSPACE_MEMBER"}})
+    # Resource isolation (Task A9): when a QuotaService is configured,
+    # consult its tracker's pre-check before invoking the executor. If
+    # the configured quota is in "hard" mode and estimated_tokens
+    # exceeds the limit, refuse with 429. When no QuotaService is
+    # configured (the common dev/test path), skip the check entirely
+    # so existing callers are not affected.
+    if _quota_service is not None:
+        decision = _quota_service._usage.quota_pre_check(  # type: ignore[attr-defined]
+            body.workspace_id, body.estimated_tokens
+        )
+        if not decision.allowed:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": {
+                        "code": "QUOTA_EXCEEDED",
+                        "mode": decision.mode,
+                    }
+                },
+            )
     if _executor is None:
         raise HTTPException(status_code=503, detail="executor not configured")
 
