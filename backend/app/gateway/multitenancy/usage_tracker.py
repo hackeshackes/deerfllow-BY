@@ -67,11 +67,12 @@ class InMemoryUsageTracker:
         return int((ts if ts is not None else time.time()) // 60)
 
     def set_quota(self, quota: ResourceQuota | None) -> None:
-        """Attach (or clear) the fallback quota for ``quota_pre_check``.
+        """Set (or clear) the fallback quota used by `quota_pre_check`.
 
-        Called by ``QuotaService.__init__`` so the tracker can answer
-        synchronous pre-checks without the caller needing a reference
-        to ``QuotaService`` itself.
+        Why a setter rather than a constructor parameter: the tracker is
+        constructed by the FastAPI lifespan before the quota is configured;
+        the canvas router wires the quota in via `configure()` after both
+        the tracker and the QuotaService exist.
         """
         self._fallback_quota = quota
 

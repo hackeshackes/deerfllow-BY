@@ -150,3 +150,113 @@ def test_workflow_execute_rejects_other_workspace():
     assert resp.status_code == 403, resp.text
     body = resp.json()
     assert body["detail"]["error"]["code"] == "NOT_WORKSPACE_MEMBER"
+
+
+def test_quota_soft_mode_allows_execute_with_overage():
+    """enforce_mode='soft' never blocks — overage produces only a warning."""
+    from app.gateway.multitenancy.models import QuotaPeriod, ResourceQuota
+    from app.gateway.multitenancy.quota import QuotaService
+    from app.gateway.multitenancy.usage_tracker import InMemoryUsageTracker
+
+    wstore = InMemoryWorkflowStore()
+    vstore = InMemoryVersionStore()
+    tracker = InMemoryUsageTracker()
+    quota = ResourceQuota(
+        tenant_id="ws1",
+        period=QuotaPeriod.MONTHLY,
+        max_tokens=10,
+        max_rpm=0,
+        enforce_mode="soft",
+    )
+    qservice = QuotaService(tracker, quota)
+    configure(wstore, VersionManager(wstore, vstore), quota_service=qservice)
+
+    client = _client_with_owner()
+    created = client.post(
+        "/api/workflows",
+        json={
+            "name": "demo",
+            "workspace_id": "ws1",
+            "nodes": [{"id": "n1", "kind": "prompt", "config": {}, "position": [0.0, 0.0]}],
+            "edges": [],
+        },
+    ).json()
+    resp = client.post(
+        f"/api/workflows/{created['id']}/execute",
+        json={"inputs": {}, "workspace_id": "ws1", "estimated_tokens": 100},
+    )
+    # soft mode allows overage — but execute may still 503 (no executor) or 200 (depending on wiring)
+    # What we care about: NOT 429
+    assert resp.status_code != 429, resp.text
+
+
+def test_quota_advisory_mode_allows_execute_with_overage():
+    """enforce_mode='advisory' (default) never blocks."""
+    from app.gateway.multitenancy.models import QuotaPeriod, ResourceQuota
+    from app.gateway.multitenancy.quota import QuotaService
+    from app.gateway.multitenancy.usage_tracker import InMemoryUsageTracker
+
+    wstore = InMemoryWorkflowStore()
+    vstore = InMemoryVersionStore()
+    tracker = InMemoryUsageTracker()
+    quota = ResourceQuota(
+        tenant_id="ws1",
+        period=QuotaPeriod.MONTHLY,
+        max_tokens=10,
+        max_rpm=0,
+        enforce_mode="advisory",
+    )
+    qservice = QuotaService(tracker, quota)
+    configure(wstore, VersionManager(wstore, vstore), quota_service=qservice)
+
+    client = _client_with_owner()
+    created = client.post(
+        "/api/workflows",
+        json={
+            "name": "demo",
+            "workspace_id": "ws1",
+            "nodes": [{"id": "n1", "kind": "prompt", "config": {}, "position": [0.0, 0.0]}],
+            "edges": [],
+        },
+    ).json()
+    resp = client.post(
+        f"/api/workflows/{created['id']}/execute",
+        json={"inputs": {}, "workspace_id": "ws1", "estimated_tokens": 100},
+    )
+    assert resp.status_code != 429, resp.text
+
+
+def test_quota_unlimited_max_tokens_zero_allows_execute():
+    """max_tokens=0 means 'unlimited' — never blocks even in hard mode."""
+    from app.gateway.multitenancy.models import QuotaPeriod, ResourceQuota
+    from app.gateway.multitenancy.quota import QuotaService
+    from app.gateway.multitenancy.usage_tracker import InMemoryUsageTracker
+
+    wstore = InMemoryWorkflowStore()
+    vstore = InMemoryVersionStore()
+    tracker = InMemoryUsageTracker()
+    quota = ResourceQuota(
+        tenant_id="ws1",
+        period=QuotaPeriod.MONTHLY,
+        max_tokens=0,  # unlimited
+        max_rpm=0,
+        enforce_mode="hard",
+    )
+    qservice = QuotaService(tracker, quota)
+    configure(wstore, VersionManager(wstore, vstore), quota_service=qservice)
+
+    client = _client_with_owner()
+    created = client.post(
+        "/api/workflows",
+        json={
+            "name": "demo",
+            "workspace_id": "ws1",
+            "nodes": [{"id": "n1", "kind": "prompt", "config": {}, "position": [0.0, 0.0]}],
+            "edges": [],
+        },
+    ).json()
+    resp = client.post(
+        f"/api/workflows/{created['id']}/execute",
+        json={"inputs": {}, "workspace_id": "ws1", "estimated_tokens": 999999},
+    )
+    assert resp.status_code != 429, resp.text
