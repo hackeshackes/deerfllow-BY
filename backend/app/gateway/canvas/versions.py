@@ -95,6 +95,9 @@ class VersionManager:
         current = self._store.get(workflow_id)
         if current is None:
             raise LookupError(f"workflow {workflow_id} not found")
+        # Preserve the live WorkflowStatus — rolling back a PUBLISHED workflow to
+        # a buggy draft should NOT silently re-publish it. Caller can override
+        # via the A8 router's status field after rollback if they want a status swap.
         restored = self._store.upsert(replace(old.snapshot, status=current.status))
         self.commit(restored)
         return restored
