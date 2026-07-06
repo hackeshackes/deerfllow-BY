@@ -21,6 +21,7 @@ export function PublishButton({ threadId, currentWorkspaceId }: Props) {
   const [workspaces, setWorkspaces] = React.useState<Workspace[]>([]);
   const [target, setTarget] = React.useState("");
   const [status, setStatus] = React.useState<Status>("idle");
+  const submittingRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -42,12 +43,16 @@ export function PublishButton({ threadId, currentWorkspaceId }: Props) {
   }, [open, currentWorkspaceId]);
 
   const submit = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setStatus("loading");
     try {
       await publishThread(threadId, target);
       setStatus("ok");
     } catch {
       setStatus("err");
+    } finally {
+      submittingRef.current = false;
     }
   };
 
