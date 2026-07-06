@@ -1,7 +1,8 @@
-"""Unit tests for canvas AgentNode executor (v1.6.x Task A6).
+"""Unit tests for canvas AgentNode (v1.6.x Task A6).
 
-AgentNode delegates chat to a `DeerFlowClient`-shaped `AgentClient`
-Protocol defined locally (no direct harness import).
+Covers the NodeExecutor Protocol contract via the concrete AgentNode,
+which delegates to an AgentClient Protocol so the harness runtime
+can be injected at app construction without importing deerflow.* here.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from app.gateway.canvas.nodes.base import NodeOutput
 
 
 class _FakeClient:
-    def __init__(self, reply: str) -> None:
+    def __init__(self, reply: str = "") -> None:
         self._reply = reply
         self.calls: list[dict[str, Any]] = []
 
@@ -47,3 +48,25 @@ async def test_agent_node_renders_prompt_with_inputs():
     )
     assert out.outputs == {"text": "ok"}
     assert client.calls[0]["message"] == "echo alpha"
+
+
+@pytest.mark.asyncio
+async def test_agent_node_missing_variable_returns_error():
+    node = AgentNode(client=_FakeClient(), default_thread_id="t-1")  # type: ignore[arg-type]
+    out = await node.execute(
+        config={"prompt": "hello {{name}}"},
+        inputs={},  # name missing
+    )
+    assert out.error is not None
+    assert "name" in out.error
+    assert "missing" in out.error.lower()
+
+
+@pytest.mark.asyncio
+async def test_agent_node_non_string_prompt_returns_error():
+    node = AgentNode(client=_FakeClient(), default_thread_id="t-1")  # type: ignore[arg-type]
+    out = await node.execute(
+        config={"prompt": 123},  # type: ignore[dict-item]
+        inputs={},
+    )
+    assert out.error is not None

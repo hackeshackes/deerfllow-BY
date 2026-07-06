@@ -23,9 +23,8 @@ class ToolNode:
 
     - `config["tool_name"]` is required (string).
     - `config["args"]` is an optional dict of tool arguments.
-    - `inputs` may override or supply additional kwargs via `setdefault`,
-      so node-config defaults can be supplemented — but not clobbered —
-      by upstream workflow inputs.
+    - `inputs` may override or supply additional kwargs,
+      so node-config defaults can be overridden by upstream workflow inputs.
     - Returns the registry result directly when it is a dict, otherwise
       wraps it as `{"value": result}`.
     - Unknown tools (`registry.call` raises `KeyError`) surface as
@@ -41,10 +40,10 @@ class ToolNode:
         if not isinstance(name, str) or not name:
             return NodeOutput(outputs={}, error="tool_name is required")
         args = dict(config.get("args") or {})
-        # Merge inputs last so node-config defaults can be supplemented by
-        # workflow inputs without overwriting explicit args.
+        # Merge inputs last so workflow inputs OVERRIDE node config defaults
+        # (per spec §3.3: 'inputs win on conflict')
         for k, v in inputs.items():
-            args.setdefault(k, v)
+            args[k] = v
         try:
             result = self._registry.call(name, **args)
         except KeyError:
