@@ -15,6 +15,8 @@ Versioning rule:
   `version=1` regardless of the caller's value.
 * `upsert` of an existing `Workflow` increments `version` by 1 and
   preserves all other fields the caller passed in.
+* Each save also refreshes `updated_at` to the current UTC time,
+  matching spec §3.2 line 216.
 
 This is deliberately simple — no conditional updates, no optimistic
 locking. Higher-level concerns (auth, soft delete, audit log) belong
@@ -24,6 +26,7 @@ in the gateway service layer, not the store.
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Protocol
 
 from .models import Workflow
@@ -54,10 +57,11 @@ class InMemoryWorkflowStore:
 
     def upsert(self, workflow: Workflow) -> Workflow:
         existing = self._by_id.get(workflow.id)
+        now = datetime.now(UTC)
         if existing is None:
-            saved = replace(workflow, version=1)
+            saved = replace(workflow, version=1, updated_at=now)
         else:
-            saved = replace(workflow, version=existing.version + 1)
+            saved = replace(workflow, version=existing.version + 1, updated_at=now)
         self._by_id[saved.id] = saved
         return saved
 

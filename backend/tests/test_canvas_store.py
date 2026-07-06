@@ -8,6 +8,7 @@ the `WorkflowStore` Protocol contract.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from app.gateway.canvas.models import NodeKind, Workflow, WorkflowNode, WorkflowStatus
@@ -63,3 +64,17 @@ def test_delete_removes_workflow():
 def test_get_returns_none_for_unknown_id():
     store = InMemoryWorkflowStore()
     assert store.get("missing") is None
+
+
+def test_upsert_refreshes_updated_at_on_every_save():
+    """Spec §3.2: '自增 version,改 updated_at' — updated_at is server-controlled."""
+    from datetime import UTC, datetime
+
+    store = InMemoryWorkflowStore()
+    initial = _workflow()
+    initial = replace(initial, updated_at=datetime(2020, 1, 1, tzinfo=UTC))
+    first = store.upsert(initial)
+    assert first.updated_at > datetime(2020, 1, 1, tzinfo=UTC)
+
+    second = store.upsert(first)
+    assert second.updated_at >= first.updated_at
