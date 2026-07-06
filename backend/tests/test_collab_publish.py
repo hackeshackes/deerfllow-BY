@@ -109,8 +109,11 @@ def test_history_is_capped_at_50():
 
 
 def test_publish_missing_source_thread_raises():
+    """Missing source thread raises LookupError (router translates to 404)."""
+    from app.gateway.collaboration.publish import PublishService
+
     tstore = _ThreadStore(threads={})
     svc = PublishService(thread_store=tstore)
 
-    with pytest.raises(Exception):  # LookupError or HTTPException
+    with pytest.raises(LookupError):
         svc.publish("missing", "ws-b", "u1")

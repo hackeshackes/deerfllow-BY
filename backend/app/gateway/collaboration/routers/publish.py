@@ -15,6 +15,8 @@ Endpoints:
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 
@@ -54,6 +56,7 @@ class _PublishResponse(BaseModel):
     source_thread_id: str
     target_workspace_id: str
     original_thread_id: str
+    published_at: datetime
 
 
 @router.post("/{thread_id}/publish", response_model=_PublishResponse)
@@ -72,6 +75,7 @@ def publish_thread(
         source_thread_id=result.source_thread_id,
         target_workspace_id=result.target_workspace_id,
         original_thread_id=result.original_thread_id,
+        published_at=result.published_at,
     )
 
 

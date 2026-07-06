@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Protocol
 
 from app.gateway.threads.models import Thread, ThreadSource
 
@@ -44,14 +44,14 @@ class PublishResult:
 
 
 class ThreadStore(Protocol):
-    """Duck-typed contract for thread persistence used by PublishService.
+    """Subset of the project's thread store used by PublishService.
 
-    The real implementation will be wired in a later v1.6.x integration
-    task; for unit tests, see ``tests/test_collab_publish.py``.
+    Real integration: `app.gateway.routers.threads.create_thread` and the
+    thread persistence layer; the v1.6.x integration phase will wire this.
     """
 
-    def get(self, thread_id: str) -> Any | None: ...
-    def create(self, thread: Any) -> Any: ...
+    def get(self, thread_id: str) -> Thread | None: ...
+    def create(self, thread: Thread) -> Thread: ...
     def append_publish_event(self, thread_id: str, event: PublishEvent) -> None: ...
 
 
