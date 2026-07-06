@@ -442,6 +442,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     from app.gateway.comments.routers.comments import router as comments_router
 
     app.include_router(comments_router)
+
+    # Canvas workflows API (v1.6.x) mounted at /api/workflows
+    from app.gateway.canvas.routers.workflows import router as canvas_router
+
+    app.include_router(canvas_router)
     # Wire a singleton store for the app's lifetime. Backend selected
     # by MICX_COMMENTS_STORE env (memory | sqlite). Tests can still
     # swap this out via app.state.comments_store before the first
