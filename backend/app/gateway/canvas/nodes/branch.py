@@ -53,7 +53,9 @@ class BranchNode:
 
 def _parse_literal(raw: str) -> Any:
     raw = raw.strip()
-    if raw.startswith("{") and raw.endswith("}"):
+    if raw.startswith("{"):
+        if not raw.endswith("}"):
+            raise ValueError(f"malformed set literal: {raw!r}")
         items = [p.strip().strip("'\"") for p in raw[1:-1].split(",") if p.strip()]
         return set(items)
     if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
