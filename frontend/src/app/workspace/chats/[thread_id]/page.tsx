@@ -23,9 +23,11 @@ import { ThreadTitle } from "@/components/workspace/thread-title";
 import { TodoList } from "@/components/workspace/todo-list";
 import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
 import { Welcome } from "@/components/workspace/welcome";
+import { PublishButton } from "@/core/collaboration/PublishButton";
 import { useI18n } from "@/core/i18n/hooks";
 import { useNotification } from "@/core/notification/hooks";
 import { useThreadSettings } from "@/core/settings";
+import { useCurrentSpace } from "@/core/spaces/hooks/use-current-space";
 import { useThreadStream } from "@/core/threads/hooks";
 import { textOfMessage } from "@/core/threads/utils";
 import { env } from "@/env";
@@ -67,7 +69,9 @@ export default function ChatPage() {
       }
 
       try {
-        const response = await fetch(`/api/threads/${encodeURIComponent(currentThreadId)}`);
+        const response = await fetch(
+          `/api/threads/${encodeURIComponent(currentThreadId)}`,
+        );
         if (!response.ok) {
           if (!cancelled) {
             window.sessionStorage.removeItem(`lg:stream:${currentThreadId}`);
@@ -89,6 +93,8 @@ export default function ChatPage() {
   }, [isNewThread, router, threadId]);
 
   const { showNotification } = useNotification();
+  const { space: currentSpace } = useCurrentSpace();
+  const currentWorkspaceId = currentSpace?.id ?? "personal";
 
   const [thread, sendMessage, isUploading] = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
@@ -148,8 +154,14 @@ export default function ChatPage() {
             <div className="flex w-full items-center text-sm font-medium">
               <ThreadTitle threadId={threadId} thread={thread} />
             </div>
-            <div className="flex items-center gap-2 rounded-full border bg-background/80 px-2 py-1 shadow-sm">
+            <div className="bg-background/80 flex items-center gap-2 rounded-full border px-2 py-1 shadow-sm">
               <TokenUsageIndicator messages={thread.messages} />
+              {threadId && threadId !== "new" ? (
+                <PublishButton
+                  threadId={threadId}
+                  currentWorkspaceId={currentWorkspaceId}
+                />
+              ) : null}
               <ExportTrigger threadId={threadId} />
               <ArtifactTrigger />
               <CaptureTrigger threadId={threadId} />
