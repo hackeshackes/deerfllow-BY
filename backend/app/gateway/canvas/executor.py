@@ -31,7 +31,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .models import NodeKind, Workflow
-from .nodes.base import NodeOutput
+from .nodes.base import NodeExecutor, NodeOutput
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,11 @@ class ExecutionStep:
 
 @dataclass(frozen=True)
 class WorkflowExecution:
-    """Aggregate result of running a workflow end-to-end."""
+    """Aggregate result of running a workflow end-to-end.
+
+    `total_tokens` is reserved for v1.7+ once Agent/Tool nodes report token
+    usage; in v1.6.x it is always 0.
+    """
 
     workflow_id: str
     workflow_version: int
@@ -71,7 +75,7 @@ class WorkflowExecutor:
 
     def __init__(
         self,
-        node_executors: Mapping[NodeKind, Any],
+        node_executors: Mapping[NodeKind, NodeExecutor],
         fail_fast: bool = False,
         loop_wall_clock_seconds: int = 60,
     ) -> None:
