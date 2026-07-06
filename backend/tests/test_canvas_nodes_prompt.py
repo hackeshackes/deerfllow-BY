@@ -15,8 +15,11 @@ from app.gateway.canvas.nodes.prompt import PromptNode
 
 @pytest.mark.asyncio
 async def test_prompt_renders_jinja_like_vars():
-    node = PromptNode(config={"template": "hello {{name}}"})
-    out = await node.execute(inputs={"name": "world"})
+    node = PromptNode()
+    out = await node.execute(
+        config={"template": "hello {{name}}"},
+        inputs={"name": "world"},
+    )
     assert isinstance(out, NodeOutput)
     assert out.outputs == {"text": "hello world"}
     assert out.error is None
@@ -24,14 +27,20 @@ async def test_prompt_renders_jinja_like_vars():
 
 @pytest.mark.asyncio
 async def test_prompt_missing_var_returns_error():
-    node = PromptNode(config={"template": "hello {{name}}"})
-    out = await node.execute(inputs={})
+    node = PromptNode()
+    out = await node.execute(
+        config={"template": "hello {{name}}"},
+        inputs={},
+    )
     assert out.error is not None
     assert "name" in out.error
 
 
 @pytest.mark.asyncio
 async def test_prompt_static_template_no_vars():
-    node = PromptNode(config={"template": "hello"})
-    out = await node.execute(inputs={})
+    node = PromptNode()
+    out = await node.execute(
+        config={"template": "hello"},
+        inputs={},
+    )
     assert out.outputs == {"text": "hello"}
