@@ -17,10 +17,6 @@ Protocol (`nodes/base.py`). The executor's job is:
 * Surface aggregate state — ``WorkflowExecution.outputs`` is
   ``node_id -> outputs`` and ``failed_node_id`` is set on first failure
   in ``fail_fast`` mode.
-
-The ``loop_wall_clock_seconds`` budget is reserved for v1.7 when the
-loop sentinel grows real loop-body execution. v1.6.x loop nodes only
-return their iteration count.
 """
 
 from __future__ import annotations
@@ -77,11 +73,9 @@ class WorkflowExecutor:
         self,
         node_executors: Mapping[NodeKind, NodeExecutor],
         fail_fast: bool = False,
-        loop_wall_clock_seconds: int = 60,
     ) -> None:
         self._executors = dict(node_executors)
         self._fail_fast = fail_fast
-        self._loop_timeout = loop_wall_clock_seconds
 
     async def execute(
         self,
