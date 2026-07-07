@@ -70,6 +70,33 @@ The frontend is a stateful chat application. Users create **threads** (conversat
 - **LangGraph client** is a singleton obtained via `getAPIClient()` in `core/api/`
 - **Environment validation** uses `@t3-oss/env-nextjs` with Zod schemas (`src/env.js`). Skip with `SKIP_ENV_VALIDATION=1`
 
+## Canvas Workflows (v1.6.0-canvas)
+
+Editor + collaboration for `Workflow` resources that execute against the LangGraph runtime.
+
+### Layout (`src/core/canvas/`)
+- `types.ts` — `Workflow` / `CanvasNode` / `CanvasEdge` / `ExecutionResult` mirror backend `app/gateway/canvas/models.py` and `routers/workflows.py`
+- `api.ts` — `canvasApi.{list,get,create,update,remove,listVersions,rollback,execute}` over `/api/workflows/*` with `credentials: "include"`
+- `hooks/` — `useWorkflows` (CRUD + optimistic), `useWorkflowExecute` (run with `isRunning`), `useWorkflowVersions` (rollback)
+- `components/`:
+  - `Canvas` — React Flow surface, domain ↔ RF shape reconciled via `useEffect`; `data-testid="canvas-view"` / `"node-{id}"` contract kept stable from v1.5.9
+  - `NodePalette` — 5 kind buttons (prompt / agent / tool / branch / loop)
+  - `NodeInspector` — per-kind fields + connected-edges list
+  - `EdgeConnector` — 2-step source/target form with optional `true`/`false` branch condition
+
+### Pages (`src/app/workspace/workflows/`)
+- `page.tsx` — list of workflows for the current space (replaces v1.5.x user-skill grid)
+- `new/page.tsx` — name + workspace, POST then `router.push` to `/edit`
+- `[id]/page.tsx` — read-only detail + Run (surfaces 429 as `quotaExceeded` i18n key)
+- `[id]/edit/page.tsx` — editor integrating NodePalette + EdgeConnector + Canvas + NodeInspector, save via `canvasApi.update`
+- `[id]/edit/components/WorkflowToolbar.tsx` — version dropdown + per-version rollback
+
+### i18n
+30 new keys under `t.canvasWorkflows` in `core/i18n/locales/{en-US,zh-CN}.ts`. Defined in `core/i18n/locales/types.ts` so the `Translations` interface stays in sync.
+
+### Collaboration
+`PublishButton` from `core/collaboration/PublishButton.tsx` is mounted on the thread detail page (`src/app/workspace/chats/[thread_id]/page.tsx`).
+
 ## Code Style
 
 - **Imports**: Enforced ordering (builtin → external → internal → parent → sibling), alphabetized, newlines between groups. Use inline type imports: `import { type Foo }`.

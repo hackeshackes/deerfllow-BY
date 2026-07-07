@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0-canvas] - 2026-07-07
+
+> **范围:** v1.6.x 画布 + 协作合并工作的可视前端 + 可发版 tag(基于 `c2179510` 合并的后端 + 这一轮 3 个 commit 的前端)。
+> 后端部分(A1–A9, C1–C2)已在 `c2179510` 合入 main,前端 B 线(B1–B4)在这一轮 3 个 commit 中合入。
+> Tag `v1.6.0-canvas` 指向 `2d03f0de`。注:同名 `v1.6.0` tag(2026-05-19)是 STT 版,保留不覆盖。
+
+### Added
+
+#### 画布后端(commit `b172e31f`..`c2179510`)
+- `canvas/models.py` — `Workflow` / `WorkflowNode` / `WorkflowEdge` + `NodeKind`(5 种:AGENT/TOOL/PROMPT/BRANCH/LOOP)+ `WorkflowStatus` + frozen dataclass 校验
+- `canvas/store.py` — `WorkflowStore` Protocol + `InMemoryWorkflowStore`(13 测试覆盖)
+- `canvas/versions.py` — `VersionManager` + `InMemoryVersionStore`(commit / list / rollback,3 测试)
+- `canvas/executor.py` — `WorkflowExecutor`(顺序拓扑,可选 fail_fast,21 测试)
+- `canvas/nodes/{agent,tool,prompt,branch,loop}.py` — 5 类节点执行器,NodeExecutor Protocol 严格类型
+  - `PromptNode`:`{{var}}` 占位
+  - `BranchNode`:固定 AST 评估器(==/!=/>/</>=/<=/in/contains/matches),**不**用 `eval`/`exec`,20 测试
+  - `LoopNode`:哨兵,executor 按 `iterations` 重复
+  - `AgentNode`:委托 `deerflow.client.DeerFlowClient.chat` Protocol
+  - `ToolNode`:`ToolRegistry` Protocol,args 优先级 inputs > config
+- `canvas/routers/workflows.py` — `POST /api/workflows` / `GET/PUT/DELETE /api/workflows/{id}` / `GET /api/workflows/{id}/versions` / `POST /api/threads/{id}/publish` / `POST /api/threads/{id}/publish-history`(owner-only create)
+- `multitenancy/usage_tracker.py` — `quota_pre_check` + 3 模式(advisory/soft/hard)
+- 资源隔离:execute 强制 `workspace_id` 匹配,非成员 403
+
+#### 协作后端(commit `c6231b19`)
+- `collaboration/publish.py` — `PublishService`(同步 + 异步两种,`StoreLike` Protocol)
+- `collaboration/routers/publish.py` — `POST /api/threads/{id}/publish` / `GET /api/threads/{id}/publish-history`
+- `threads/models.py` 加 `publish_history: list`(maxlen=50 enforced at write site)
+- 链式 publish 保留 `original_thread_id`(`A → B → C` 中 C.original = A)
+
+#### 画布前端(commit `eb8814ab`,`88a99b35`,`2d03f0de` 本轮)
+- i18n:30 个新 key 在 `canvasWorkflows` 命名空间(en-US + zh-CN,types.ts 同步)
+- `core/canvas/{types,api}.ts` — 与后端 `WorkflowResponse` / `NodeKind` 对齐,9 个 `canvasApi.*` 方法
+- `core/canvas/hooks/` — `useWorkflows` / `useWorkflowExecute` / `useWorkflowVersions`(22 hook + api 测试)
+- `core/canvas/components/`:
+  - `Canvas` — React Flow 容器,domain ↔ RF shape 双向 reconcile,选中态高亮
+  - `NodePalette` — 5 kind 按钮,disabled 状态
+  - `NodeInspector` — per-kind 字段(prompt template / agent prompt / tool name+args / branch condition / loop iterations)+ 关联 edges 列表
+  - `EdgeConnector` — 两步表单 source/target,可挂 `true`/`false` branch condition
+- `app/workspace/workflows/`:list / new / [id] / [id]/edit 4 页(替换 v1.5.x 用户技能网格)
+- `app/workspace/workflows/[id]/edit/components/WorkflowToolbar.tsx` — version dropdown + per-version rollback
+- `core/collaboration/PublishButton.tsx` — 已在 thread detail page 挂载
+
+### Test
+- 后端:73 个 v1.6.x 测试(API + models + store + versions + executor + nodes + resource_isolation + collab_publish)
+- 前端:4 组件 + 3 hooks + 1 api + 1 toolbar + 4 page = 14 个新测试文件,**38 files / 169 tests** 全过
+- `pnpm typecheck` 0 errors,B 线 `pnpm lint` 0 errors
+- `pnpm build` 编译 51 静态页含 4 个新路由
+- `curl localhost:2026/workspace/workflows*` 4 路由全部 307(中间件识别为需登录)
+
+### Known limitations (deferred)
+- `ChatOps Workflow` 落库关联的 quota binding 已部分实现,但 v1.6.x 没完成"workflow quota 反向引用"`workflow_id` 字段(usage_tracker 还是按 tenant 维度)
+- Slack 连接器(C3 P1)未做,推到 v1.6.1
+- ABAC 简化版未做,推到 v1.6.1
+- D1(灰度) / D2(验收) 阶段未做
+
+### Fixed (v1.6.0-canvas, commit `2d03f0de` 之上的补充)
+- **`executor._should_run` BRANCH 真实路由** — Plan 自审点名的占位已实现:BRANCH 节点按 `outputs["matched"]` + 出边 `condition` 选 true/false 边,unselected 边记为 `skipped` step
+- **LOOP body 嵌套** — Plan 自审点名的占位已实现:LOOP 节点的 `outputs["iterations"]` 控制下游子图重复执行,每步带 `metadata.iteration`,outputs 累积为 list
+
 ## [1.5.10] - 2026-XX-XX
 
 > **范围:** 把 v1.5.8/v1.5.9 留下的 P0 缺口"收口"。v1.6.0 大版本留作 5-7 周的画布 + 协作完整化。

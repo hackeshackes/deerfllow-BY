@@ -141,3 +141,76 @@ async def test_missing_executor_for_kind_marks_step_failed():
     assert result.steps[0].status == "failed"
     assert "no executor" in (result.steps[0].error or "")
     assert result.failed_node_id is None  # default fail_fast=False
+
+
+@pytest.mark.asyncio
+async def test_branch_routes_to_true_edge_only_when_matched():
+    """BRANCH node with `matched=True` runs the `condition='true'` edge target and skips the `condition='false'` one.
+
+    Plan v1.6.x self-audit item: executor was previously running all nodes
+    linearly regardless of branch condition. This locks the routing
+    behavior so callers can rely on the executor picking a side.
+    """
+    wf = _wf(
+        nodes=(
+            WorkflowNode(id="br", kind=NodeKind.BRANCH, config={"condition": "x == 1"}, position=(0.0, 0.0)),
+            WorkflowNode(id="t", kind=NodeKind.PROMPT, config={"template": "true-branch"}, position=(0.0, 0.0)),
+            WorkflowNode(id="f", kind=NodeKind.PROMPT, config={"template": "false-branch"}, position=(0.0, 0.0)),
+        ),
+        edges=(
+            WorkflowEdge(id="e1", source_node_id="br", target_node_id="t", condition="true"),
+            WorkflowEdge(id="e2", source_node_id="br", target_node_id="f", condition="false"),
+        ),
+    )
+    ex = WorkflowExecutor(
+        node_executors={
+            NodeKind.BRANCH: _Match(matched=True),
+            NodeKind.PROMPT: _EchoPrompt(),
+        },
+    )
+    result = await ex.execute(wf, inputs={})
+    # Only the branch node + the true-branch target should run; the
+    # `condition='false'` target is recorded as a skipped step so the
+    # user can see in the trace that the unselected branch was
+    # intentionally bypassed.
+    assert [s.node_id for s in result.steps] == ["br", "t", "f"]
+    statuses = {s.node_id: s.status for s in result.steps}
+    assert statuses["br"] == "ok"
+    assert statuses["t"] == "ok"
+    assert statuses["f"] == "skipped"
+    assert result.outputs.get("t") == {"text": "TRUE-BRANCH"}
+    assert "f" not in result.outputs
+
+
+@pytest.mark.asyncio
+async def test_loop_repeats_downstream_subgraph_iterations_times():
+    """A LOOP node followed by a single downstream node runs the downstream node `iterations` times.
+
+    Each iteration appends a step record tagged with `metadata.iteration`.
+    Output for the downstream node accumulates as a list under its id
+    so callers can see per-iteration values.
+    """
+    wf = _wf(
+        nodes=(
+            WorkflowNode(id="loop1", kind=NodeKind.LOOP, config={"iterations": 3}, position=(0.0, 0.0)),
+            WorkflowNode(id="body", kind=NodeKind.PROMPT, config={"template": "x"}, position=(0.0, 0.0)),
+        ),
+        edges=(WorkflowEdge(id="e1", source_node_id="loop1", target_node_id="body"),),
+    )
+    ex = WorkflowExecutor(
+        node_executors={
+            NodeKind.LOOP: _Loop(),
+            NodeKind.PROMPT: _EchoPrompt(),
+        },
+    )
+    result = await ex.execute(wf, inputs={})
+    # 1 loop sentinel step + 3 body steps.
+    body_steps = [s for s in result.steps if s.node_id == "body"]
+    assert len(body_steps) == 3
+    assert [s.metadata.get("iteration") for s in body_steps] == [1, 2, 3]
+    # Accumulated outputs as a list, one entry per iteration.
+    assert result.outputs["body"] == [
+        {"text": "X"},
+        {"text": "X"},
+        {"text": "X"},
+    ]

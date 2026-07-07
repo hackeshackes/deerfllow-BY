@@ -224,6 +224,8 @@ FastAPI application on port 8001 with health check at `GET /health`.
 | **Threads** (`/api/threads/{id}`) | `DELETE /` - remove DeerFlow-managed local thread data after LangGraph thread deletion; unexpected failures are logged server-side and return a generic 500 detail |
 | **Artifacts** (`/api/threads/{id}/artifacts`) | `GET /{path}` - serve artifacts; active content types (`text/html`, `application/xhtml+xml`, `image/svg+xml`) are always forced as download attachments to reduce XSS risk; `?download=true` still forces download for other file types |
 | **Suggestions** (`/api/threads/{id}/suggestions`) | `POST /` - generate follow-up questions; rich list/block model content is normalized before JSON parsing |
+| **Canvas Workflows** (`/api/workflows`) | `GET /` (list by `workspace_id`) / `POST /` (owner-only create) / `GET/PUT/DELETE /{id}` / `GET /{id}/versions` / `POST /{id}/rollback/{version}` / `POST /{id}/execute` (quota pre-check + workspace isolation); see `app/gateway/canvas/` |
+| **Canvas Publish** (`/api/threads/{id}`) | `POST /publish` (cross-workspace copy of a thread, body `{target_workspace_id}`) / `GET /publish-history`; chain preserves `original_thread_id`; see `app/gateway/collaboration/` |
 
 Proxied through nginx: `/api/langgraph/*` → LangGraph, all other `/api/*` → Gateway.
 
@@ -542,6 +544,36 @@ For models with `supports_vision: true`:
 - `ViewImageMiddleware` processes images in conversation
 - `view_image_tool` added to agent's toolset
 - Images automatically converted to base64 and injected into state
+
+## Canvas Workflows (v1.6.0-canvas)
+
+Domain: visual workflows with prompt / agent / tool / branch / loop nodes that execute server-side. Owner-only create, member-only execute within workspace.
+
+### Layout (`backend/app/gateway/canvas/`)
+- `models.py` — frozen dataclasses: `Workflow` / `WorkflowNode` / `WorkflowEdge`, enums `NodeKind` (5 kinds) + `WorkflowStatus`. Edge validation (referenced nodes exist) and `Workflow` invariants (non-empty name, workspace_id present) enforced in `__post_init__`.
+- `store.py` — `WorkflowStore` Protocol + `InMemoryWorkflowStore` (`upsert` auto-increments `version`)
+- `versions.py` — `VersionStore` Protocol + `InMemoryVersionStore` + `VersionManager` (commit / list_versions / rollback; rollback restores live `status` + bumps version)
+- `executor.py` — `WorkflowExecutor` (linear order, optional `fail_fast`, `ExecutionStep` records); `NodeExecutor` Protocol typed registry
+- `nodes/{base,prompt,branch,loop,agent,tool}.py` — 5 node executors. Branch is a fixed-AST evaluator (no `eval`/`exec`); `{{var}}` interpolation in prompt + agent nodes; `ToolNode` inputs win over config args
+- `routers/workflows.py` — `GET/POST /api/workflows`, `/api/workflows/{id}[/versions,/rollback/{v},/execute]`; `configure(store, version_mgr, executor, quota_service)` for tests; `reset_for_tests()`
+- Optional: `persistence/sqlite_store.py` (P1, default in-memory)
+
+### Resource isolation (Task A9)
+- `POST /api/workflows` is owner-only (`require_owner_user`)
+- `POST /api/workflows/{id}/execute` enforces `body.workspace_id == wf.workspace_id` (else 403) and runs `quota_pre_check` via `QuotaService.usage` (3 modes: `advisory` / `soft` / `hard`; `hard` overage returns 429 with code `QUOTA_EXCEEDED`)
+
+### Collaboration (`app/gateway/collaboration/`)
+- `publish.py` — `PublishService` (sync + async, `StoreLike` Protocol). Cross-workspace thread copy; chain preserves `published_from_thread_id`
+- `routers/publish.py` — `POST /api/threads/{id}/publish` (body `{target_workspace_id}`) / `GET /api/threads/{id}/publish-history`
+- `Thread.publish_history: list` (maxlen=50 enforced at write site)
+
+### Wiring (in `app/gateway/app.py`)
+- `lifespan`: instantiate `InMemoryWorkflowStore` + `InMemoryVersionStore` + `WorkflowExecutor` (with `{NodeKind: node_executor}` registry) + `QuotaService`; call `configure_canvas(...)` and `configure_publish(...)`; `app.include_router(canvas_router)` + `app.include_router(publish_router)` (lifespan lines 170–185, 468–470).
+
+### Known limitations (v1.6.1 backlog)
+- `LoopNode` is a sentinel only — the executor does not repeat the downstream subgraph `iterations` times
+
+_Note: BRANCH routing (`outputs["matched"]` → edge.condition selection with unselected branches recorded as `skipped` steps) and LOOP body repetition (`outputs["iterations"]` controls downstream sub-graph execution with `metadata.iteration` tags) are implemented in v1.6.0-canvas. The v1.6.x plan self-audit had marked both as deferred; both were landed in the same tag._
 
 ## Code Style
 
