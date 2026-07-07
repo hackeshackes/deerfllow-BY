@@ -166,6 +166,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
 
             app.include_router(metrics_router)
+
+            # v1.6.x — cross-workspace publish (B2). Wires PublishService
+            # against the same Store that backs thread records, so
+            # PublishButton on the frontend can target a workspace and
+            # produce a real new thread + lineage event.
+            from app.gateway.collaboration.publish import PublishService
+            from app.gateway.collaboration.routers.publish import (
+                configure as configure_publish,
+            )
+            from app.gateway.collaboration.routers.publish import (
+                router as publish_router,
+            )
+
+            store = getattr(app.state, "store", None)
+            if store is not None:
+                configure_publish(PublishService(store=store))
+                app.include_router(publish_router)
+                logger.info("Collaboration publish router mounted")
+            else:
+                logger.warning("Store unavailable at lifespan; publish router not mounted")
+
             logger.info("Multitenancy admin router mounted")
         except Exception:
             logger.exception("Failed to mount multitenancy admin router; admin endpoints will return 503")
