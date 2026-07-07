@@ -8,9 +8,10 @@ scheduled automation result, or inbound from an external channel).
 that were promoted from a personal thread — it preserves the lineage so
 downstream consumers can show "originally posted in /u/me".
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -20,9 +21,9 @@ class SpaceType(str, Enum):
 
 
 class ThreadSource(str, Enum):
-    MANUAL = "manual"          # User-created via the chat UI
+    MANUAL = "manual"  # User-created via the chat UI
     AUTOMATION = "automation"  # Result of a scheduled task
-    CHANNEL = "channel"        # Inbound from external channel (Feishu/DingTalk/...)
+    CHANNEL = "channel"  # Inbound from external channel (Feishu/DingTalk/...)
 
 
 @dataclass
@@ -36,3 +37,4 @@ class Thread:
     published_from_thread_id: str | None = None
     created_at: str = ""
     updated_at: str = ""
+    publish_history: list = field(default_factory=list)  # maxlen=50 enforced at write site (collaboration.publish)

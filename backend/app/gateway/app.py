@@ -166,6 +166,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
 
             app.include_router(metrics_router)
+
+            # v1.6.x — cross-workspace publish (B2). Wires PublishService
+            # against the same Store that backs thread records, so
+            # PublishButton on the frontend can target a workspace and
+            # produce a real new thread + lineage event.
+            from app.gateway.collaboration.publish import PublishService
+            from app.gateway.collaboration.routers.publish import (
+                configure as configure_publish,
+            )
+            from app.gateway.collaboration.routers.publish import (
+                router as publish_router,
+            )
+
+            store = getattr(app.state, "store", None)
+            if store is not None:
+                configure_publish(PublishService(store=store))
+                app.include_router(publish_router)
+                logger.info("Collaboration publish router mounted")
+            else:
+                logger.warning("Store unavailable at lifespan; publish router not mounted")
+
             logger.info("Multitenancy admin router mounted")
         except Exception:
             logger.exception("Failed to mount multitenancy admin router; admin endpoints will return 503")
@@ -442,6 +463,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     from app.gateway.comments.routers.comments import router as comments_router
 
     app.include_router(comments_router)
+
+    # Canvas workflows API (v1.6.x) mounted at /api/workflows
+    from app.gateway.canvas.routers.workflows import router as canvas_router
+
+    app.include_router(canvas_router)
     # Wire a singleton store for the app's lifetime. Backend selected
     # by MICX_COMMENTS_STORE env (memory | sqlite). Tests can still
     # swap this out via app.state.comments_store before the first
