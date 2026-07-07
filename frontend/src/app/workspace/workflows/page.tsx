@@ -1,172 +1,125 @@
 "use client";
 
-import { ClockIcon, PlayIcon, SettingsIcon, StarIcon, WorkflowIcon } from "lucide-react";
+import { PlusIcon, WorkflowIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   WorkspaceBody,
   WorkspaceContainer,
   WorkspaceHeader,
 } from "@/components/workspace/workspace-container";
+import { useWorkflows } from "@/core/canvas/hooks/use-workflows";
 import { useI18n } from "@/core/i18n/hooks";
-import { useUserSkills } from "@/core/skills/hooks";
-import type { UserSkillConfig } from "@/core/skills/type";
+import { useCurrentSpace } from "@/core/spaces/hooks/use-current-space";
 
-function workflowPrompt(skill: UserSkillConfig): string {
-  return `请使用「${skill.display_name}」工作流来完成任务。\n\n我的目标是：`;
-}
-
-function workflowHref(skill: UserSkillConfig): string {
-  const params = new URLSearchParams({
-    workflow: skill.skill_name,
-    prompt: workflowPrompt(skill),
-  });
-  return `/workspace/chats/new?${params.toString()}`;
-}
-
-export default function WorkflowsPage() {
-  const router = useRouter();
+export default function WorkflowsListPage() {
   const { t } = useI18n();
-  const { skills, isLoading, error } = useUserSkills();
+  const { space } = useCurrentSpace();
+  const workspaceId = space?.id ?? null;
+  const { workflows, isLoading, error, refresh } = useWorkflows(workspaceId);
 
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    document.title = `${t.sidebar.workflows} - MicX`;
-  }, [t.sidebar.workflows]);
+    setHydrated(true);
+    document.title = `${t.canvasWorkflows.listTitle} - MicX`;
+  }, [t]);
 
-  const enabledSkills = useMemo(
-    () => skills.filter((skill) => skill.enabled),
-    [skills],
-  );
-  const defaultSkills = useMemo(
-    () => skills.filter((skill) => skill.is_default),
-    [skills],
+  const sorted = useMemo(
+    () => [...workflows].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+    [workflows],
   );
 
   return (
     <WorkspaceContainer>
       <WorkspaceHeader>
-        <Link href="/workspace/settings/skills">
-          <Button size="sm" variant="outline" className="gap-2">
-            <SettingsIcon className="size-4" />
-            {t.settings.skills.advancedManagement}
+        <Link href="/workspace/workflows/new">
+          <Button size="sm" className="gap-2" data-testid="workflows-new">
+            <PlusIcon className="size-4" />
+            {t.canvasWorkflows.newWorkflow}
           </Button>
         </Link>
       </WorkspaceHeader>
       <WorkspaceBody>
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 py-8">
-          <div>
-            <div className="flex items-center gap-2 text-2xl font-semibold">
+          <header>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold">
               <WorkflowIcon className="size-6" />
-              {t.sidebar.workflows}
-            </div>
-            <p className="text-muted-foreground mt-2 text-sm">
-              {t.workflows.description}
-            </p>
-          </div>
+              {t.canvasWorkflows.listTitle}
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">{t.canvasWorkflows.listDescription}</p>
+          </header>
 
-          {isLoading ? (
-            <div className="text-muted-foreground text-center">{t.common.loading}</div>
+          {!hydrated || isLoading ? (
+            <p className="text-muted-foreground text-center text-sm" data-testid="workflows-loading">
+              {t.common.loading}
+            </p>
           ) : error ? (
-            <div className="text-destructive text-sm">{t.workflows.loadError}: {error.message}</div>
+            <div
+              role="alert"
+              data-testid="workflows-error"
+              className="text-destructive rounded border p-4 text-sm"
+            >
+              {t.canvasWorkflows.errorTitle}: {error.message}
+              <Button size="sm" variant="outline" className="ml-2" onClick={() => void refresh()}>
+                Retry
+              </Button>
+            </div>
+          ) : sorted.length === 0 ? (
+            <div
+              className="rounded-2xl border py-12 text-center"
+              data-testid="workflows-empty"
+            >
+              <WorkflowIcon className="text-muted-foreground mx-auto mb-3 size-10" />
+              <p className="font-medium">{t.canvasWorkflows.emptyTitle}</p>
+              <p className="text-muted-foreground text-sm">{t.canvasWorkflows.emptyDescription}</p>
+              <Link href="/workspace/workflows/new" className="mt-4 inline-block">
+                <Button size="sm">{t.canvasWorkflows.createButton}</Button>
+              </Link>
+            </div>
           ) : (
-            <Tabs defaultValue="enabled">
-              <TabsList>
-                <TabsTrigger value="enabled">{t.workflows.availableWorkflows}</TabsTrigger>
-                <TabsTrigger value="defaults">{t.workflows.defaultWorkflows}</TabsTrigger>
-                <TabsTrigger value="all">{t.workflows.all}</TabsTrigger>
-              </TabsList>
-              <TabsContent value="enabled" className="mt-4">
-                <WorkflowGrid skills={enabledSkills} onCreateAutomation={(skill) => router.push(`/workspace/automations/new?workflow=${encodeURIComponent(skill.skill_name)}`)} />
-              </TabsContent>
-              <TabsContent value="defaults" className="mt-4">
-                <WorkflowGrid skills={defaultSkills} onCreateAutomation={(skill) => router.push(`/workspace/automations/new?workflow=${encodeURIComponent(skill.skill_name)}`)} />
-              </TabsContent>
-              <TabsContent value="all" className="mt-4">
-                <WorkflowGrid skills={skills} onCreateAutomation={(skill) => router.push(`/workspace/automations/new?workflow=${encodeURIComponent(skill.skill_name)}`)} />
-              </TabsContent>
-            </Tabs>
+            <ul
+              data-testid="workflows-grid"
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            >
+              {sorted.map((wf) => (
+                <li key={wf.id}>
+                  <Card className="flex h-full flex-col" data-testid="workflow-card">
+                    <CardHeader>
+                      <CardTitle className="text-base">
+                        <Link href={`/workspace/workflows/${wf.id}`} className="hover:underline">
+                          {wf.name}
+                        </Link>
+                      </CardTitle>
+                      <CardDescription className="line-clamp-2">
+                        {wf.nodes.length} nodes · {wf.edges.length} edges
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="mt-auto flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="secondary">{wf.status}</Badge>
+                        <span className="text-muted-foreground">
+                          {t.canvasWorkflows.versionLabel} {wf.version}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Link href={`/workspace/workflows/${wf.id}/edit`}>
+                          <Button size="sm" variant="outline" data-testid="workflow-edit">
+                            {t.common.edit}
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </WorkspaceBody>
     </WorkspaceContainer>
-  );
-}
-
-function WorkflowGrid({
-  skills,
-  onCreateAutomation,
-}: {
-  skills: UserSkillConfig[];
-  onCreateAutomation: (skill: UserSkillConfig) => void;
-}) {
-  const { t } = useI18n();
-
-  if (skills.length === 0) {
-    return (
-      <div className="rounded-2xl border py-12 text-center">
-        <WorkflowIcon className="text-muted-foreground mx-auto mb-3 size-10" />
-        <p className="text-muted-foreground">{t.workflows.noWorkflows}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {skills.map((skill) => (
-        <Card key={skill.skill_name} className="flex flex-col">
-          <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">{skill.display_name}</CardTitle>
-                <CardDescription className="mt-2 line-clamp-3">
-                {skill.description || t.workflows.noWorkflows}
-                </CardDescription>
-              </div>
-              {skill.is_default && (
-                <Badge variant="secondary" className="gap-1">
-                  <StarIcon className="size-3" />
-                  {t.workflows.defaultWorkflows}
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="mt-auto space-y-4">
-            <div className="text-muted-foreground flex items-center justify-between text-sm">
-              <span>{skill.enabled ? t.workflows.enabled : t.workflows.disabled}</span>
-              {skill.average_rating !== null && <span>{t.workflows.rating} {skill.average_rating.toFixed(1)}</span>}
-            </div>
-            <div className="flex gap-2">
-              <Button asChild size="sm" className="flex-1 gap-1">
-                <Link href={workflowHref(skill)}>
-                  <PlayIcon className="size-4" />
-                  {t.workflows.use}
-                </Link>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 gap-1"
-                onClick={() => onCreateAutomation(skill)}
-              >
-                <ClockIcon className="size-4" />
-                {t.workflows.automation}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
   );
 }
