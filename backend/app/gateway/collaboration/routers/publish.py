@@ -1,12 +1,7 @@
-"""FastAPI router for cross-workspace thread publish (v1.6.x).
+"""FastAPI router for cross-workspace thread publish (v1.6.x B2).
 
-NOT YET WIRED into ``app.py``. This file exists so that:
-
-- The route shape is documented and reviewable.
-- A future integration task can wire it via ``app.include_router(router)``
-  plus a ``configure(...)`` call during app startup.
-- Tests can exercise the routes in isolation by setting the singleton
-  via :func:`configure` and then mounting the router on a test app.
+Wired into ``app.py`` via ``app.include_router(router)`` after the lifespan
+configures the singleton service with ``configure(PublishService(...))``.
 
 Endpoints:
 - ``POST /api/threads/{thread_id}/publish``
@@ -17,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from app.gateway.auth import AuthUser, require_user
@@ -29,7 +24,7 @@ _service: PublishService | None = None
 
 
 def configure(service: PublishService) -> None:
-    """Wire the PublishService. Called from app.py lifespan (future integration)."""
+    """Wire the PublishService. Called from app.py lifespan."""
     global _service
     _service = service
 
@@ -60,16 +55,20 @@ class _PublishResponse(BaseModel):
 
 
 @router.post("/{thread_id}/publish", response_model=_PublishResponse)
-def publish_thread(
+async def publish_thread(
     thread_id: str,
     body: _PublishBody,
+    request: Request,
     user: AuthUser = Depends(require_user),
     svc: PublishService = Depends(_dep_service),
 ) -> _PublishResponse:
+    # Touch the request so FastAPI doesn't strip it; also useful for future
+    # request-scoped tracing.
+    _ = request
     try:
-        result = svc.publish(thread_id, body.target_workspace_id, actor_user_id=user.id)
+        result = await svc.publish(thread_id, body.target_workspace_id, actor_user_id=user.id)
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _PublishResponse(
         new_thread_id=result.new_thread_id,
         source_thread_id=result.source_thread_id,
@@ -80,9 +79,22 @@ def publish_thread(
 
 
 @router.get("/{thread_id}/publish-history", response_model=dict)
-def publish_history(
+async def publish_history(
     thread_id: str,
+    request: Request,
     user: AuthUser = Depends(require_user),
     svc: PublishService = Depends(_dep_service),
 ) -> dict:
-    return {"events": [e.__dict__ for e in svc.history(thread_id)]}
+    _ = request
+    events = await svc.history(thread_id)
+    return {
+        "events": [
+            {
+                "new_thread_id": e.new_thread_id,
+                "target_workspace_id": e.target_workspace_id,
+                "actor_user_id": e.actor_user_id,
+                "at": e.at,
+            }
+            for e in events
+        ]
+    }
