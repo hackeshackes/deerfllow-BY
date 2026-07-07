@@ -785,6 +785,43 @@ export interface Translations {
     automation: string;
   };
 
+  // Canvas workflows — v1.6.x
+  canvasWorkflows: {
+    listTitle: string;
+    listDescription: string;
+    newWorkflow: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    createButton: string;
+    errorTitle: string;
+    versionLabel: string;
+    statusLabel: string;
+    nameLabel: string;
+    namePlaceholder: string;
+    workspaceLabel: string;
+    createTitle: string;
+    createDescription: string;
+    createSubmit: string;
+    createCancel: string;
+    createError: string;
+    editTitle: string;
+    detailTitle: string;
+    backToList: string;
+    notFound: string;
+    saveChanges: string;
+    savingChanges: string;
+    savedAt: string;
+    run: string;
+    running: string;
+    runResult: string;
+    runInputs: string;
+    runError: string;
+    quotaExceeded: string;
+    inspectorTitle: string;
+    selectNodeHint: string;
+    noNodes: string;
+  };
+
   // All
   all: string;
 
