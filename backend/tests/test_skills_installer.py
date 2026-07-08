@@ -196,7 +196,9 @@ class TestInstallSkillFromArchive:
             install_skill_from_archive(zip_path, skills_root=skills_root)
 
     def test_invalid_extension(self, tmp_path):
-        bad_path = tmp_path / "bad.zip"
+        # An extension that the installer doesn't whitelist (.skill /
+        # .zip / .tar.gz) should be rejected before any zipfile work.
+        bad_path = tmp_path / "bad.txt"
         bad_path.write_text("not a skill")
         with pytest.raises(ValueError, match=".skill"):
             install_skill_from_archive(bad_path)

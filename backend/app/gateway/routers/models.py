@@ -124,6 +124,10 @@ def _persist_and_reload(data: dict[str, Any]):
 
 def _model_to_response(model: ModelConfig, *, is_default: bool = False, include_sensitive: bool = False) -> ModelResponse:
     api_key = model.api_key
+    # `enabled` is not declared on ModelConfig (it lives in extra=allow territory
+    # so admins can flip a model off without redeploying). Use getattr so the
+    # missing-attribute case defaults to True rather than blowing up.
+    enabled = getattr(model, "enabled", None)
     return ModelResponse(
         name=model.name,
         model=model.model,
@@ -144,7 +148,7 @@ def _model_to_response(model: ModelConfig, *, is_default: bool = False, include_
         output_version=model.output_version,
         thinking=model.thinking,
         when_thinking_enabled=model.when_thinking_enabled,
-        enabled=bool(model.enabled) if model.enabled is not None else True,
+        enabled=bool(enabled) if enabled is not None else True,
         is_default=is_default,
         capabilities=model.capabilities,
     )

@@ -16,7 +16,8 @@ class ModelConfig(BaseModel):
     api_key: str | None = Field(default=None, description="API key or secret reference")
     request_timeout: int = Field(default=120, description="Request timeout in seconds")
     max_retries: int = Field(default=3, description="Maximum number of retries")
-    max_tokens: int = Field(default=8192, description="Maximum tokens to generate")
+    max_tokens: int | None = Field(default=8192, description="Maximum tokens to generate")
+    temperature: float | None = Field(default=None, description="Sampling temperature")
     model_config = ConfigDict(extra="allow")
     use_responses_api: bool | None = Field(
         default=None,
