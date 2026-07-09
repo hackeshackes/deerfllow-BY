@@ -67,3 +67,11 @@ class InMemoryWorkflowStore:
 
     def delete(self, workflow_id: str) -> None:
         self._by_id.pop(workflow_id, None)
+
+    def close(self) -> None:
+        """Release the underlying resources.
+
+        Process-local; no-op. Provided so callers do not have to branch
+        on the store backend when the production setup uses the
+        SQLite-backed variant.
+        """

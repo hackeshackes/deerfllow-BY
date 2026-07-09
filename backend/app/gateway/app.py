@@ -91,6 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # show an empty list, which is the right behavior for dev environments.
     try:
         import yaml
+
         from app.gateway.connectors.integrations.builtin import (
             register_builtin_connectors,
         )
@@ -133,7 +134,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Provides /api/admin/cost/summary, /api/admin/usage/{tenant_id},
         # and /api/admin/quota/{tenant_id} using the v1.5.8 data layer.
         try:
-            from app.gateway.multitenancy.models import ResourceQuota, QuotaPeriod
+            from app.gateway.multitenancy.models import QuotaPeriod, ResourceQuota
             from app.gateway.multitenancy.quota import QuotaService
             from app.gateway.multitenancy.routers.api import (
                 configure as configure_mt,
@@ -464,10 +465,27 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     app.include_router(comments_router)
 
-    # Canvas workflows API (v1.6.x) mounted at /api/workflows
-    from app.gateway.canvas.routers.workflows import router as canvas_router
+    # Canvas workflows API (v1.6.x) mounted at /api/workflows.
+    # Store backend is selected by MICX_CANVAS_STORE (memory | sqlite) —
+    # see ``app.gateway.canvas.store_service.get_canvas_store_and_versions``.
+    # Default memory preserves v1.6.0-canvas behaviour for cold-start.
+    from app.gateway.canvas.routers.workflows import (
+        configure as configure_canvas,
+    )
+    from app.gateway.canvas.routers.workflows import (
+        router as canvas_router,
+    )
+    from app.gateway.canvas.store_service import get_canvas_store_and_versions
 
+    wstore, vstore = get_canvas_store_and_versions()
+    # VersionManager wraps both stores; without wiring it here, the
+    # router would 503 on the first create/rollback attempt.
+    from app.gateway.canvas.versions import VersionManager
+
+    configure_canvas(wstore, VersionManager(wstore, vstore))
     app.include_router(canvas_router)
+    app.state.canvas_store = wstore
+    app.state.canvas_version_store = vstore
     # Wire a singleton store for the app's lifetime. Backend selected
     # by MICX_COMMENTS_STORE env (memory | sqlite). Tests can still
     # swap this out via app.state.comments_store before the first

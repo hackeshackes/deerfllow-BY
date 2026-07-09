@@ -69,6 +69,13 @@ class InMemoryVersionStore:
                 return v
         return None
 
+    def close(self) -> None:
+        """Release the underlying resources.
+
+        Process-local; no-op. Mirrors the SQLite-backed variant so the
+        application can shut the canvas store down uniformly.
+        """
+
 
 class VersionManager:
     def __init__(self, store: WorkflowStore, versions: VersionStore) -> None:

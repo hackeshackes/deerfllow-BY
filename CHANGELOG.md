@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### 画布持久化(v1.6.1 follow-up)
+- `backend/app/gateway/canvas/persistence/sqlite_store.py` — `SqliteWorkflowStore` + `SqliteVersionStore`,文件级 SQLite 双表(`workflows` / `workflow_versions`),与 `InMemoryWorkflowStore` 同 Protocol 契约(upsert 自增 version + 刷 `updated_at`、list 按 workspace_id)
+- `backend/app/gateway/canvas/store_service.py` — 工厂 `get_canvas_store_and_versions()`,读 `MICX_CANVAS_STORE=memory|sqlite` 与 `MICX_CANVAS_DB`
+- `InMemoryWorkflowStore.close()` / `InMemoryVersionStore.close()` 加 no-op `close()`,统一 backend 切换时的清理调用
+- `app/gateway/app.py` lifespan 用工厂装配 `canvas_store` + `VersionManager` 并 `configure_canvas(...)`,修复 v1.6.0-canvas 里路由未实际注 store 的 503 缺口;`app.state.canvas_store` 暴露给管理脚本
+- 测试:`test_canvas_sqlite_store.py`(9 用例,upsert/versioning/persistence-across-instances/工厂切换)+ `test_canvas_lifespan_sqlite.py`(1 用例,端到端 router wiring + 落盘 round-trip)
+
+### Changed
+
+- `app/gateway/app.py` — canvas router 现在通过 `configure_canvas()` 注入 store(原来只 `include_router` 没注,生产会 503);通过 `MICX_CANVAS_STORE=sqlite` 可启用持久化
+
 ## [1.6.0-canvas] - 2026-07-07
 
 > **范围:** v1.6.x 画布 + 协作合并工作的可视前端 + 可发版 tag(基于 `c2179510` 合并的后端 + 这一轮 3 个 commit 的前端)。
