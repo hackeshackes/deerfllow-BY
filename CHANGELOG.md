@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InMemoryWorkflowStore.close()` / `InMemoryVersionStore.close()` 加 no-op `close()`,统一 backend 切换时的清理调用
 - `app/gateway/app.py` lifespan 用工厂装配 `canvas_store` + `VersionManager` 并 `configure_canvas(...)`,修复 v1.6.0-canvas 里路由未实际注 store 的 503 缺口;`app.state.canvas_store` 暴露给管理脚本
 - 测试:`test_canvas_sqlite_store.py`(9 用例,upsert/versioning/persistence-across-instances/工厂切换)+ `test_canvas_lifespan_sqlite.py`(1 用例,端到端 router wiring + 落盘 round-trip)
+- e2e:`e2e/tests/v1.6.x-canvas.spec.ts` — 4 个 contract 测试覆盖 `/api/workflows` 的 list、POST + 自动 commit 一次、validation 422、versions endpoint。沿用 v1.5.7 spec 的 pattern(`E2E_LIVE=1` 才跑,默认 skip 不拖 CI)
 
 ### Changed
 
