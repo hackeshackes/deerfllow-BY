@@ -1,8 +1,6 @@
 """Tests for the built-in connector registration helper."""
 from __future__ import annotations
 
-import pytest
-
 from app.gateway.connectors.dingtalk.connector import DingTalkConnector
 from app.gateway.connectors.email.connector import EmailConnector
 from app.gateway.connectors.feishu.connector import FeishuConnector
@@ -94,9 +92,19 @@ def test_unknown_vendor_ignored():
     reg = ConnectorRegistry()
     register_builtin_connectors(
         registry=reg,
-        config={"slack": {"bot_token": "x"}},  # no built-in slack yet
+        config={"futurecorp": {"token": "x"}},  # not a built-in vendor
     )
     assert reg.list_names() == []
+
+
+def test_slack_vendor_is_built_in_v1_6_1():
+    """v1.6.1 Task C3: slack now has a built-in adapter."""
+    reg = ConnectorRegistry()
+    register_builtin_connectors(
+        registry=reg,
+        config={"slack": {"bot_token": "xoxb-x"}},
+    )
+    assert "slack" in reg.list_names()
 
 
 def test_partial_config_for_vendor_does_not_register():

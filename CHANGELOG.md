@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `canvas/routers/workflows.py` `/execute`:`_executor.execute(...)` 成功后 best-effort 调 `qservice.record_usage(... workflow_id=...)`,与 503 / 200 解耦,失败不阻断执行但日志告警
 - 测试:`tests/test_quota_workflow_id.py`(5 用例,3 个 tracker 单元 + 1 个 router wiring + 1 个 backward compat)
 
+### Slack 连接器(v1.6.1, Task C3)
+- `backend/app/gateway/connectors/slack/connector.py` — `SlackConnector` 实现 `BaseConnector`,outbound `chat.postMessage` + bearer auth,inbound `event_callback` → `ConnectorMessage` 只翻译 `message` 事件(过滤 `bot_message`、`reaction_added` 等),URL-verification challenge 在 `verify_challenge_event()` 单独处理(避免被误标成可执行消息),`health_check()` 用 `auth.test`
+- `backend/app/gateway/connectors/integrations/builtin.py` — 加 `slack` 分支(`bot_token`)
+- `backend/app/gateway/connectors/slack/yaml/slack.example.yaml` — 配置模板(Socket Mode 标注 P2 未实现)
+- Socket Mode(apps.connections.open + WebSocket) 标注 P2 推 v1.6.2 — spec 的明确边界
+- 测试:`tests/test_slack_connector.py`(14 用例)+ 修复 `test_connectors_builtin_registration.py` 里一个"slack 还没 builtin adapter"的过时断言(替换为真 vendor 名 + 新增 v1.6.1 测试)
+
 ### Changed
 
 - `app/gateway/app.py` — canvas router 现在通过 `configure_canvas()` 注入 store(原来只 `include_router` 没注,生产会 503);通过 `MICX_CANVAS_STORE=sqlite` 可启用持久化

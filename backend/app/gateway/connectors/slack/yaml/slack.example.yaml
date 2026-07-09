@@ -1,0 +1,13 @@
+name: slack-prod
+type: slack
+enabled: true
+credentials:
+  bot_token: xoxb-your-bot-token-here
+routes:
+  - pattern: "thread.created"
+    target:
+      channel: C1234567890
+# v1.6.1 (Task C3) — Slack connector is the HTTP-Events variant.
+# Socket Mode (apps.connections.open + WebSocket) is P2, not yet wired.
+# Webhook URL verification handshake is handled by the bridge before
+# delegating to the connector — no extra config needed here.

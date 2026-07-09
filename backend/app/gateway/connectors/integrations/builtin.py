@@ -4,14 +4,15 @@
     {
         "feishu":   {"app_id": ..., "app_secret": ...},
         "dingtalk": {"client_id": ..., "client_secret": ...},
+        "slack":    {"bot_token": ...},
         "wecom":    {"bot_id": ..., "bot_secret": ...},
         "email":    {"smtp_host": ..., "smtp_port": ..., ...},
     }
 
-Vendors that have no built-in adapter (e.g. slack) are silently skipped —
-the caller can later attach a custom adapter via `registry.register(...)`.
-A vendor whose required credentials are missing is also skipped, not raised;
-this keeps a partially-completed config from breaking startup.
+Vendors that have no built-in adapter are silently skipped — the
+caller can later attach a custom adapter via `registry.register(...)`.
+A vendor whose required credentials are missing is also skipped, not
+raised; this keeps a partially-completed config from breaking startup.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from ..dingtalk.connector import DingTalkConnector
 from ..email.connector import EmailConnector
 from ..feishu.connector import FeishuConnector
 from ..registry import ConnectorRegistry
+from ..slack.connector import SlackConnector
 from ..wecom.connector import WeComConnector
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,15 @@ def register_builtin_connectors(registry: ConnectorRegistry, config: dict) -> No
             )
         else:
             logger.warning("dingtalk config missing client_id/client_secret; skipping")
+
+    if "slack" in config:
+        # v1.6.1 (Task C3): Slack connector is HTTP-Events based;
+        # Socket Mode is P2 and not implemented.
+        c = config["slack"]
+        if c.get("bot_token"):
+            registry.register(SlackConnector(bot_token=c["bot_token"]))
+        else:
+            logger.warning("slack config missing bot_token; skipping")
 
     if "wecom" in config:
         c = config["wecom"]
