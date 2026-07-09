@@ -53,11 +53,16 @@ class QuotaService:
         tokens: int,
         rpm_bucket: str | None = None,
         ts: float | None = None,
+        workflow_id: str | None = None,
     ) -> QuotaDecision:
         """Record a request's token usage and return the quota decision.
 
         In v1.5.8 this is advisory only. The caller is expected to
         surface `decision.warnings` to the user.
+
+        v1.6.1: optionally stamp ``workflow_id`` so quota audits can
+        attribute consumption to a specific producing resource. Default
+        ``None`` preserves backward compatibility with chat-run callers.
         """
         now = ts if ts is not None else time.time()
         await self._usage.record(
@@ -66,6 +71,7 @@ class QuotaService:
             tokens=tokens,
             model="unknown",
             ts=now,
+            workflow_id=workflow_id,
         )
 
         warnings: list[str] = []
@@ -142,4 +148,35 @@ class QuotaService:
             remaining_tokens=remaining_tokens,
             remaining_rpm=remaining_rpm,
             warnings=warnings,
+        )
+
+    async def record_usage(
+        self,
+        tokens: int,
+        model: str,
+        tenant_id: str | None = None,
+        user_id: str | None = None,
+        workflow_id: str | None = None,
+    ) -> None:
+        """Record token usage WITHOUT consulting the quota decision.
+
+        v1.6.1: used by the canvas ``/execute`` route *after* a
+        workflow has actually run — the per-route decision is made by
+        ``tracker.quota_pre_check`` (synchronous) and the post-execute
+        accounting happens here. Recording without a quota decision
+        avoids the cost of recomputing the same windows twice.
+
+        ``tenant_id`` and ``user_id`` are required because this entry
+        point may be invoked from outside any HTTP-request lifecycle
+        (e.g. the canvas router, where the workspace id is the tenant
+        scope and the session user is the consumer).
+        """
+        if tenant_id is None or user_id is None:
+            raise ValueError("tenant_id and user_id are required for record_usage")
+        await self._usage.record(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            tokens=tokens,
+            model=model,
+            workflow_id=workflow_id,
         )

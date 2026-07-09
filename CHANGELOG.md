@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `app/gateway/app.py` lifespan 用工厂装配 `canvas_store` + `VersionManager` 并 `configure_canvas(...)`,修复 v1.6.0-canvas 里路由未实际注 store 的 503 缺口;`app.state.canvas_store` 暴露给管理脚本
 - 测试:`test_canvas_sqlite_store.py`(9 用例,upsert/versioning/persistence-across-instances/工厂切换)+ `test_canvas_lifespan_sqlite.py`(1 用例,端到端 router wiring + 落盘 round-trip)
 - e2e:`e2e/tests/v1.6.x-canvas.spec.ts` — 4 个 contract 测试覆盖 `/api/workflows` 的 list、POST + 自动 commit 一次、validation 422、versions endpoint。沿用 v1.5.7 spec 的 pattern(`E2E_LIVE=1` 才跑,默认 skip 不拖 CI)
+- `multitenancy/usage_tracker.py`:UsageRecord 加 `workflow_id` 反向指针;`record()` + `tokens_in_window_for_workflow()` 在 `UsageTracker` 上
+- `multitenancy/quota.py`:`check_and_record(workflow_id=...)` 转发 + 新增 `record_usage()` 单 record 入口(canvas /execute 用)
+- `canvas/routers/workflows.py` `/execute`:`_executor.execute(...)` 成功后 best-effort 调 `qservice.record_usage(... workflow_id=...)`,与 503 / 200 解耦,失败不阻断执行但日志告警
+- 测试:`tests/test_quota_workflow_id.py`(5 用例,3 个 tracker 单元 + 1 个 router wiring + 1 个 backward compat)
 
 ### Changed
 

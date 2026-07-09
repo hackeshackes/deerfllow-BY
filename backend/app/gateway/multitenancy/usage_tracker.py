@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass
 
 from .models import ResourceQuota
@@ -21,6 +21,15 @@ class UsageRecord:
     model: str
     tokens: int
     timestamp: float
+    """Optional reverse pointer to the producing resource — v1.6.1.
+
+    Set by callers that have a specific resource id (e.g. the canvas
+    router on ``/execute`` forwards the workflow id; quota audits can
+    then attribute consumption to a specific workflow instead of just
+    a tenant aggregate). Historical records written before v1.6.1
+    carry ``None``.
+    """
+    workflow_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -132,11 +141,21 @@ class InMemoryUsageTracker:
         user_id: str,
         tokens: int,
         model: str,
+        workflow_id: str | None = None,
         ts: float | None = None,
     ) -> None:
         ts = ts if ts is not None else time.time()
         async with self._lock:
-            self._records.append(UsageRecord(tenant_id, user_id, model, tokens, ts))
+            self._records.append(
+                UsageRecord(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    model=model,
+                    tokens=tokens,
+                    timestamp=ts,
+                    workflow_id=workflow_id,
+                )
+            )
             self._rpm[(tenant_id, self._minute_bucket(ts))] += 1
 
     async def tokens_in_window(
@@ -152,6 +171,30 @@ class InMemoryUsageTracker:
         """Return the request count for the current minute bucket."""
         async with self._lock:
             return self._rpm.get((tenant_id, self._minute_bucket()), 0)
+
+    async def tokens_in_window_for_workflow(
+        self,
+        tenant_id: str,
+        workflow_id: str,
+        window_start: float,
+        window_end: float,
+    ) -> int:
+        """Reverse-lookup quota consumption for a specific workflow (v1.6.1).
+
+        Filters tenant usage records down to those stamped with this
+        ``workflow_id``. Records with ``workflow_id=None`` (written
+        before v1.6.1, or by callers that don't have a workflow
+        pointer — chat runs, ad-hoc agent calls) are excluded; they
+        cannot be attributed to a specific workflow by definition.
+        """
+        async with self._lock:
+            return sum(
+                r.tokens
+                for r in self._records
+                if r.tenant_id == tenant_id
+                and r.workflow_id == workflow_id
+                and window_start <= r.timestamp < window_end
+            )
 
     async def all_records(self) -> list[UsageRecord]:
         async with self._lock:

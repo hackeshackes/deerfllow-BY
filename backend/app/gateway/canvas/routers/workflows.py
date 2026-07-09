@@ -320,6 +320,30 @@ async def execute_workflow(
         raise HTTPException(status_code=503, detail="executor not configured")
 
     execution = await _executor.execute(wf, body.inputs)
+
+    # Resource accounting (v1.6.1): stamp workflow_id on the UsageRecord
+    # so quota audits can attribute consumption to a specific workflow
+    # instead of just a tenant aggregate. We best-effort this — if the
+    # tracker refuses (e.g. concurrent quota reconfigure) we don't fail
+    # the workflow; the audit history simply misses the row.
+    if _quota_service is not None and execution.total_tokens > 0:
+        try:
+            await _quota_service.record_usage(
+                tokens=execution.total_tokens,
+                model="workflow",
+                tenant_id=body.workspace_id,
+                user_id=user.id,
+                workflow_id=workflow_id,
+            )
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "canvas execute: failed to record usage for workflow %s: %s",
+                workflow_id,
+                exc,
+            )
+
     return {
         "workflow_id": execution.workflow_id,
         "workflow_version": execution.workflow_version,
