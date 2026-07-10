@@ -8,7 +8,20 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.gateway.auth import AuthUser, require_owner_user, require_user
+from app.gateway.abac import (
+    Action,
+    OwnerOnlyPolicy,
+    Resource,
+    Subject,
+    WorkspaceMemberPolicy,
+    evaluate,
+)
+from app.gateway.auth import (
+    AuthUser,
+    list_workspaces_for_user,
+    require_owner_user,
+    require_user,
+)
 from app.gateway.canvas.executor import WorkflowExecutor
 from app.gateway.canvas.models import (
     NodeKind,
@@ -316,6 +329,36 @@ async def execute_workflow(
                     }
                 },
             )
+
+    # ABAC (v1.6.1): enforce workspace membership BEFORE the executor
+    # runs (and before we 503 on missing executor — denying a user
+    # must not leak that the gateway is not configured). OwnerOnlyPolicy
+    # short-circuits for owners; WorkspaceMemberPolicy matches members
+    # in the workflow's workspace. Deny → 403.
+    abac_subject = Subject(
+        id=user.id,
+        role=user.role,
+        attrs={
+            "workspaces": [
+                m.workspace_id for m in list_workspaces_for_user(user.id)
+            ]
+        },
+    )
+    abac_resource = Resource(
+        type="workflow", id=workflow_id, attrs={"workspace_id": wf.workspace_id}
+    )
+    abac_decision = evaluate(
+        subject=abac_subject,
+        resource=abac_resource,
+        action=Action(verb="execute"),
+        policies=(
+            OwnerOnlyPolicy(verbs=("execute",)),
+            WorkspaceMemberPolicy(verbs=("execute",)),
+        ),
+    )
+    if not abac_decision.allowed:
+        raise HTTPException(status_code=403, detail=abac_decision.reason)
+
     if _executor is None:
         raise HTTPException(status_code=503, detail="executor not configured")
 

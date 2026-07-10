@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `app/gateway/app.py` — canvas router 现在通过 `configure_canvas()` 注入 store(原来只 `include_router` 没注,生产会 503);通过 `MICX_CANVAS_STORE=sqlite` 可启用持久化
 
+### ABAC 简化版(v1.6.1 P1,完成 release notes backlog)
+
+设计与 spec §3 ABAC 简化版对齐,把 Subject / Resource / Action / AttributePolicy 当作 first-class 概念落地:取代 route 内联 `user.role == "owner"` 这种 RBAC 字符串判断,把授权数据化。
+
+- `backend/app/gateway/abac/evaluator.py` — fixed AST evaluator(`equals` / `in` / `all_of` / `any_of`)。明确**没有** `eval`/`exec` — 跟 canvas branch node 同 shape,auditable。`_resolve_path` 支持 `subject.workspaces` 这类落到 `attrs` 的回退。
+- `backend/app/gateway/abac/policies.py` — 两个 preset policy:`OwnerOnlyPolicy`(role=owner)、`WorkspaceMemberPolicy`(owner 直通或 member 的 workspace_id ∈ subject.workspaces)。
+- `backend/app/gateway/collaboration/routers/publish.py` — publish 路由走 ABAC,fail-closed。
+- `backend/app/gateway/canvas/routers/workflows.py` — execute 路由在 quota pre-check 之后、executor 之前走 ABAC,403 优先级高于 503(不泄漏 gateway 配置状态)。
+- 测试:`tests/test_abac.py`(9 用例,evaluator + policies)+ `tests/test_abac_canvas_route.py`(2 用例,canvas execute deny/allow)+ `tests/test_collab_publish.py` 加 1 个 ABAC-deny 集成测试。
+
+P2 推 v1.7+:全 policies 文件 + 前端策略编辑器 + 接入所有 route 的 thread/workflow/connector/quota。v1.5.4 RBAC v2 仍负责 owner / admin 这种粗粒度判断。
+
 ## [1.6.0-canvas] - 2026-07-07
 
 > **范围:** v1.6.x 画布 + 协作合并工作的可视前端 + 可发版 tag(基于 `c2179510` 合并的后端 + 这一轮 3 个 commit 的前端)。

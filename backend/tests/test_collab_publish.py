@@ -26,7 +26,6 @@ from app.gateway.collaboration.publish import (
     PublishService,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fake Store
 # ---------------------------------------------------------------------------
@@ -163,7 +162,7 @@ def _override_user():
     return AuthUser(
         id="u1",
         email="u@x.com",
-        role="member",
+        role="owner",  # OwnerOnlyPolicy path — bypasses workspace membership
         name="U",
         status="active",
         password_hash="x",
@@ -176,6 +175,8 @@ def test_router_post_publish_and_history_via_fake_store():
     from app.gateway.collaboration.routers.publish import (
         configure,
         reset_for_tests,
+    )
+    from app.gateway.collaboration.routers.publish import (
         router as publish_router,
     )
 
@@ -216,6 +217,8 @@ def test_router_404_when_source_thread_missing():
     from app.gateway.collaboration.routers.publish import (
         configure,
         reset_for_tests,
+    )
+    from app.gateway.collaboration.routers.publish import (
         router as publish_router,
     )
 
@@ -242,6 +245,8 @@ def test_router_503_when_service_not_configured():
     """Calling without configure() returns 503 — proves wiring is required."""
     from app.gateway.collaboration.routers.publish import (
         reset_for_tests,
+    )
+    from app.gateway.collaboration.routers.publish import (
         router as publish_router,
     )
 
@@ -256,3 +261,46 @@ def test_router_503_when_service_not_configured():
             json={"target_workspace_id": "ws-b"},
         )
         assert resp.status_code == 503
+
+
+def test_router_abac_denies_member_when_workspace_membership_empty():
+    """v1.6.1: ABAC evaluates before the service runs. A 'member'
+    user with no workspace membership is denied (no policy matches)."""
+    from app.gateway.collaboration.routers.publish import (
+        configure,
+        reset_for_tests,
+    )
+    from app.gateway.collaboration.routers.publish import (
+        router as publish_router,
+    )
+
+    fake = _FakeStore()
+    _seed_thread(fake, "A")
+    configure(PublishService(store=fake))
+
+    def member_no_workspaces():
+        return AuthUser(
+            id="u2",
+            email="u2@x.com",
+            role="member",  # not owner → WorkspaceMemberPolicy must allow
+            name="U2",
+            status="active",
+            password_hash="x",
+            salt="y",
+        )
+
+    try:
+        app = FastAPI()
+        app.include_router(publish_router)
+        app.dependency_overrides[require_user] = member_no_workspaces
+
+        with TestClient(app) as client:
+            resp = client.post(
+                "/api/threads/A/publish",
+                json={"target_workspace_id": "ws-b"},
+            )
+            # ABAC fail-closed → 403 before any thread lookup is done.
+            assert resp.status_code == 403, resp.text
+            assert "no matching policy" in resp.text
+    finally:
+        reset_for_tests()
