@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.1-canvas-released] - 2026-07-10
+
+> **范围:** v1.6.0-canvas release notes 列出的全部 4 个 P1 backlog 一次性收口。Single PR,5 commits,5 个独立 scope。Tag 指向 `c2db039e`(`fix/v1.6.1-canvas-sqlite` 分支 HEAD)。
 
 ### Added
 
-#### 画布持久化(v1.6.1 follow-up)
+#### 画布持久化
 - `backend/app/gateway/canvas/persistence/sqlite_store.py` — `SqliteWorkflowStore` + `SqliteVersionStore`,文件级 SQLite 双表(`workflows` / `workflow_versions`),与 `InMemoryWorkflowStore` 同 Protocol 契约(upsert 自增 version + 刷 `updated_at`、list 按 workspace_id)
 - `backend/app/gateway/canvas/store_service.py` — 工厂 `get_canvas_store_and_versions()`,读 `MICX_CANVAS_STORE=memory|sqlite` 与 `MICX_CANVAS_DB`
 - `InMemoryWorkflowStore.close()` / `InMemoryVersionStore.close()` 加 no-op `close()`,统一 backend 切换时的清理调用
