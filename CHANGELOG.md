@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Slack webhook signing-secret verification(HMAC v0,v1.6.1 P0 follow-up)
+- `backend/app/gateway/connectors/slack/signing.py` — `verify_slack_signature(...)` + `SlackSignatureVerifier` 类,验 v0=`hmac_sha256(signing_secret, "v0=" + ts + ":" + body)` + 5-minute replay defense;URL-verification 不验签(slack 协议)
+- `backend/app/gateway/connectors/slack/routers/events.py` — `POST /api/connectors/slack/events`:URL 验证回 200 plain text challenge,签名错/未配置 secret/stale timestamp 全部 401
+- 测试:`tests/test_slack_signature_verification.py`(15 用例,9 verifier 单元 + 6 endpoint 集成)
+
+`v1.6.1-canvas-released` 已知缺口 "Slack webhook signing-secret verification" 闭合。
+
 ## [1.6.1-canvas-released] - 2026-07-10
 
 > **范围:** v1.6.0-canvas release notes 列出的全部 4 个 P1 backlog 一次性收口。Single PR,5 commits,5 个独立 scope。Tag 指向 `c2db039e`(`fix/v1.6.1-canvas-sqlite` 分支 HEAD)。
