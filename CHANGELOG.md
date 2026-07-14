@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 `v1.6.1-canvas-released` 已知缺口 "Slack webhook signing-secret verification" 闭合。
 
+### workflow_executions SQLite 表(v1.6.1 follow-up,3 表 schema 收口)
+- `backend/app/gateway/canvas/persistence/sqlite_store.py` 加第三张表 `workflow_executions` + `SqliteExecutionStore` + `ExecutionRecord` dataclass
+- `backend/app/gateway/canvas/store_service.py` 加 `get_canvas_execution_store()` 工厂(纯 opt-in,只有 sqlite backend 才存在)
+- `backend/app/gateway/canvas/routers/workflows.py` 加 `GET /api/workflows/{id}/executions` 端点(best-effort,memory backend 返回 `[]`)
+- canvas `/execute` 在 executor 返回后 best-effort 持久化 execution 行(失败仅 log,不阻断业务)
+- `backend/app/gateway/app.py` lifespan 在 `MICX_CANVAS_STORE=sqlite` 时挂上 `app.state.canvas_execution_store`
+- 测试:`tests/test_canvas_executions_sqlite.py`(11 用例,含跨进程 subprocess 持久化验证)
+
+`v1.6.2 backlog` 中的 "`workflow_executions` SQLite table" 一项闭合。
+
 ## [1.6.1-canvas-released] - 2026-07-10
 
 > **范围:** v1.6.0-canvas release notes 列出的全部 4 个 P1 backlog 一次性收口。Single PR,5 commits,5 个独立 scope。Tag 指向 `c2db039e`(`fix/v1.6.1-canvas-sqlite` 分支 HEAD)。

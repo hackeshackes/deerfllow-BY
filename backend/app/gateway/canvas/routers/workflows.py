@@ -5,7 +5,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.gateway.abac import (
@@ -287,6 +287,83 @@ def rollback(
     return _to_response(restored)
 
 
+def _persist_execution(*, request, execution_id, execution):
+    """Best-effort persist of a WorkflowExecution into the
+    workflow_executions SQLite table. Failures are logged but never
+    propagate — the executor's result is the contract the API owes
+    the client; the audit row is opportunistic.
+    """
+    import logging
+
+    store = getattr(request.app.state, "canvas_execution_store", None)
+    if store is None:
+        return
+    try:
+        store.save(execution_id, execution)
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "canvas execute: failed to persist execution for %s: %s",
+            execution_id,
+            exc,
+        )
+
+
+@router.get("/{workflow_id}/executions")
+async def list_executions(
+    workflow_id: str,
+    request: Request,
+    limit: int = 50,
+    user: AuthUser = Depends(require_user),
+    store: WorkflowStore = Depends(_dep_store),
+):
+    """Return the most recent executions for a workflow.
+
+    Read-only endpoint that surfaces the ``workflow_executions``
+    SQLite table (v1.6.1 follow-up). Best-effort, never 5xx: when
+    the executions table doesn't exist (memory backend, or pre-v1.6.1
+    database without the schema migration) the endpoint returns ``[]``
+    rather than failing the request — consistent with how the rest
+    of the canvas surfaces degrade gracefully without the optional
+    store.
+    """
+    if store.get(workflow_id) is None:
+        raise HTTPException(status_code=404, detail="workflow not found")
+    exec_store = getattr(request.app.state, "canvas_execution_store", None)
+    if exec_store is None:
+        return {"executions": []}
+    try:
+        records = exec_store.list(workflow_id, limit=limit)
+    except Exception:
+        return {"executions": []}
+    return {
+        "executions": [
+            {
+                "execution_id": r.execution_id,
+                "workflow_id": r.workflow_id,
+                "workflow_version": r.workflow_version,
+                "status": r.status,
+                "started_at": r.started_at.isoformat(),
+                "ended_at": r.ended_at.isoformat(),
+                "total_tokens": r.total_tokens,
+                "failed_node_id": r.failed_node_id,
+                "error": r.error,
+                "steps": [
+                    {
+                        "node_id": s.node_id,
+                        "status": s.status,
+                        "started_at": s.started_at.isoformat(),
+                        "ended_at": s.ended_at.isoformat(),
+                        "outputs": dict(s.outputs),
+                        "error": s.error,
+                    }
+                    for s in r.steps
+                ],
+            }
+            for r in records
+        ]
+    }
+
+
 class _ExecuteBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     inputs: dict[str, Any] = Field(default_factory=dict)
@@ -301,6 +378,7 @@ class _ExecuteBody(BaseModel):
 async def execute_workflow(
     workflow_id: str,
     body: _ExecuteBody,
+    request: Request,
     user: AuthUser = Depends(require_user),
     store: WorkflowStore = Depends(_dep_store),
 ):
@@ -363,6 +441,15 @@ async def execute_workflow(
         raise HTTPException(status_code=503, detail="executor not configured")
 
     execution = await _executor.execute(wf, body.inputs)
+
+    # v1.6.1 follow-up: persist each execution in the
+    # ``workflow_executions`` SQLite table when configured. Best-effort;
+    # memory backend or pre-v1.6.1 store silently degrades.
+    _persist_execution(
+        request=request,
+        execution_id=workflow_id,  # using workflow_id; UI can sub in run-uuid later
+        execution=execution,
+    )
 
     # Resource accounting (v1.6.1): stamp workflow_id on the UsageRecord
     # so quota audits can attribute consumption to a specific workflow

@@ -485,6 +485,12 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     configure_canvas(wstore, VersionManager(wstore, vstore))
     app.include_router(canvas_router)
     app.state.canvas_store = wstore
+    # v1.6.1 follow-up: execution-history store. None under memory
+    # backend; the canvas router degrades to "executions: []" if
+    # the attr is missing.
+    from app.gateway.canvas.store_service import get_canvas_execution_store
+
+    app.state.canvas_execution_store = get_canvas_execution_store()
     app.state.canvas_version_store = vstore
     # Wire a singleton store for the app's lifetime. Backend selected
     # by MICX_COMMENTS_STORE env (memory | sqlite). Tests can still

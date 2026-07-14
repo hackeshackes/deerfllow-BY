@@ -35,6 +35,7 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
+from ..executor import ExecutionStep, WorkflowExecution
 from ..models import NodeKind, Workflow, WorkflowEdge, WorkflowNode, WorkflowStatus
 from ..store import WorkflowStore
 from ..versions import VersionStore, WorkflowVersion
@@ -63,6 +64,35 @@ CREATE INDEX IF NOT EXISTS idx_versions_workflow
     ON workflow_versions(workflow_id);
 """
 
+# v1.6.1 follow-up: per-execution history. The spec called for a
+# 3-table SQLite schema (workflows / workflow_versions /
+# workflow_executions); the third landed after the original v1.6.1
+# work. Each row is a complete ``WorkflowExecution`` snapshot so we
+# can replay / audit / debug runs without re-executing anything.
+_EXECUTION_TABLE = """
+CREATE TABLE IF NOT EXISTS workflow_executions (
+    execution_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    workflow_version INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT NOT NULL,
+    total_tokens INTEGER NOT NULL,
+    failed_node_id TEXT,
+    error TEXT,
+    steps_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_executions_workflow
+    ON workflow_executions(workflow_id, started_at DESC);
+"""
+
+_EXECUTION_STATUS_BY_FINISH = {
+    "running": "running",
+    "ok": "ok",
+    "failed": "failed",
+    "skipped": "ok",
+}
+
 
 class _SqliteBackedStore:
     """Common connection/lock/schema plumbing for canvas sqlite stores."""
@@ -76,7 +106,9 @@ class _SqliteBackedStore:
 
     def _ensure_schema(self, extra_ddl: str) -> None:
         with self._lock:
-            self._conn.executescript(_WORKFLOW_TABLE + _VERSION_TABLE + extra_ddl)
+            self._conn.executescript(
+                _WORKFLOW_TABLE + _VERSION_TABLE + _EXECUTION_TABLE + extra_ddl
+            )
             self._conn.commit()
 
     def close(self) -> None:
@@ -205,6 +237,133 @@ class SqliteVersionStore(_SqliteBackedStore, VersionStore):
         return _row_to_version(row) if row else None
 
 
+class ExecutionRecord:
+    """Public-row shape for a stored execution. The dataclass is
+    frozen so that callers passing it around cannot mutate it
+    accidentally; mutability belongs to the store.
+
+    Mirrors the public fields of ``WorkflowExecution`` plus the
+    execution_id primary key. Step records are reconstructed as
+    ``ExecutionStep`` instances so the consumer doesn't have to know
+    the JSON schema.
+    """
+
+    __slots__ = (
+        "execution_id",
+        "workflow_id",
+        "workflow_version",
+        "status",
+        "started_at",
+        "ended_at",
+        "total_tokens",
+        "failed_node_id",
+        "error",
+        "steps",
+    )
+
+    def __init__(
+        self,
+        execution_id: str,
+        workflow_id: str,
+        workflow_version: int,
+        status: str,
+        started_at: datetime,
+        ended_at: datetime,
+        total_tokens: int,
+        failed_node_id: str | None,
+        error: str | None,
+        steps: tuple[ExecutionStep, ...],
+    ) -> None:
+        self.execution_id = execution_id
+        self.workflow_id = workflow_id
+        self.workflow_version = workflow_version
+        self.status = status
+        self.started_at = started_at
+        self.ended_at = ended_at
+        self.total_tokens = total_tokens
+        self.failed_node_id = failed_node_id
+        self.error = error
+        self.steps = tuple(steps)
+
+    def __repr__(self) -> str:
+        return (
+            f"ExecutionRecord(execution_id={self.execution_id!r}, "
+            f"workflow_id={self.workflow_id!r}, status={self.status!r}, "
+            f"steps={len(self.steps)})"
+        )
+
+
+class SqliteExecutionStore(_SqliteBackedStore):
+    """Persistence for ``WorkflowExecution`` rows.
+
+    This is a sibling of ``SqliteWorkflowStore`` and
+    ``SqliteVersionStore`` but does not implement a Protocol in the
+    canvas domain — at the time of writing only the canvas router
+    reads execution history, and it does so via the app.state
+    hookup (same pattern as canvas_store / canvas_version_store). A
+    dedicated Protocol can be added if other surfaces (e.g. an admin
+    audit view) consume it.
+    """
+
+    def __init__(self, db_path: str) -> None:
+        super().__init__(db_path)
+
+    def save(self, execution_id: str, execution: WorkflowExecution) -> None:
+        if not execution_id:
+            raise ValueError("execution_id must be a non-empty string")
+        status = _execution_status(execution)
+        steps_payload = json.dumps(
+            [_serialize_step(s) for s in execution.steps]
+        )
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO workflow_executions
+                    (execution_id, workflow_id, workflow_version, status,
+                     started_at, ended_at, total_tokens,
+                     failed_node_id, error, steps_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    execution_id,
+                    execution.workflow_id,
+                    execution.workflow_version,
+                    status,
+                    execution.started_at.isoformat(),
+                    execution.ended_at.isoformat(),
+                    execution.total_tokens,
+                    execution.failed_node_id,
+                    _truncate_error(execution),
+                    steps_payload,
+                ),
+            )
+            self._conn.commit()
+
+    def list(self, workflow_id: str, limit: int | None = None) -> list[ExecutionRecord]:
+        with self._lock:
+            if limit is None:
+                rows = self._conn.execute(
+                    "SELECT * FROM workflow_executions WHERE workflow_id = ? "
+                    "ORDER BY started_at DESC",
+                    (workflow_id,),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT * FROM workflow_executions WHERE workflow_id = ? "
+                    "ORDER BY started_at DESC LIMIT ?",
+                    (workflow_id, int(limit)),
+                ).fetchall()
+        return [_row_to_execution(r) for r in rows]
+
+    def get(self, execution_id: str) -> ExecutionRecord | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM workflow_executions WHERE execution_id = ?",
+                (execution_id,),
+            ).fetchone()
+        return _row_to_execution(row) if row else None
+
+
 # ---- (de)serialization helpers ----
 
 
@@ -218,6 +377,30 @@ def replace_workflow(workflow: Workflow, **changes: Any) -> Workflow:
     from dataclasses import replace
 
     return replace(workflow, **changes)
+
+
+def _serialize_step(step: ExecutionStep) -> dict[str, Any]:
+    return {
+        "node_id": step.node_id,
+        "status": step.status,
+        "started_at": step.started_at.isoformat(),
+        "ended_at": step.ended_at.isoformat(),
+        "outputs": dict(step.outputs),
+        "error": step.error,
+        "metadata": dict(step.metadata),
+    }
+
+
+def _deserialize_step(data: Mapping[str, Any]) -> ExecutionStep:
+    return ExecutionStep(
+        node_id=data["node_id"],
+        status=data["status"],
+        started_at=_coerce_dt(data.get("started_at")),
+        ended_at=_coerce_dt(data.get("ended_at")),
+        outputs=dict(data.get("outputs") or {}),
+        error=data.get("error"),
+        metadata=dict(data.get("metadata") or {}),
+    )
 
 
 def _serialize_workflow(wf: Workflow) -> dict[str, Any]:
@@ -295,6 +478,37 @@ def _row_to_version(row: sqlite3.Row) -> WorkflowVersion:
         version=int(row["version"]),
         snapshot=snapshot,
         created_at=_coerce_dt(row["created_at"]),
+    )
+
+
+def _execution_status(execution: WorkflowExecution) -> str:
+    """Map a WorkflowExecution to a top-level status string."""
+    if execution.failed_node_id or any(s.status == "failed" for s in execution.steps):
+        return "failed"
+    return "ok"
+
+
+def _truncate_error(execution: WorkflowExecution) -> str | None:
+    """Pick the most informative error string off the execution, if any."""
+    for step in execution.steps:
+        if step.error:
+            return step.error
+    return None
+
+
+def _row_to_execution(row: sqlite3.Row) -> ExecutionRecord:
+    raw_steps = json.loads(row["steps_json"]) if row["steps_json"] else []
+    return ExecutionRecord(
+        execution_id=row["execution_id"],
+        workflow_id=row["workflow_id"],
+        workflow_version=int(row["workflow_version"]),
+        status=row["status"],
+        started_at=_coerce_dt(row["started_at"]),
+        ended_at=_coerce_dt(row["ended_at"]),
+        total_tokens=int(row["total_tokens"]),
+        failed_node_id=row["failed_node_id"],
+        error=row["error"],
+        steps=tuple(_deserialize_step(s) for s in raw_steps),
     )
 
 
