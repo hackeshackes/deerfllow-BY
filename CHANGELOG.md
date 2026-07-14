@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Slack webhook signing-secret verification(HMAC v0,v1.6.1 P0 follow-up)
+- `backend/app/gateway/connectors/slack/signing.py` — `verify_slack_signature(...)` + `SlackSignatureVerifier` 类,验 v0=`hmac_sha256(signing_secret, "v0=" + ts + ":" + body)` + 5-minute replay defense;URL-verification 不验签(slack 协议)
+- `backend/app/gateway/connectors/slack/routers/events.py` — `POST /api/connectors/slack/events`:URL 验证回 200 plain text challenge,签名错/未配置 secret/stale timestamp 全部 401
+- 测试:`tests/test_slack_signature_verification.py`(15 用例,9 verifier 单元 + 6 endpoint 集成)
+
+`v1.6.1-canvas-released` 已知缺口 "Slack webhook signing-secret verification" 闭合。
+
+### workflow_executions SQLite 表(v1.6.1 follow-up,3 表 schema 收口)
+- `backend/app/gateway/canvas/persistence/sqlite_store.py` 加第三张表 `workflow_executions` + `SqliteExecutionStore` + `ExecutionRecord` dataclass
+- `backend/app/gateway/canvas/store_service.py` 加 `get_canvas_execution_store()` 工厂(纯 opt-in,只有 sqlite backend 才存在)
+- `backend/app/gateway/canvas/routers/workflows.py` 加 `GET /api/workflows/{id}/executions` 端点(best-effort,memory backend 返回 `[]`)
+- canvas `/execute` 在 executor 返回后 best-effort 持久化 execution 行(失败仅 log,不阻断业务)
+- `backend/app/gateway/app.py` lifespan 在 `MICX_CANVAS_STORE=sqlite` 时挂上 `app.state.canvas_execution_store`
+- 测试:`tests/test_canvas_executions_sqlite.py`(11 用例,含跨进程 subprocess 持久化验证)
+
+`v1.6.2 backlog` 中的 "`workflow_executions` SQLite table" 一项闭合。
+
+## [1.6.1-canvas-released] - 2026-07-10
+
+> **范围:** v1.6.0-canvas release notes 列出的全部 4 个 P1 backlog 一次性收口。Single PR,5 commits,5 个独立 scope。Tag 指向 `c2db039e`(`fix/v1.6.1-canvas-sqlite` 分支 HEAD)。
+
+### Added
+
+#### 画布持久化
+- `backend/app/gateway/canvas/persistence/sqlite_store.py` — `SqliteWorkflowStore` + `SqliteVersionStore`,文件级 SQLite 双表(`workflows` / `workflow_versions`),与 `InMemoryWorkflowStore` 同 Protocol 契约(upsert 自增 version + 刷 `updated_at`、list 按 workspace_id)
+- `backend/app/gateway/canvas/store_service.py` — 工厂 `get_canvas_store_and_versions()`,读 `MICX_CANVAS_STORE=memory|sqlite` 与 `MICX_CANVAS_DB`
+- `InMemoryWorkflowStore.close()` / `InMemoryVersionStore.close()` 加 no-op `close()`,统一 backend 切换时的清理调用
+- `app/gateway/app.py` lifespan 用工厂装配 `canvas_store` + `VersionManager` 并 `configure_canvas(...)`,修复 v1.6.0-canvas 里路由未实际注 store 的 503 缺口;`app.state.canvas_store` 暴露给管理脚本
+- 测试:`test_canvas_sqlite_store.py`(9 用例,upsert/versioning/persistence-across-instances/工厂切换)+ `test_canvas_lifespan_sqlite.py`(1 用例,端到端 router wiring + 落盘 round-trip)
+- e2e:`e2e/tests/v1.6.x-canvas.spec.ts` — 4 个 contract 测试覆盖 `/api/workflows` 的 list、POST + 自动 commit 一次、validation 422、versions endpoint。沿用 v1.5.7 spec 的 pattern(`E2E_LIVE=1` 才跑,默认 skip 不拖 CI)
+- `multitenancy/usage_tracker.py`:UsageRecord 加 `workflow_id` 反向指针;`record()` + `tokens_in_window_for_workflow()` 在 `UsageTracker` 上
+- `multitenancy/quota.py`:`check_and_record(workflow_id=...)` 转发 + 新增 `record_usage()` 单 record 入口(canvas /execute 用)
+- `canvas/routers/workflows.py` `/execute`:`_executor.execute(...)` 成功后 best-effort 调 `qservice.record_usage(... workflow_id=...)`,与 503 / 200 解耦,失败不阻断执行但日志告警
+- 测试:`tests/test_quota_workflow_id.py`(5 用例,3 个 tracker 单元 + 1 个 router wiring + 1 个 backward compat)
+
+### Slack 连接器(v1.6.1, Task C3)
+- `backend/app/gateway/connectors/slack/connector.py` — `SlackConnector` 实现 `BaseConnector`,outbound `chat.postMessage` + bearer auth,inbound `event_callback` → `ConnectorMessage` 只翻译 `message` 事件(过滤 `bot_message`、`reaction_added` 等),URL-verification challenge 在 `verify_challenge_event()` 单独处理(避免被误标成可执行消息),`health_check()` 用 `auth.test`
+- `backend/app/gateway/connectors/integrations/builtin.py` — 加 `slack` 分支(`bot_token`)
+- `backend/app/gateway/connectors/slack/yaml/slack.example.yaml` — 配置模板(Socket Mode 标注 P2 未实现)
+- Socket Mode(apps.connections.open + WebSocket) 标注 P2 推 v1.6.2 — spec 的明确边界
+- 测试:`tests/test_slack_connector.py`(14 用例)+ 修复 `test_connectors_builtin_registration.py` 里一个"slack 还没 builtin adapter"的过时断言(替换为真 vendor 名 + 新增 v1.6.1 测试)
+
+### Changed
+
+- `app/gateway/app.py` — canvas router 现在通过 `configure_canvas()` 注入 store(原来只 `include_router` 没注,生产会 503);通过 `MICX_CANVAS_STORE=sqlite` 可启用持久化
+
+### ABAC 简化版(v1.6.1 P1,完成 release notes backlog)
+
+设计与 spec §3 ABAC 简化版对齐,把 Subject / Resource / Action / AttributePolicy 当作 first-class 概念落地:取代 route 内联 `user.role == "owner"` 这种 RBAC 字符串判断,把授权数据化。
+
+- `backend/app/gateway/abac/evaluator.py` — fixed AST evaluator(`equals` / `in` / `all_of` / `any_of`)。明确**没有** `eval`/`exec` — 跟 canvas branch node 同 shape,auditable。`_resolve_path` 支持 `subject.workspaces` 这类落到 `attrs` 的回退。
+- `backend/app/gateway/abac/policies.py` — 两个 preset policy:`OwnerOnlyPolicy`(role=owner)、`WorkspaceMemberPolicy`(owner 直通或 member 的 workspace_id ∈ subject.workspaces)。
+- `backend/app/gateway/collaboration/routers/publish.py` — publish 路由走 ABAC,fail-closed。
+- `backend/app/gateway/canvas/routers/workflows.py` — execute 路由在 quota pre-check 之后、executor 之前走 ABAC,403 优先级高于 503(不泄漏 gateway 配置状态)。
+- 测试:`tests/test_abac.py`(9 用例,evaluator + policies)+ `tests/test_abac_canvas_route.py`(2 用例,canvas execute deny/allow)+ `tests/test_collab_publish.py` 加 1 个 ABAC-deny 集成测试。
+
+P2 推 v1.7+:全 policies 文件 + 前端策略编辑器 + 接入所有 route 的 thread/workflow/connector/quota。v1.5.4 RBAC v2 仍负责 owner / admin 这种粗粒度判断。
+
 ## [1.6.0-canvas] - 2026-07-07
 
 > **范围:** v1.6.x 画布 + 协作合并工作的可视前端 + 可发版 tag(基于 `c2179510` 合并的后端 + 这一轮 3 个 commit 的前端)。
