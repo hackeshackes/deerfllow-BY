@@ -16,6 +16,94 @@ class PathTraversalError(ValueError):
     """Raised when a path escapes its allowed base directory."""
 
 
+class DangerousFileTypeError(ValueError):
+    """Raised when an uploaded file uses a disallowed (executable/script) extension."""
+
+
+# Extensions that could lead to code execution if served, executed by a misconfigured
+# downstream (nginx + PHP-FPM, JSP container, .htaccess handlers), or rendered by
+# an agent tool that auto-detects MIME. We reject these regardless of content-type.
+_DANGEROUS_EXTENSIONS: frozenset[str] = frozenset({
+    # Server-side scripts
+    ".php", ".php3", ".php4", ".php5", ".php7", ".phps", ".phtml", ".phar",
+    ".jsp", ".jspx", ".asp", ".aspx", ".cer", ".asa",
+    # Native executables / shell
+    ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".cpl",
+    ".sh", ".bash", ".zsh", ".ksh", ".csh", ".fish",
+    ".ps1", ".ps2", ".psc1", ".psm1", ".vbs", ".vbe", ".jse", ".wsf", ".wsh",
+    # Python / Ruby / Perl / Node
+    ".py", ".pyc", ".pyo", ".pyz", ".pyw",
+    ".rb", ".rbw", ".pl", ".pm", ".cgi",
+    ".js", ".mjs", ".cjs",
+    # Other dangerous formats
+    ".svg",  # served as image/svg+xml can carry <script> when rendered inline
+    ".swf",
+    ".jar", ".war",
+})
+
+# Compound-suffix entries — matched against the tail of the filename so that
+# ``payload.user.ini`` is blocked even though ``Path.suffix`` only sees
+# ``.ini``. Single-dot entries belong in ``_DANGEROUS_EXTENSIONS`` instead.
+_DANGEROUS_SUFFIX_TAILS: frozenset[str] = frozenset({
+    ".user.ini",
+})
+
+# Filenames that are dangerous regardless of any suffix. These are matched
+# case-insensitively against the basename (without parent directories).
+# ``Path.suffix`` only returns the final ``.ext``, so compound entries like
+# ``.user.ini`` and bare names like ``.htaccess`` would never trigger a
+# suffix-based check. Splitting them out avoids that footgun.
+_DANGEROUS_FILENAMES: frozenset[str] = frozenset({
+    ".htaccess",
+    ".htpasswd",
+    "web.config",
+})
+
+
+def validate_upload_extension(filename: str) -> None:
+    """Reject filenames with extensions known to enable RCE/XSS when served.
+
+    Defense in depth on top of nginx content-type forcing — a misconfigured
+    reverse proxy or a downstream tool that re-serves files by extension could
+    still trigger code execution. The check is case-insensitive.
+
+    Raises:
+        DangerousFileTypeError: If the extension is on the deny list.
+    """
+    path = Path(filename)
+    basename = path.name.lower()
+
+    # 1. Bare-filename entries — config files that have no suffix at all
+    #    (``.htaccess``) or that act like config files when named bare
+    #    (``web.config``). Match by exact lowercase basename.
+    if basename in _DANGEROUS_FILENAMES:
+        raise DangerousFileTypeError(
+            f"Filename {basename!r} is not allowed for security reasons. "
+            "Server-control configuration files are blocked."
+        )
+
+    # 2. Compound-suffix entries — match any filename whose tail is on the
+    #    deny list, regardless of how many dotted segments precede it. This
+    #    covers ``payload.user.ini`` because ``Path.suffix`` would only see
+    #    ``.ini``.
+    lowered = filename.lower()
+    for dangerous in _DANGEROUS_SUFFIX_TAILS:
+        if lowered.endswith(dangerous):
+            raise DangerousFileTypeError(
+                f"File extension {dangerous!r} is not allowed for security reasons. "
+                "Server-control configuration files are blocked."
+            )
+
+    # 3. Standard suffix check — the canonical case for things like ``.php``,
+    #    ``.svg``, ``.exe``. ``Path.suffix`` returns the final dotted segment.
+    ext = path.suffix.lower()
+    if ext in _DANGEROUS_EXTENSIONS:
+        raise DangerousFileTypeError(
+            f"File extension {ext!r} is not allowed for security reasons. "
+            "Server-side scripts, executables, and active-content formats (HTML, SVG) are blocked."
+        )
+
+
 # thread_id must be alphanumeric, hyphens, underscores, or dots only.
 _SAFE_THREAD_ID = re.compile(r"^[a-zA-Z0-9._-]+$")
 

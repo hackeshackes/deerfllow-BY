@@ -4,6 +4,7 @@ import logging
 import os
 import stat
 import time
+from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -18,6 +19,7 @@ from app.gateway.ownership import (
 from deerflow.config.paths import get_paths
 from deerflow.sandbox.sandbox_provider import get_sandbox_provider
 from deerflow.uploads.manager import (
+    DangerousFileTypeError,
     PathTraversalError,
     delete_file_safe,
     enrich_file_listing,
@@ -27,6 +29,7 @@ from deerflow.uploads.manager import (
     normalize_filename,
     upload_artifact_url,
     upload_virtual_path,
+    validate_upload_extension,
 )
 from deerflow.utils.file_conversion import CONVERTIBLE_EXTENSIONS, convert_file_to_markdown
 
@@ -176,6 +179,15 @@ async def upload_files(
         except ValueError:
             logger.warning(f"Skipping file with unsafe filename: {file.filename!r}")
             continue
+
+        try:
+            validate_upload_extension(safe_filename)
+        except DangerousFileTypeError as exc:
+            logger.warning(f"Rejecting upload of dangerous file type: {safe_filename!r} ({exc})")
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type not allowed: {Path(safe_filename).suffix}",
+            )
 
         try:
             content = await file.read()
