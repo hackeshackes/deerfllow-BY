@@ -3,10 +3,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/admin/roles", tags=["rbac"])
+from app.gateway.auth import require_owner_user
+
+router = APIRouter(
+    prefix="/api/admin/roles",
+    tags=["rbac"],
+    dependencies=[Depends(require_owner_user)],
+)
 
 
 class RoleIn(BaseModel):

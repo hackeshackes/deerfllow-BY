@@ -3,13 +3,18 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import PlainTextResponse
 
+from app.gateway.auth import require_owner_user
 from ..audit.query import export_events_csv
 from ..audit.writer import get_audit_writer
 
-router = APIRouter(prefix="/api/admin/audit", tags=["audit"])
+router = APIRouter(
+    prefix="/api/admin/audit",
+    tags=["audit"],
+    dependencies=[Depends(require_owner_user)],
+)
 
 
 @router.get("/events")

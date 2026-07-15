@@ -1,9 +1,15 @@
 """SCIM admin API."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-router = APIRouter(prefix="/api/admin/scim", tags=["scim"])
+from app.gateway.auth import require_owner_user
+
+router = APIRouter(
+    prefix="/api/admin/scim",
+    tags=["scim"],
+    dependencies=[Depends(require_owner_user)],
+)
 
 # Stub state; in production, persisted in DB
 _state: dict[str, dict] = {}
