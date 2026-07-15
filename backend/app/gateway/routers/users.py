@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
@@ -161,7 +162,22 @@ def _invite_to_response(invite: InviteToken | None) -> InviteResponse | None:
     )
 
 
-def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership) -> WorkspaceResponse:
+def _mask_email(email: str) -> str:
+    """Partially mask an email address for display to non-owners.
+
+    Example: `john.doe@example.com` -> `j******e@example.com`
+    """
+    if not email or "@" not in email:
+        return email
+    local, _, domain = email.partition("@")
+    if len(local) <= 2:
+        masked_local = local[0] + "*" * max(len(local) - 1, 1)
+    else:
+        masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+    return f"{masked_local}@{domain}"
+
+
+def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership, viewer_role: str | None = None) -> WorkspaceResponse:
     workspace_dir = get_paths().workspace_dir(workspace.id)
     threads_dir = workspace_dir / "threads"
     agents_dir = workspace_dir / "agents"
@@ -170,6 +186,9 @@ def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership
     artifact_file_count = _count_files_under_many(thread_dir / "user-data" / "outputs" for thread_dir in threads_dir.iterdir() if thread_dir.is_dir()) if threads_dir.exists() else 0
     workspace_memberships = [item for item in list_workspace_memberships() if item.workspace_id == workspace.id]
     member_count = len(workspace_memberships)
+    # Only owners see raw email addresses of workspace members; everyone else
+    # gets a partially masked value to avoid PII leakage.
+    can_see_email = (viewer_role == "owner")
     members = []
     for workspace_membership in workspace_memberships:
         member_user = get_user_by_id(workspace_membership.user_id)
@@ -179,7 +198,7 @@ def _to_workspace_response(workspace: Workspace, membership: WorkspaceMembership
             {
                 "id": member_user.id,
                 "name": member_user.name,
-                "email": member_user.email,
+                "email": member_user.email if can_see_email else _mask_email(member_user.email),
                 "role": workspace_membership.role,
             }
         )
@@ -227,13 +246,32 @@ def _to_response(user: AuthUser, active_workspace_id: str | None = None) -> Sess
     )
 
 
-def _to_user_response(user: AuthUser, active_workspace_id: str | None = None) -> UserResponse:
+def _to_user_response(user: AuthUser, active_workspace_id: str | None = None, include_invite: bool = False) -> UserResponse:
     base = _to_response(user, active_workspace_id=active_workspace_id)
-    invite = _invite_to_response(get_active_invite_for_user(user.id)) if user.status == "invited" else None
+    # Only expose the invite token when the caller explicitly asks for it
+    # (i.e. just created/resent an invite). Listing users never includes the
+    # token to prevent it from leaking through logs or intermediary caches.
+    invite = (
+        _invite_to_response(get_active_invite_for_user(user.id))
+        if include_invite and user.status == "invited"
+        else None
+    )
     return UserResponse(**base.model_dump(), invite=invite)
 
 
 def _use_secure_cookie(request: Request | None = None) -> bool:
+    """Decide whether to set the session cookie with the Secure flag.
+
+    Trusts the configured deployment mode (``BY_FORCE_SECURE_COOKIE``) over the
+    incoming ``X-Forwarded-Proto`` header — the latter can be spoofed by an
+    attacker on the same network to convince the gateway that the connection
+    is HTTPS even when it isn't.
+    """
+    # Operator opt-in: require Secure regardless of header state. Recommended
+    # in any deployment that fronts the gateway with HTTPS.
+    forced = os.getenv("BY_FORCE_SECURE_COOKIE", "").lower() in {"1", "true", "yes"}
+    if forced:
+        return True
     if request is not None:
         forwarded_proto = request.headers.get("x-forwarded-proto", "")
         if forwarded_proto.lower() == "https":
@@ -328,22 +366,31 @@ async def get_users(
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
-async def create_user_endpoint(body: UserCreateRequest, request: Request) -> UserResponse:
+async def create_user_endpoint(
+    body: UserCreateRequest,
+    request: Request,
+    include_invite: bool = Query(default=False, description="If true, returns the activation token in the invite field. Defaults to false to avoid leaking the token via logs."),
+) -> UserResponse:
     actor = require_owner_user(request)
     user = create_user(body.email, role=body.role, name=body.name, status="invited")
     issue_invite_token(user.id)
     append_admin_audit_record("user.created", actor_id=actor.id, target=user.id, details={"email": user.email, "role": user.role})
-    return _to_user_response(user)
+    return _to_user_response(user, include_invite=include_invite)
 
 
 @router.post("/users/{user_id}/invite", response_model=UserResponse)
-async def resend_invite_endpoint(user_id: str, body: UserInviteRequest, request: Request) -> UserResponse:
+async def resend_invite_endpoint(
+    user_id: str,
+    body: UserInviteRequest,
+    request: Request,
+    include_invite: bool = Query(default=False, description="If true, returns the activation token in the invite field. Defaults to false to avoid leaking the token via logs."),
+) -> UserResponse:
     actor = require_owner_user(request)
     user = update_user(user_id, status="invited")
     issue_invite_token(user.id, expires_in_hours=body.expires_in_hours)
     refreshed = get_user_by_email(user.email) or user
     append_admin_audit_record("user.reinvited", actor_id=actor.id, target=user.id, details={"expires_in_hours": body.expires_in_hours})
-    return _to_user_response(refreshed)
+    return _to_user_response(refreshed, include_invite=include_invite)
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
@@ -379,7 +426,7 @@ async def get_workspaces(request: Request) -> WorkspacesListResponse:
         workspaces = []
         for workspace in list_workspaces():
             membership = get_workspace_membership(user.id, workspace.id) or WorkspaceMembership(workspace_id=workspace.id, user_id=user.id, role="owner")
-            workspaces.append(_to_workspace_response(workspace, membership))
+            workspaces.append(_to_workspace_response(workspace, membership, viewer_role=user.role))
         return WorkspacesListResponse(workspaces=workspaces)
 
     memberships = list_workspaces_for_user(user.id)
@@ -387,7 +434,7 @@ async def get_workspaces(request: Request) -> WorkspacesListResponse:
     for membership in memberships:
         workspace = get_workspace_by_id(membership.workspace_id)
         if workspace is not None:
-            workspaces.append(_to_workspace_response(workspace, membership))
+            workspaces.append(_to_workspace_response(workspace, membership, viewer_role=user.role))
     return WorkspacesListResponse(workspaces=workspaces)
 
 
@@ -397,7 +444,7 @@ async def create_workspace_endpoint(body: WorkspaceCreateRequest, request: Reque
     workspace = create_workspace(body.name, actor.id)
     membership = get_workspace_membership(actor.id, workspace.id)
     append_admin_audit_record("workspace.created", actor_id=actor.id, target=workspace.id, details={"name": workspace.name})
-    return _to_workspace_response(workspace, membership)
+    return _to_workspace_response(workspace, membership, viewer_role=actor.role)
 
 
 @router.post("/workspaces/{workspace_id}/members", response_model=WorkspaceResponse)
@@ -406,7 +453,7 @@ async def add_workspace_member_endpoint(workspace_id: str, body: WorkspaceMember
     membership = add_workspace_member(workspace_id, body.user_id, role=body.role)
     workspace = get_workspace_by_id(workspace_id)
     append_admin_audit_record("workspace.member_added", actor_id=actor.id, target=workspace_id, details={"user_id": body.user_id, "role": body.role})
-    return _to_workspace_response(workspace, membership)
+    return _to_workspace_response(workspace, membership, viewer_role=actor.role)
 
 
 @router.patch("/workspaces/{workspace_id}", response_model=WorkspaceResponse)
@@ -415,7 +462,7 @@ async def update_workspace_endpoint(workspace_id: str, body: WorkspaceUpdateRequ
     workspace = update_workspace(workspace_id, name=body.name)
     membership = get_workspace_membership(actor.id, workspace.id)
     append_admin_audit_record("workspace.updated", actor_id=actor.id, target=workspace_id, details={"name": workspace.name})
-    return _to_workspace_response(workspace, membership)
+    return _to_workspace_response(workspace, membership, viewer_role=actor.role)
 
 
 @router.delete("/workspaces/{workspace_id}", response_model=WorkspaceDeleteResponse)
@@ -435,7 +482,7 @@ async def remove_workspace_member_endpoint(workspace_id: str, user_id: str, requ
         raise HTTPException(status_code=404, detail="未找到该空间")
     append_admin_audit_record("workspace.member_removed", actor_id=actor.id, target=workspace_id, details={"user_id": removed.user_id})
     membership = get_workspace_membership(actor.id, workspace_id)
-    return _to_workspace_response(workspace, membership)
+    return _to_workspace_response(workspace, membership, viewer_role=actor.role)
 
 
 @router.post("/session/workspace", response_model=SessionUserResponse)
