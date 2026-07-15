@@ -17,7 +17,19 @@ export type AuthSession = {
 };
 
 function authSecret() {
-  return env.BETTER_AUTH_SECRET ?? "by-local-dev-secret";
+  const configured = env.BETTER_AUTH_SECRET;
+  if (!configured) {
+    if (process.env.NODE_ENV !== "production" && process.env.BY_ALLOW_DEV_AUTH_SECRET === "1") {
+      return "by-local-dev-secret";
+    }
+    throw new Error(
+      "BETTER_AUTH_SECRET environment variable is required. Set it to a 32+ char random value.",
+    );
+  }
+  if (configured === "by-local-dev-secret" && process.env.NODE_ENV === "production") {
+    throw new Error("BETTER_AUTH_SECRET must not be the well-known development default in production.");
+  }
+  return configured;
 }
 
 function encodeBase64Url(value: Uint8Array) {

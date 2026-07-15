@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 from threading import Lock
@@ -10,10 +11,14 @@ from typing import TYPE_CHECKING
 
 from deerflow.config.paths import get_paths
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from cryptography.fernet import Fernet
 
 SECRET_REF_PREFIX = "secret://"
+_DEV_AUTH_SECRET = "by-local-dev-secret"
+_ENV_FLAG_DEV_ALLOWED = "BY_ALLOW_DEV_AUTH_SECRET"
 _secret_lock = Lock()
 
 
@@ -25,12 +30,41 @@ def _secret_key_name(ref_key: str) -> str:
     return ref_key.removeprefix(SECRET_REF_PREFIX)
 
 
+def _is_dev_secret_allowed() -> bool:
+    """Mirror of app.gateway.auth._is_dev_secret_allowed.
+
+    Production must never use the dev default; otherwise the Fernet vault
+    becomes decryptable by anyone who knows the well-known string.
+    """
+    if os.getenv("ENV", "").lower() == "production":
+        return False
+    return os.getenv(_ENV_FLAG_DEV_ALLOWED, "").lower() in {"1", "true", "yes"}
+
+
 def _vault_cipher() -> Fernet:
     try:
         from cryptography.fernet import Fernet
     except ModuleNotFoundError as exc:
         raise RuntimeError("cryptography is required for admin secret storage. Install backend dependencies first.") from exc
-    raw_secret = os.getenv("MICX_ADMIN_SECRET_KEY") or os.getenv("BETTER_AUTH_SECRET") or "by-local-dev-secret"
+    raw_secret = os.getenv("MICX_ADMIN_SECRET_KEY") or os.getenv("BETTER_AUTH_SECRET")
+    if not raw_secret:
+        if _is_dev_secret_allowed():
+            logger.warning(
+                "MICX_ADMIN_SECRET_KEY and BETTER_AUTH_SECRET are unset; using development fallback for the admin vault. "
+                "This is insecure and only allowed when BY_ALLOW_DEV_AUTH_SECRET=1 is set outside of production."
+            )
+            raw_secret = _DEV_AUTH_SECRET
+        else:
+            raise RuntimeError(
+                "MICX_ADMIN_SECRET_KEY (or BETTER_AUTH_SECRET) is required to encrypt the admin vault. "
+                "Generate a strong secret (e.g. `openssl rand -base64 32`) before starting the server."
+            )
+    elif raw_secret == _DEV_AUTH_SECRET and not _is_dev_secret_allowed():
+        raise RuntimeError(
+            "MICX_ADMIN_SECRET_KEY/BETTER_AUTH_SECRET is set to the well-known development default. "
+            "Generate a strong secret and update the environment. "
+            "To keep the dev default, set BY_ALLOW_DEV_AUTH_SECRET=1."
+        )
     derived = hashlib.sha256(raw_secret.encode("utf-8")).digest()
     return Fernet(base64.urlsafe_b64encode(derived))
 

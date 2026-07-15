@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -11,6 +12,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException, Request
 
@@ -64,8 +67,40 @@ class InviteToken:
     created_at: str
 
 
+_DEV_AUTH_SECRET = "by-local-dev-secret"
+_ENV_FLAG_DEV_ALLOWED = "BY_ALLOW_DEV_AUTH_SECRET"
+
+
+def _is_dev_secret_allowed() -> bool:
+    """Dev-only escape hatch. Returns True only when explicitly opted in.
+
+    Never allow the development default secret when ENV is "production".
+    """
+    if os.getenv("ENV", "").lower() == "production":
+        return False
+    return os.getenv(_ENV_FLAG_DEV_ALLOWED, "").lower() in {"1", "true", "yes"}
+
+
 def _auth_secret() -> str:
-    return os.getenv("BETTER_AUTH_SECRET") or "by-local-dev-secret"
+    secret = os.getenv("BETTER_AUTH_SECRET")
+    if not secret:
+        if _is_dev_secret_allowed():
+            logger.warning(
+                "BETTER_AUTH_SECRET is unset; using development fallback. "
+                "Set the environment variable or unset BY_ALLOW_DEV_AUTH_SECRET for stricter behavior."
+            )
+            return _DEV_AUTH_SECRET
+        raise RuntimeError(
+            "BETTER_AUTH_SECRET environment variable is required. "
+            "Set it to a 32+ char random value before starting the server."
+        )
+    if secret == _DEV_AUTH_SECRET and not _is_dev_secret_allowed():
+        raise RuntimeError(
+            "BETTER_AUTH_SECRET is set to the well-known development default. "
+            "Generate a strong secret (e.g. `openssl rand -base64 32`) and update the environment. "
+            "To keep the dev default, set BY_ALLOW_DEV_AUTH_SECRET=1."
+        )
+    return secret
 
 
 def _users_file():
