@@ -1,15 +1,231 @@
 from __future__ import annotations
 
 import json
+from enum import StrEnum
 from threading import Lock
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from deerflow.admin.secrets import is_secret_ref, mask_secret_value, upsert_secret
 from deerflow.config.paths import get_paths
 
 _config_lock = Lock()
 _cached_config: AdminConfig | None = None
+
+
+class ModelVendor(StrEnum):
+    """Catalog of supported model vendors.
+
+    Adding a new vendor here is intentionally additive: existing configs that
+    do not declare a vendor default to ``ModelVendor.OPENAI_COMPATIBLE`` so the
+    field stays backwards compatible with the pre-hardening configs.
+    """
+
+    OPENAI = "openai"
+    OPENAI_COMPATIBLE = "openai_compatible"
+    AZURE_OPENAI = "azure_openai"
+    ANTHROPIC = "anthropic"
+    GOOGLE = "google"
+    MISTRAL = "mistral"
+    DEEPSEEK = "deepseek"
+    QWEN = "qwen"
+    VOLCENGINE = "volcengine"
+    ALIYUN = "aliyun"
+    MOONSHOT = "moonshot"
+    CODEX = "codex"  # ChatGPT Codex Responses API
+    VLLM = "vllm"  # OpenAI-compatible self-hosted
+
+
+VendorName = Literal[
+    "openai",
+    "openai_compatible",
+    "azure_openai",
+    "anthropic",
+    "google",
+    "mistral",
+    "deepseek",
+    "qwen",
+    "volcengine",
+    "aliyun",
+    "moonshot",
+    "codex",
+    "vllm",
+]
+
+
+class ModelCapability(BaseModel):
+    """Boolean flags advertising what a model can do.
+
+    Each flag corresponds to a runtime capability checked by the agent router
+    before invoking the underlying provider. The flags are derived from the
+    vendor's published model card at registration time and may be overridden
+    per-model.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: bool = True
+    vision: bool = False
+    audio_in: bool = False
+    audio_out: bool = False
+    video_in: bool = False
+    tool_use: bool = True
+    parallel_tool_use: bool = False
+    structured_output: bool = True
+    json_schema: bool = False
+    prompt_caching: bool = False  # Anthropic-style 5m/1h cache_control
+    prompt_cache_key: bool = False  # allow per-cache-key routing
+    web_search: bool = False
+    computer_use: bool = False
+    image_generation: bool = False
+    file_search: bool = False
+    code_execution: bool = False
+    context_management: bool = False  # Anthropic context_management edits
+    thinking: bool = False  # extended thinking / reasoning tokens
+    reasoning_effort: bool = False  # OpenAI o-series reasoning_effort
+    reasoning_content: bool = False  # DeepSeek reasoning_content field
+    thought_signature: bool = False  # Google Gemini thought signatures
+    skills: bool = False  # Anthropic Skills / container skill refs
+
+
+class ThinkingConfig(BaseModel):
+    """Vendor-agnostic thinking configuration.
+
+    Each provider maps these fields onto its own request payload:
+    - Anthropic: ``thinking={"type": "enabled", "budget_tokens": N}``
+    - OpenAI o-series / Codex: ``reasoning_effort="low|medium|high"``
+    - Google Gemini: ``thinking_config.thinking_budget`` + ``include_thoughts``
+    - DeepSeek: ``reasoning_content=True``
+    - Qwen / vLLM: ``extra_body.chat_template_kwargs.enable_thinking=True``
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["enabled", "disabled", "adaptive"] = "enabled"
+    budget_tokens: int | None = Field(default=None, ge=0, le=200_000)
+    effort: Literal["minimal", "low", "medium", "high", "xhigh"] | None = None
+    include_thoughts: bool = False
+    return_reasoning: bool = True  # DeepSeek / o-series: stream reasoning_content back
+    interleave_thinking: bool = False  # Gemini: interleaved thinking
+    adaptive_budget: bool = False  # Gemini 2.5 adaptive thinking budget
+
+
+class StopSequences(BaseModel):
+    """Model-level stop sequences (provider-native)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sequences: list[str] = Field(default_factory=list, max_length=8)
+
+
+class GenerationParams(BaseModel):
+    """Generation defaults surfaced in admin UI.
+
+    Each field has a vendor fallback in ``vendor_profiles``; explicit values
+    win, falling back to provider defaults only when unset.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
+    top_k: int | None = Field(default=None, ge=1)  # Anthropic / Google / Mistral
+    max_tokens: int = Field(default=4096, ge=1)
+    stop: StopSequences = Field(default_factory=StopSequences)
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    seed: int | None = Field(default=None, ge=0)
+    response_format: Literal["text", "json_object", "json_schema"] = "text"
+    json_schema: dict[str, Any] | None = None
+    parallel_tool_calls: bool = False
+    stream_options_include_usage: bool = True
+    service_tier: Literal["auto", "default", "flex", "priority"] | None = None
+    safety_settings: list[dict[str, Any]] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class AdminModelConfig(BaseModel):
+    """Catalog entry for a single chat model.
+
+    Backwards compatible: existing fields keep their meaning; new vendor /
+    capability fields are additive and default to vendor-neutral values.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    # ── Identity ─────────────────────────────────────────────────────────────
+    name: str = Field(..., description="Model name identifier")
+    display_name: str = Field(..., description="Display name for UI")
+    description: str | None = Field(default=None, description="Model description")
+    vendor: ModelVendor = Field(
+        default=ModelVendor.OPENAI_COMPATIBLE,
+        description="Model vendor. Determines which vendor-specific fields are honored at runtime.",
+    )
+    use: str = Field(..., description="Model provider class path")
+    model: str = Field(..., description="Model name for API")
+
+    # ── Auth / endpoint ──────────────────────────────────────────────────────
+    api_key: str | None = Field(default=None, description="API key (encrypted)")
+    api_base: str | None = Field(default=None, description="API base URL")
+    api_version: str | None = Field(default=None, description="Azure / Google API version")
+    organization: str | None = Field(default=None, description="OpenAI org header")
+    project: str | None = Field(default=None, description="OpenAI project header")
+    region: str | None = Field(default=None, description="AWS region (Bedrock / Vertex routing)")
+    headers: dict[str, str] = Field(default_factory=dict, description="Extra HTTP headers")
+
+    # ── Request defaults ─────────────────────────────────────────────────────
+    request_timeout: float = Field(default=600.0, description="Request timeout in seconds")
+    max_retries: int = Field(default=2, ge=0, description="Maximum retry attempts")
+    generation: GenerationParams = Field(default_factory=GenerationParams)
+    thinking: ThinkingConfig | None = Field(default=None, description="Thinking configuration")
+
+    # ── Capability flags ─────────────────────────────────────────────────────
+    capabilities: ModelCapability = Field(default_factory=ModelCapability)
+    supports_vision: bool = Field(default=False, description="Whether model supports vision")
+    supports_thinking: bool = Field(default=False, description="Whether model supports thinking mode")
+    supports_reasoning_effort: bool = Field(default=False, description="Whether model supports reasoning effort")
+
+    # ── Routing ─────────────────────────────────────────────────────────────
+    is_default: bool = Field(default=False, description="Is this the default model")
+    enabled: bool = Field(default=True, description="Whether the model is enabled")
+    tier: Literal["primary", "secondary", "fallback"] = "primary"
+    weight: int = Field(default=100, ge=1, le=1000, description="Routing weight for fallback pools")
+    cost_per_1k_input: float | None = Field(default=None, ge=0)
+    cost_per_1k_output: float | None = Field(default=None, ge=0)
+    context_window: int | None = Field(default=None, ge=1, description="Max context tokens")
+
+    # ── Vendor-specific flags (mapped onto provider kwargs) ───────────────────
+    use_responses_api: bool = Field(default=False, description="Use OpenAI Responses API")
+    use_chat_completions: bool = Field(default=False, description="Use OpenAI Chat Completions API explicitly")
+    output_version: str | None = Field(default=None, description="Structured output version")
+    when_thinking_enabled: dict[str, Any] | None = Field(default=None, description="Settings when thinking is enabled")
+
+    # Anthropic-specific
+    anthropic_beta: list[str] = Field(
+        default_factory=list,
+        description="Anthropic beta features (e.g. prompt-caching-2024-07-31, computer-use-2024-10-22, skills-2025-01-01)",
+    )
+    prompt_cache_retention: Literal["5m", "1h"] | None = None
+    container_skills: list[str] = Field(
+        default_factory=list,
+        description="Anthropic container Skills references (skill://... or version refs)",
+    )
+
+    # Google Gemini-specific
+    gemini_safety: list[dict[str, Any]] = Field(default_factory=list)
+    gemini_thinking_budget: int | None = Field(default=None, ge=0, le=24576)
+    gemini_thinking_include: bool = False
+
+    # Qwen / vLLM-specific
+    qwen_enable_thinking: bool | None = None  # explicit override of chat_template_kwargs
+
+    # Codex Responses API
+    codex_endpoint: Literal["responses", "chat"] = "responses"
+    codex_store: bool = False
+
+    # Legacy fast-path fields kept for back-compat
+    legacy_thinking: dict[str, Any] | None = Field(default=None, exclude=True)
 
 
 class AdminTracingProviderConfig(BaseModel):
@@ -96,28 +312,6 @@ class AdminSandboxConfig(BaseModel):
     bash_output_max_chars: int = Field(default=20000, ge=0, description="Max chars for bash output")
     read_file_output_max_chars: int = Field(default=50000, ge=0, description="Max chars for read_file output")
     ls_output_max_chars: int = Field(default=20000, ge=0, description="Max chars for ls output")
-
-
-class AdminModelConfig(BaseModel):
-    name: str = Field(..., description="Model name identifier")
-    display_name: str = Field(..., description="Display name for UI")
-    description: str | None = Field(default=None, description="Model description")
-    use: str = Field(..., description="Model provider class path")
-    model: str = Field(..., description="Model name for API")
-    api_key: str | None = Field(default=None, description="API key (encrypted)")
-    api_base: str | None = Field(default=None, description="API base URL")
-    request_timeout: float = Field(default=600.0, description="Request timeout in seconds")
-    max_retries: int = Field(default=2, ge=0, description="Maximum retry attempts")
-    max_tokens: int = Field(default=4096, ge=1, description="Maximum tokens per request")
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
-    supports_vision: bool = Field(default=False, description="Whether model supports vision")
-    supports_thinking: bool = Field(default=False, description="Whether model supports thinking mode")
-    supports_reasoning_effort: bool = Field(default=False, description="Whether model supports reasoning effort")
-    is_default: bool = Field(default=False, description="Is this the default model")
-    use_responses_api: bool = Field(default=False, description="Use OpenAI Responses API")
-    output_version: str | None = Field(default=None, description="Structured output version")
-    thinking: dict | None = Field(default=None, description="Thinking configuration")
-    when_thinking_enabled: dict | None = Field(default=None, description="Settings when thinking is enabled")
 
 
 class AdminToolConfig(BaseModel):
