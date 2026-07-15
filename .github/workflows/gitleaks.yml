@@ -1,0 +1,43 @@
+name: gitleaks
+
+# Secret scanning on every push and pull request.
+# Detects API keys, passwords, tokens, and other high-entropy strings
+# committed to the repository. A detected leak fails the job.
+#
+# Triggers:
+#   - every branch or tag push
+#   - every pull request (including from forks)
+#   - manual dispatch via the Actions tab
+#
+# Coverage:
+#   - gitleaks' default ruleset (https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml)
+#   - no custom gitleaks.toml is configured in this repository
+#
+# Added during the 2026-07-15 pentest remediation to reduce the chance of
+# credentials entering Git history. See .claude/plans/pentest-remediation.plan.md.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Scan for leaked secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # The action needs history to resolve push and pull-request commit
+          # ranges, and manual dispatches scan the full repository history.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
