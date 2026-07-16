@@ -3,6 +3,7 @@ __all__ = [
     "admin_knowledge",
     "admin_memory",
     "admin_monitoring",
+    "admin_secrets",
     "admin_token_usage",
     "artifacts",
     "assistants_compat",

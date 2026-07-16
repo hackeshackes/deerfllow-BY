@@ -18,6 +18,7 @@ from app.gateway.routers import (
     admin_knowledge,
     admin_memory,
     admin_monitoring,
+    admin_secrets,
     admin_token_usage,
     agents,
     artifacts,
@@ -362,6 +363,7 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     app.include_router(admin_knowledge.router)
     app.include_router(admin_memory.router)
     app.include_router(admin_monitoring.router)
+    app.include_router(admin_secrets.router)
     app.include_router(admin_token_usage.router)
 
     # Models API is mounted at /api/models

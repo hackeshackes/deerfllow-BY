@@ -1,6 +1,19 @@
 from .audit import append_admin_audit_record, read_admin_audit_records
 from .config_store import AdminConfig, AdminConfigUpdate, get_admin_config, reload_admin_config, save_admin_config
-from .secrets import is_secret_ref, mask_secret_value, resolve_secret_ref, upsert_secret
+from .secrets import (
+    KNOWN_SECRET_KEYS,
+    KNOWN_VAULT_KEYS,
+    SECRET_REF_PREFIX,
+    delete_secret,
+    get_vault_mtime,
+    is_placeholder_value,
+    is_secret_ref,
+    mask_secret_value,
+    resolve_secret_ref,
+    rotate_env_secret,
+    rotate_vault_cipher,
+    upsert_secret,
+)
 from .skill_metadata import read_skill_metadata, upsert_skill_metadata
 from .skill_metadata_defaults import DEFAULT_SKILL_METADATA_ZH
 from .user_skill_store import (

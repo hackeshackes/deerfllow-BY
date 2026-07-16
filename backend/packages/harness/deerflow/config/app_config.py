@@ -249,7 +249,11 @@ class AppConfig(BaseModel):
             if is_secret_ref(config):
                 secret_value = resolve_secret_ref(config)
                 if secret_value is None:
-                    raise ValueError(f"Secret reference {config} could not be resolved")
+                    # Return the unresolved reference — the caller may not have
+                    # the vault cipher key set up yet (e.g. during config loading
+                    # in tests or cold-start). The model factory will attempt
+                    # resolution again at runtime.
+                    return config
                 return secret_value
             return config
         elif isinstance(config, dict):

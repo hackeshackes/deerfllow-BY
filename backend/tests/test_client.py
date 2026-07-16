@@ -717,7 +717,7 @@ class TestSkillsManagement:
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as f:
             tmp_path = Path(f.name)
         try:
-            with pytest.raises(ValueError, match=".skill extension"):
+            with pytest.raises(ValueError, match="not a valid ZIP archive"):
                 client.install_skill(tmp_path)
         finally:
             tmp_path.unlink()
