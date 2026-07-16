@@ -25,16 +25,19 @@ from app.gateway.auth import authenticate_user, require_owner_user
 from deerflow.admin import (
     KNOWN_SECRET_KEYS,
     KNOWN_VAULT_KEYS,
+    SECRETS_VAULT_ROUTABLE,
     append_admin_audit_record,
     delete_secret,
+    filter_admin_audit_records,
     get_vault_mtime,
     is_placeholder_value,
     mask_secret_value,
+    read_admin_audit_records,
     rotate_env_secret,
     rotate_vault_cipher,
     upsert_secret,
 )
-from deerflow.admin.secrets import _read_secret_map
+from deerflow.admin.secrets import _acquire_rotate_lock, _read_secret_map
 
 router = APIRouter(prefix="/api/admin", tags=["admin-secrets"])
 
@@ -102,6 +105,20 @@ class SecretStatusResponse(BaseModel):
     vault_mtime: str | None
 
 
+class AdminAuditEvent(BaseModel):
+    ts: str
+    action: str
+    actor_id: str | None
+    target: str
+    details: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
+class AdminAuditResponse(BaseModel):
+    events: list[AdminAuditEvent]
+    action_prefix: str | None
+    actor_id: str | None
+
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
@@ -138,7 +155,8 @@ def _rotate_atomic(key: str, new_value: str) -> tuple[list[str], str | None]:
        stored under the existing cipher).
 
     Both steps happen inside ``_secret_lock`` so concurrent reads do not see
-    a half-decrypted vault.
+    a half-decrypted vault. Callers that need cross-process serialization
+    wrap this in ``_acquire_rotate_lock()`` — see ``/secrets/rotate``.
     """
     cascades: list[str] = []
     if key == "MICX_ADMIN_SECRET_KEY":
@@ -255,6 +273,10 @@ async def rotate_secret_endpoint(body: SecretRotateRequest, request: Request) ->
     """Atomic rotation of an env-routable secret or vault entry.
 
     Requires ``current_admin_password`` to prevent session-hijack self-lockout.
+    Only keys in ``SECRETS_VAULT_ROUTABLE`` are accepted through this endpoint;
+    others must be rotated by editing ``.env`` and restarting. Held under an
+    exclusive cross-process lock so two gateway replicas pointing at the same
+    vault serialize instead of racing the cipher swap.
     """
     user = require_owner_user(request)
     client_ip = request.client.host if request.client else "unknown"
@@ -262,10 +284,24 @@ async def rotate_secret_endpoint(body: SecretRotateRequest, request: Request) ->
 
     _verify_owner_password(body.current_admin_password)
 
-    try:
-        cascades, reference = _rotate_atomic(body.key, body.new_value)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if body.key not in SECRETS_VAULT_ROUTABLE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"key '{body.key}' is not rotatable via this endpoint; edit .env and restart instead",
+        )
+
+    with _acquire_rotate_lock() as cross_proc:
+        if cross_proc is False:
+            # No OS lock primitive on this platform — we can't safely
+            # guarantee serialization. Refuse rather than risk corruption.
+            raise HTTPException(
+                status_code=503,
+                detail="cross-process rotate lock unavailable on this platform; restart gateway solo",
+            )
+        try:
+            cascades, reference = _rotate_atomic(body.key, body.new_value)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     append_admin_audit_record(
         "admin_secret.rotated",
@@ -317,4 +353,41 @@ async def secrets_status_endpoint(
         items=items,
         known_keys=keys,
         vault_mtime=mtime.isoformat() if mtime else None,
+    )
+
+
+@router.get("/secrets/audit-events", response_model=AdminAuditResponse)
+async def admin_audit_events_endpoint(
+    request: Request,
+    action_prefix: str | None = None,
+    actor_id: str | None = None,
+    limit: int = 200,
+) -> AdminAuditResponse:
+    """Return the recent admin audit log entries (JSONL on disk).
+
+    ``action_prefix`` lets the caller narrow to a subsystem, e.g.
+    ``admin_secret.`` to see only vault activity. ``actor_id`` filters
+    by the owner who triggered the action. ``limit`` caps the read; the
+    underlying file is the truth, so we read the tail and slice.
+    """
+    require_owner_user(request)
+
+    records = read_admin_audit_records(limit=limit)
+    filtered = filter_admin_audit_records(
+        records, action_prefix=action_prefix, actor_id=actor_id,
+    )
+    return AdminAuditResponse(
+        events=[
+            AdminAuditEvent(
+                ts=str(e.get("ts", "")),
+                action=str(e.get("action", "")),
+                actor_id=e.get("actor_id"),
+                target=str(e.get("target", "")),
+                details={k: v for k, v in (e.get("details") or {}).items()
+                         if isinstance(v, (str, int, float, bool, type(None)))},
+            )
+            for e in filtered
+        ],
+        action_prefix=action_prefix,
+        actor_id=actor_id,
     )

@@ -1,6 +1,6 @@
 "use client";
 
-import { ActivityIcon, BlocksIcon, BookOpenIcon, BrainIcon, CoinsIcon, LayoutDashboardIcon, MessageCircleIcon, MicIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
+import { ActivityIcon, BlocksIcon, BookOpenIcon, BrainIcon, CoinsIcon, KeyRoundIcon, LayoutDashboardIcon, MessageCircleIcon, MicIcon, Settings2Icon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -36,6 +36,7 @@ export function AdminPageShell({
     { href: "/workspace/admin/knowledge", label: t.workspace.knowledgeManagement, icon: BookOpenIcon },
     { href: "/workspace/admin/memory", label: t.workspace.memoryManagement, icon: BrainIcon },
     { href: "/workspace/admin/voice", label: t.workspace.voiceConfig, icon: MicIcon },
+    { href: "/workspace/admin/secrets", label: t.admin.secrets.title, icon: KeyRoundIcon },
   ];
 
   return (

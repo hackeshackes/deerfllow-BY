@@ -28,3 +28,25 @@ def read_admin_audit_records(limit: int = 200) -> list[dict[str, Any]]:
         return []
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     return list(reversed(records[-limit:]))
+
+
+def filter_admin_audit_records(
+    records: list[dict[str, Any]],
+    *,
+    action_prefix: str | None = None,
+    actor_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """In-memory filter for the small per-process audit log.
+
+    The admin audit log is a single JSONL file, so we read the tail and
+    filter in-process. Keep the predicate pure so tests can call it
+    without touching the filesystem.
+    """
+    out: list[dict[str, Any]] = []
+    for r in records:
+        if action_prefix and not r.get("action", "").startswith(action_prefix):
+            continue
+        if actor_id and r.get("actor_id") != actor_id:
+            continue
+        out.append(r)
+    return out

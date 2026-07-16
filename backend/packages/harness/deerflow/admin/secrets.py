@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import datetime as _dt
 import hashlib
 import json
@@ -9,7 +10,7 @@ import os
 import re
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from deerflow.config.paths import get_paths
 
@@ -71,6 +72,26 @@ KNOWN_VAULT_KEYS: tuple[str, ...] = (
     "models/Qwen3-5-35B-A3B-Claude-4-6-Opus-Reasoning/api_key",
     "models/MicX Service/api_key",
     "models/local-openai-placeholder/api_key",
+)
+
+
+# Catalog of keys the ``/api/admin/secrets/rotate`` endpoint will accept.
+# Anything outside this set must be rotated by editing ``.env`` (or
+# ``docker/.env``) and restarting the gateway. Vendor API keys injected
+# from MCP config stay env-only by design — those credentials are owned
+# by the connector lifecycle, not the admin vault.
+SECRETS_VAULT_ROUTABLE: frozenset[str] = frozenset(
+    {
+        # Auth / cipher — rotating these is exactly the self-lockout
+        # scenario the password re-verification on /rotate guards against.
+        "BETTER_AUTH_SECRET",
+        "MICX_ADMIN_SECRET_KEY",
+        # Production vault-routed model keys.
+        "models/dspark-v1.1-mida-brikie/api_key",
+        "models/mixh-coder/api_key",
+        "models/Qwen3-5-35B-A3B-Claude-4-6-Opus-Reasoning/api_key",
+        "models/MicX Service/api_key",
+    }
 )
 
 
@@ -201,6 +222,59 @@ def is_secret_ref(value: str | None) -> bool:
 
 def _secret_key_name(ref_key: str) -> str:
     return ref_key.removeprefix(SECRET_REF_PREFIX)
+
+
+# ---------------------------------------------------------------------------
+# Cross-process lock for atomic rotate
+# ---------------------------------------------------------------------------
+# The in-process ``_secret_lock`` guards ``upsert_secret`` /
+# ``delete_secret`` / ``_read_secret_map`` from thread races inside one
+# Python interpreter. It does NOT protect against two gateway replicas
+# pointing at the same vault — that needs an OS-level lock so the second
+# rotate blocks instead of racing the cipher swap and losing the read
+# path. Mirrors the pattern in
+# ``deerflow.community.aio_sandbox.aio_sandbox_provider``: POSIX flock
+# with a ``msvcrt`` fallback for Windows. Yields ``True`` when the OS
+# lock primitive was acquired, ``False`` otherwise (test environments
+# without ``fcntl``/``msvcrt``).
+
+
+@contextlib.contextmanager
+def _acquire_rotate_lock() -> Any:
+    """Hold an exclusive cross-process lock for the duration of a rotate.
+
+    Blocks if another process holds the lock (POSIX). On Linux this is a
+    blocking ``flock``; on Windows we use ``msvcrt.locking`` with the same
+    semantics. Yields ``True`` when the lock was acquired, ``False`` when
+    the OS doesn't expose either primitive (test environments that don't
+    have ``fcntl``/``msvcrt``) — callers should fall back to the
+    in-process ``_secret_lock`` and accept the cross-process race.
+    """
+    lock_path = _vault_path().parent / ".rotate.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_file = open(lock_path, "w", encoding="utf-8")
+    try:
+        try:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            yield True
+            return
+        except (ImportError, ModuleNotFoundError):
+            pass
+        try:
+            import msvcrt
+
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+            yield True
+            return
+        except (ImportError, ModuleNotFoundError):
+            pass
+        # No OS lock primitive available — rely on in-process serialization
+        # only. Better than failing closed in odd environments.
+        yield False
+    finally:
+        lock_file.close()
 
 
 def _is_dev_secret_allowed() -> bool:

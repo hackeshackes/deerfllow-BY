@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 `v1.6.2 backlog` 中的 "owner-only admin secrets vault" 一项闭合。
 
+### Admin secrets v1.6.2 M2 增量（多进程 + 白名单 + 审计 + 前端）
+- `backend/packages/harness/deerflow/admin/secrets.py` 加 `_acquire_rotate_lock()` 上下文管理器（POSIX `fcntl.flock` + Windows `msvcrt` 兜底，跟 `aio_sandbox_provider` 同模式），rotate 路径包一层跨进程锁防止两副本竞态 cipher swap；无 OS 原语时返回 503 拒绝而非静默损坏。`SECRETS_VAULT_ROUTABLE` 列出可走 `/secrets/rotate` 的子集（privileged + production vault keys），其他 key 一律 400 + 提示改 `.env`。
+- `backend/packages/harness/deerflow/admin/audit.py` 加 `filter_admin_audit_records(action_prefix, actor_id)` 纯函数 helper；`backend/app/gateway/routers/admin_secrets.py` 加 `GET /api/admin/secrets/audit-events`（owner-only，读 `audit.jsonl` 尾段 + 内存过滤，明文永不返回）。
+- 前端 `frontend/src/components/workspace/admin/secrets-admin-page.tsx` + `frontend/src/app/workspace/admin/secrets/page.tsx` + 两侧 `i18n` 加 `admin.secrets` 命名空间（en-US + zh-CN）+ `admin-page-shell` 导航加 KeyRoundIcon 入口。状态 / upsert / rotate / audit 四 Tab，最小可用。
+- 测试：`test_admin_secrets_xproc_lock.py`（4 用例，含双线程 acquire/release 序列、缺 OS 原语返回 false）、`test_admin_secrets_allowlist.py`（4 用例，含 400 拒绝非白名单）、`test_admin_audit_endpoint.py`（5 用例，含 owner-only / 不返回明文 / actor 过滤）。新增 13 用例，后端 admin secrets 总计 81 用例。
+- 文档：`docs/releases/v1.6.2-admin-secrets.md` 加 M2 章节；backend CLAUDE.md 端点表更新 audit-events 与白名单描述。
+
+`v1.6.2 backlog` 的 4 项 follow-up（多进程 / 白名单 / 审计表面 / 前端 UI）全部闭合。
+
 ## [1.6.1-canvas-released] - 2026-07-10
 
 > **范围:** v1.6.0-canvas release notes 列出的全部 4 个 P1 backlog 一次性收口。Single PR,5 commits,5 个独立 scope。Tag 指向 `c2db039e`(`fix/v1.6.1-canvas-sqlite` 分支 HEAD)。

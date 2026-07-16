@@ -1042,6 +1042,30 @@ export interface Translations {
       total: string;
       times: string;
     };
+    secrets: {
+      title: string;
+      description: string;
+      tabStatus: string;
+      tabUpsert: string;
+      tabRotate: string;
+      tabAudit: string;
+      statusTitle: string;
+      statusDescription: string;
+      upsertTitle: string;
+      upsertDescription: string;
+      rotateTitle: string;
+      rotateDescription: string;
+      auditTitle: string;
+      auditDescription: string;
+      auditEmpty: string;
+      loading: string;
+      keyPlaceholder: string;
+      valuePlaceholder: string;
+      passwordPlaceholder: string;
+      upsert: string;
+      rotate: string;
+      submitting: string;
+    };
     users: {
       title: string;
       description: string;
