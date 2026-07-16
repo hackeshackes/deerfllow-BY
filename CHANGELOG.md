@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 `v1.6.2 backlog` 中的 "`workflow_executions` SQLite table" 一项闭合。
 
+### Owner-only admin secrets vault (v1.6.2)
+- `backend/packages/harness/deerflow/admin/secrets.py` — `KNOWN_SECRET_KEYS` + `KNOWN_VAULT_KEYS` catalogs (mirrors `models.override.yaml` `secret://` refs), `upsert_secret` / `delete_secret` / `get_vault_mtime` / `rotate_env_secret` / `rotate_vault_cipher` / `is_placeholder_value` / `mask_secret_value`. Write path uses per-call `tempfile.mkstemp` + `Path.replace` (atomic, no fixed `.tmp` collision). Read path swallows decrypt failures so a late-bound cipher key during cold-start degrades to empty rather than 500.
+- `backend/app/gateway/routers/admin_secrets.py` — three owner-only endpoints: `POST /api/admin/secrets/upsert` (creates/replaces; `value=null` deletes), `POST /api/admin/secrets/rotate` (atomic env + vault re-encryption, gated by `current_admin_password` to prevent session-hijack self-lockout, 10 req/min/IP sliding window), `GET /api/admin/secrets/status` (missing / placeholder / fresh / configured per catalog key; `?include_all=true` adds env-only keys).
+- `backend/app/gateway/app.py` + `backend/app/gateway/routers/__init__.py` — mount the router in the existing admin cluster.
+- `backend/packages/harness/deerflow/admin/__init__.py` — re-export the new helpers so `deerflow.admin` is the single import surface for callers.
+- 测试:`tests/test_admin_secrets_api.py` (14 cases), `tests/test_admin_secrets_atomic.py` (3 cases), `tests/test_admin_secrets_helpers.py` (36 cases). 总计 53 用例覆盖 owner/member/auth、密码校验、mask、placeholder 启发式、mid-write 崩溃原子性、并发 upsert 无 OSError、cookie 失效。
+
+`v1.6.2 backlog` 中的 "owner-only admin secrets vault" 一项闭合。
+
 ## [1.6.1-canvas-released] - 2026-07-10
 
 > **范围:** v1.6.0-canvas release notes 列出的全部 4 个 P1 backlog 一次性收口。Single PR,5 commits,5 个独立 scope。Tag 指向 `c2db039e`(`fix/v1.6.1-canvas-sqlite` 分支 HEAD)。

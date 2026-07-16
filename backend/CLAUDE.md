@@ -226,6 +226,7 @@ FastAPI application on port 8001 with health check at `GET /health`.
 | **Suggestions** (`/api/threads/{id}/suggestions`) | `POST /` - generate follow-up questions; rich list/block model content is normalized before JSON parsing |
 | **Canvas Workflows** (`/api/workflows`) | `GET /` (list by `workspace_id`) / `POST /` (owner-only create) / `GET/PUT/DELETE /{id}` / `GET /{id}/versions` / `POST /{id}/rollback/{version}` / `POST /{id}/execute` (quota pre-check + workspace isolation); see `app/gateway/canvas/` |
 | **Canvas Publish** (`/api/threads/{id}`) | `POST /publish` (cross-workspace copy of a thread, body `{target_workspace_id}`) / `GET /publish-history`; chain preserves `original_thread_id`; see `app/gateway/collaboration/` |
+| **Admin Secrets** (`/api/admin/secrets`) | `POST /upsert` (owner-only, creates/replaces a vault entry; `value=null` deletes) / `POST /rotate` (owner-only, atomic env + vault re-encryption, gated by `current_admin_password`, 10 req/min/IP rate limit) / `GET /status` (missing / placeholder / fresh / configured per catalog key; `?include_all=true` adds env-only keys) |
 
 Proxied through nginx: `/api/langgraph/*` → LangGraph, all other `/api/*` → Gateway.
 
