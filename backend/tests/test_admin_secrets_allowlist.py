@@ -55,6 +55,9 @@ def vault_env(monkeypatch, tmp_path):
     monkeypatch.setenv("MICX_ADMIN_SECRET_KEY", _fresh_cipher_key())
     admin_pw = _gen_str(24)
     monkeypatch.setenv("BY_ADMIN_PASSWORD", admin_pw)
+    # Reset the per-IP rotate rate-limit bucket so tests don't bleed into
+    # each other across modules (the bucket is process-global).
+    admin_secrets._rotate_hits.clear()
     _real_authenticate = admin_secrets.authenticate_user
 
     def _fake_authenticate(email, password):  # type: ignore[no-untyped-def]

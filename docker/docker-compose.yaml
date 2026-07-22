@@ -248,6 +248,10 @@ services:
   #   ensuring a proper HTTP 200 response. Intervals, timeouts, and retries
   #   are tuned for fast detection of unresponsiveness.
   provisioner:
+    # Opt-in via --profile provisioner (passed by deploy.sh when
+    # sandbox_mode == "provisioner"). Non-K8s users do not build or start
+    # this container by default. Mirrors docker-compose-dev.yaml:27.
+    profiles: ["provisioner"]
     build:
       context: ./provisioner
       dockerfile: Dockerfile

@@ -1,7 +1,7 @@
 # Frontend Dockerfile
-# Supports two targets:
-#   --target dev   — install deps only, run `pnpm dev` at container start
-#   --target prod  — full build baked in, run `pnpm start` at container start (default if no --target is specified)
+# Single target: prod — full build baked in, run `pnpm start` at
+# container start. (The previous `dev` target was unused by any
+# compose / script; deleted in cleanup.)
 
 ARG PNPM_STORE_PATH=/root/.local/share/pnpm/store
 ARG NPM_REGISTRY
@@ -22,11 +22,6 @@ RUN pnpm config set store-dir ${PNPM_STORE_PATH}
 RUN if [ -n "${NPM_REGISTRY}" ]; then pnpm config set registry "${NPM_REGISTRY}"; fi
 WORKDIR /app
 COPY frontend ./frontend
-
-# ── Dev: install only, CMD is overridden by docker-compose ───────────────────
-FROM base AS dev
-RUN cd /app/frontend && pnpm install --frozen-lockfile
-EXPOSE 3000
 
 # ── Builder: install + compile Next.js ───────────────────────────────────────
 FROM base AS builder
