@@ -7,40 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Slack webhook signing-secret verification(HMAC v0,v1.6.1 P0 follow-up)
-- `backend/app/gateway/connectors/slack/signing.py` — `verify_slack_signature(...)` + `SlackSignatureVerifier` 类,验 v0=`hmac_sha256(signing_secret, "v0=" + ts + ":" + body)` + 5-minute replay defense;URL-verification 不验签(slack 协议)
-- `backend/app/gateway/connectors/slack/routers/events.py` — `POST /api/connectors/slack/events`:URL 验证回 200 plain text challenge,签名错/未配置 secret/stale timestamp 全部 401
-- 测试:`tests/test_slack_signature_verification.py`(15 用例,9 verifier 单元 + 6 endpoint 集成)
+### 计划中
 
-`v1.6.1-canvas-released` 已知缺口 "Slack webhook signing-secret verification" 闭合。
+暂未启动。
 
-### workflow_executions SQLite 表(v1.6.1 follow-up,3 表 schema 收口)
-- `backend/app/gateway/canvas/persistence/sqlite_store.py` 加第三张表 `workflow_executions` + `SqliteExecutionStore` + `ExecutionRecord` dataclass
-- `backend/app/gateway/canvas/store_service.py` 加 `get_canvas_execution_store()` 工厂(纯 opt-in,只有 sqlite backend 才存在)
-- `backend/app/gateway/canvas/routers/workflows.py` 加 `GET /api/workflows/{id}/executions` 端点(best-effort,memory backend 返回 `[]`)
-- canvas `/execute` 在 executor 返回后 best-effort 持久化 execution 行(失败仅 log,不阻断业务)
-- `backend/app/gateway/app.py` lifespan 在 `MICX_CANVAS_STORE=sqlite` 时挂上 `app.state.canvas_execution_store`
-- 测试:`tests/test_canvas_executions_sqlite.py`(11 用例,含跨进程 subprocess 持久化验证)
+## [1.6.3] - 2026-07-22
 
-`v1.6.2 backlog` 中的 "`workflow_executions` SQLite table" 一项闭合。
+> **范围:** 自 `v1.6.1-canvas-released` (commit `c2db039e`) 以来到当前 HEAD (`ca1c82a4`) 的累计变更。
+> 重点：admin-secrets 闭环两次增量（M1 路由 + M2 多进程锁/白名单/审计/前端）+ drift recovery helper + 周边安全与基础设施加固。
+> 5 commits + 13 个独立 scope。Tag 指向 `ca1c82a4`。
 
-### Owner-only admin secrets vault (v1.6.2)
+### Drift recovery: reset_owner_password helper
+
+- `scripts/reset_owner_password.py`（新文件，100 行）：当 owner 的 `password_hash` 与 `.env` 中 `BY_ADMIN_PASSWORD` 漂移时（忘记密码、手工编辑哈希、`users.json` 字段重命名失误），用 `BY_ADMIN_PASSWORD` 的当前值重写 owner 记录的 salt + PBKDF2-SHA256（120k 轮）哈希匹配 `auth.py:_hash_password` 约定。原子写入（`tempfile.mkstemp` + `Path.replace`），其余 6 个用户原样不动。
+- Salt 以 utf-8 编码的 ASCII 字符（非 `bytes.fromhex`）参与哈希，与现有 `auth.py` 实现保持一致；盘上格式仍为 hex 字符串。
+- 端到端已验证：`docker exec` 重置 → `/api/session/login` 返回 200 → `/api/admin/secrets/*` 4 个端点全 `200`/`204`。
+- 复用 `users.json` 路径走 docker volume mount，主仓库 `backend/.deer-flow/` 与容器内 `/app/backend/.deer-flow/` 同源。
+
+### Owner-only admin secrets vault (v1.6.2 M1)
+
 - `backend/packages/harness/deerflow/admin/secrets.py` — `KNOWN_SECRET_KEYS` + `KNOWN_VAULT_KEYS` catalogs (mirrors `models.override.yaml` `secret://` refs), `upsert_secret` / `delete_secret` / `get_vault_mtime` / `rotate_env_secret` / `rotate_vault_cipher` / `is_placeholder_value` / `mask_secret_value`. Write path uses per-call `tempfile.mkstemp` + `Path.replace` (atomic, no fixed `.tmp` collision). Read path swallows decrypt failures so a late-bound cipher key during cold-start degrades to empty rather than 500.
 - `backend/app/gateway/routers/admin_secrets.py` — three owner-only endpoints: `POST /api/admin/secrets/upsert` (creates/replaces; `value=null` deletes), `POST /api/admin/secrets/rotate` (atomic env + vault re-encryption, gated by `current_admin_password` to prevent session-hijack self-lockout, 10 req/min/IP sliding window), `GET /api/admin/secrets/status` (missing / placeholder / fresh / configured per catalog key; `?include_all=true` adds env-only keys).
 - `backend/app/gateway/app.py` + `backend/app/gateway/routers/__init__.py` — mount the router in the existing admin cluster.
 - `backend/packages/harness/deerflow/admin/__init__.py` — re-export the new helpers so `deerflow.admin` is the single import surface for callers.
 - 测试:`tests/test_admin_secrets_api.py` (14 cases), `tests/test_admin_secrets_atomic.py` (3 cases), `tests/test_admin_secrets_helpers.py` (36 cases). 总计 53 用例覆盖 owner/member/auth、密码校验、mask、placeholder 启发式、mid-write 崩溃原子性、并发 upsert 无 OSError、cookie 失效。
 
-`v1.6.2 backlog` 中的 "owner-only admin secrets vault" 一项闭合。
-
 ### Admin secrets v1.6.2 M2 增量（多进程 + 白名单 + 审计 + 前端）
+
 - `backend/packages/harness/deerflow/admin/secrets.py` 加 `_acquire_rotate_lock()` 上下文管理器（POSIX `fcntl.flock` + Windows `msvcrt` 兜底，跟 `aio_sandbox_provider` 同模式），rotate 路径包一层跨进程锁防止两副本竞态 cipher swap；无 OS 原语时返回 503 拒绝而非静默损坏。`SECRETS_VAULT_ROUTABLE` 列出可走 `/secrets/rotate` 的子集（privileged + production vault keys），其他 key 一律 400 + 提示改 `.env`。
 - `backend/packages/harness/deerflow/admin/audit.py` 加 `filter_admin_audit_records(action_prefix, actor_id)` 纯函数 helper；`backend/app/gateway/routers/admin_secrets.py` 加 `GET /api/admin/secrets/audit-events`（owner-only，读 `audit.jsonl` 尾段 + 内存过滤，明文永不返回）。
 - 前端 `frontend/src/components/workspace/admin/secrets-admin-page.tsx` + `frontend/src/app/workspace/admin/secrets/page.tsx` + 两侧 `i18n` 加 `admin.secrets` 命名空间（en-US + zh-CN）+ `admin-page-shell` 导航加 KeyRoundIcon 入口。状态 / upsert / rotate / audit 四 Tab，最小可用。
 - 测试：`test_admin_secrets_xproc_lock.py`（4 用例，含双线程 acquire/release 序列、缺 OS 原语返回 false）、`test_admin_secrets_allowlist.py`（4 用例，含 400 拒绝非白名单）、`test_admin_audit_endpoint.py`（5 用例，含 owner-only / 不返回明文 / actor 过滤）。新增 13 用例，后端 admin secrets 总计 81 用例。
 - 文档：`docs/releases/v1.6.2-admin-secrets.md` 加 M2 章节；backend CLAUDE.md 端点表更新 audit-events 与白名单描述。
 
-`v1.6.2 backlog` 的 4 项 follow-up（多进程 / 白名单 / 审计表面 / 前端 UI）全部闭合。
+### Vendor-aware model catalog (2026 providers)
+
+- `backend/packages/harness/deerflow/models/` —— 按 vendor 分组的解析 + override 匹配：Anthropic beta header（`anthropic-beta`）、Google thought signature（`thought_signature` / `thoughts` 字段透传）、DeepSeek `reasoning_content` 分支展开、Qwen `thinking_budget` 参数化等。
+- `tests/test_model_vendor_catalog.py`（34 用例）覆盖每个 vendor 的 canonical 与 edge case（缺席字段、错误类型、嵌套 JSON）。
+- 与 admin secrets vault 协同——vendor catalog 引用 `models.override.yaml` 中 `secret://` 风格的引用，rotate 后热生效。
+
+### CI: secret scanning
+
+- `.github/workflows/gitleaks.yaml`（新文件）—— PR + push 触发，pin `gitleaks/gitleaks-action@v3`，自定义 `config.toml` 遵循仓库历史泄漏规避规则（v1.5.0 泄露密码 `MicxLocal123!` 已 filter-repo 清除，本次 PR 主动扫描回归）。
+
+### Env template hardening
+
+- `.env` / `docker/.env` template 加 `BETTER_AUTH_SECRET` 与 `MICX_ADMIN_SECRET_KEY` 占位符，并附 `docker compose` `env_file` COPY 模板注释——README 引导新部署者一次性补齐所有 secret 占位，命中 fail-fast 路径（V01）而非哑启动 dev default。
+- 与 admin secrets vault 互补：vault 处理运行时 secret，`.env` template 处理部署初始化 secret；端口 5432/2026 文档同步。
+
+### Provisioner profile-aligned docker-compose
+
+- `docker/docker-compose.yaml` 的 `provisioner` 服务标 `profiles: ["provisioner"]`，与 `docker-compose-dev.yaml:27` 保持一致。
+- `scripts/deploy.sh` 的 `build` / `start` / 默认 `up` + `scripts/docker.sh` 的 `start()` 在 `sandbox_mode == "provisioner"` 时把 `--profile provisioner` 放到 `docker compose` 顶层选项（修正先前把它置于 `up` 之后触发 `unknown flag: --profile` 的根因）。
+- README.md 给出 K8s 用户完整命令：`docker compose -f docker/docker-compose.yaml --profile provisioner up -d --build`。
+- 行为变化：本地沙箱用户（默认）**不构建也不启动** provisioner 镜像。
+
+### Security pentest fixes (V01–V11)
+
+- V01：缺省或 dev-default auth secret fail-fast → `tests/test_auth_secret_fail_fast.py` (14 用例)
+- V02/V07：`admin` / `audit` / `scim` router 强 owner 守卫 → `test_admin_routers_require_owner.py` (15 用例)
+- V03：`AdminBrandingConfig` 拒绝 HTML/script payload → `test_admin_branding_xss_rejection.py` (8 用例)
+- V04/V05：upload 危险扩展名拒绝（含 name-match fix） → `test_uploads_deny_extensions.py` (16 用例)
+- V08/V10/V11：email mask + opt-in invite token + secure cookie → `test_users_mask_and_cookie.py` (18 用例)
+- 综合回归：`test_security_regression.py` (24 用例) 把 7 个 fix 串起来跑端到端。
+- 总计 95 用例覆盖 7 个 pentest 修复（含边界与跨路径交集）。
 
 ## [1.6.1-canvas-released] - 2026-07-10
 

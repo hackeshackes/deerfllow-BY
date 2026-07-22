@@ -205,7 +205,16 @@ if [ "$CMD" = "build" ]; then
         export DEER_FLOW_DOCKER_SOCKET="/var/run/docker.sock"
     fi
 
-    "${COMPOSE_CMD[@]}" build
+    # Build path: profile_args is computed later (after sandbox_mode
+    # detection). For build mode, sandbox_mode is detected inside this
+    # branch because we don't want to require config.yaml to exist when
+    # running other commands.
+    profile_args=()
+    if [ "$(detect_sandbox_mode)" = "provisioner" ]; then
+        profile_args=(--profile provisioner)
+    fi
+
+    "${COMPOSE_CMD[@]}" "${profile_args[@]}" build
 
     echo ""
     echo "=========================================="
@@ -247,6 +256,17 @@ if [ "$sandbox_mode" = "provisioner" ]; then
     services="$services provisioner"
 fi
 
+# `--profile provisioner` is a TOP-LEVEL docker compose option (it must
+# appear BEFORE the subcommand). When sandbox_mode == "provisioner" we
+# pass it so that the gated service is both built and started. Without
+# this, non-K8s users would still build the unused image and start an
+# unhealthy container (compose treats services listed by name as opt-in,
+# but `--profile` is what gives non-listed services the boot).
+profile_args=()
+if [ "$sandbox_mode" = "provisioner" ]; then
+    profile_args=(--profile provisioner)
+fi
+
 # ── DEER_FLOW_DOCKER_SOCKET ───────────────────────────────────────────────────
 
 if [ -z "$DEER_FLOW_DOCKER_SOCKET" ]; then
@@ -271,13 +291,13 @@ if [ "$CMD" = "start" ]; then
     echo "Starting containers (no rebuild)..."
     echo ""
     # shellcheck disable=SC2086
-    "${COMPOSE_CMD[@]}" up -d --remove-orphans $services
+    "${COMPOSE_CMD[@]}" "${profile_args[@]}" up -d --remove-orphans $services
 else
     # Default: build + start
     echo "Building images and starting containers..."
     echo ""
     # shellcheck disable=SC2086
-    "${COMPOSE_CMD[@]}" up --build -d --remove-orphans $services
+    "${COMPOSE_CMD[@]}" "${profile_args[@]}" up --build -d --remove-orphans $services
 fi
 
 echo ""

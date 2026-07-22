@@ -180,6 +180,17 @@ start() {
         fi
     fi
 
+    # `--profile provisioner` is a TOP-LEVEL docker compose option (must
+    # come BEFORE the subcommand). When sandbox_mode == "provisioner"
+    # we pass it so the gated service is both built and started.
+    # $COMPOSE_CMD is a string here (not an array), so we unquoted-
+    # word-split it through `set -- ... && "$@"` rather than expanding
+    # in-line.
+    profile_args=()
+    if [ "$sandbox_mode" = "provisioner" ]; then
+        profile_args=(--profile provisioner)
+    fi
+
     if $gateway_mode; then
         echo -e "${BLUE}Runtime: Gateway mode (experimental) — no LangGraph container${NC}"
     fi
@@ -238,7 +249,8 @@ start() {
     fi
 
     echo "Building and starting containers..."
-    cd "$DOCKER_DIR" && $COMPOSE_CMD up --build -d --remove-orphans $services
+    # shellcheck disable=SC2086
+    cd "$DOCKER_DIR" && $COMPOSE_CMD "${profile_args[@]}" up --build -d --remove-orphans $services
     echo ""
     echo "=========================================="
     echo "  DeerFlow Docker is starting!"

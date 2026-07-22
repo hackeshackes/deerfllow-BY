@@ -13,6 +13,49 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 
 > **注意**: 本项目已与原版 DeerFlow 有显著差异，请勿直接使用原版文档参考本项目。
 
+## 🎉 v1.6.3 已发布 (2026-07-22)
+
+### 本版本核心变更
+
+v1.6.3 是一次 **patch 累计迭代**：自 v1.6.1-canvas-released 以来,drift recovery operator script + admin-secrets 闭环两次增量 + security pentest V01–V11 防御加固 + 周围基础设施。
+
+- **🔐 Owner-only admin secrets vault (M1 + M2)** — `POST /api/admin/secrets/{upsert,rotate,status,audit-events}` 四个 owner-only 端点。Helper 层 (`upsert_secret` / `delete_secret` / `rotate_env_secret` / `rotate_vault_cipher` / `is_placeholder_value` / `mask_secret_value` / `KNOWN_SECRET_KEYS` / `KNOWN_VAULT_KEYS`) 通过 `tempfile.mkstemp + Path.replace` 原子写入。M2 增量加 POSIX `fcntl.flock` 跨进程 rotate 锁 + `SECRETS_VAULT_ROUTABLE` 白名单 + `audit.jsonl` 过滤表面 + 前端 `secrets-admin-page` 四 Tab UI + `admin-page-shell` KeyRoundIcon 入口。总计 81 用例 (M1 53 + M2 13 + 助手 + 审计)。
+
+- **🛠️ Drift recovery helper** — `scripts/reset_owner_password.py` 修复 owner 密码哈希与 `BY_ADMIN_PASSWORD` 漂移场景(忘记密码、手工编辑、`users.json` 字段重命名失误)。从 `.env` 读 `BY_ADMIN_PASSWORD`,重写 salt + PBKDF2-SHA256 (120k 轮) 哈希匹配 `auth.py:_hash_password`,**只动 owner,其他 6 个用户原样不动**,原子写入。端到端已验证:重置 → `/api/session/login` → `/api/admin/secrets/*` 全 200。
+
+- **🛡️ Security pentest (V01–V11)** — 7 个 path 一次性回归:fail-fast auth secret、owner-only admin 守卫、HTML/script payload 拒绝、upload 危险扩展 (含双重扩展名)、SCIM owner-only、email mask、opt-in invite token、secure cookies。95 用例跨 7 个测试文件 + 综合端到端回归。
+
+- **🧠 Vendor-aware model catalog (2026 providers)** — Anthropic beta header / Google thought signature / DeepSeek `reasoning_content` / Qwen `thinking_budget`。与 admin secrets 协同:`models.override.yaml` 中 `secret://` 引用 rotate 后热生效。
+
+- **🛡️ CI: secret scanning** — `.github/workflows/gitleaks.yaml` 在 PR + push 触发,pin `gitleaks/gitleaks-action@v3`,自定义 `config.toml` 防 v1.5.0 泄露密码 `MicxLocal123!` 类问题回归。
+
+- **📦 Env template hardening** — `.env` / `docker/.env` template 加 `BETTER_AUTH_SECRET` + `MICX_ADMIN_SECRET_KEY` 占位,README 引导新部署者一次性补齐 secret,命中 V01 fail-fast 路径而非启动 dev default。
+
+- **🐳 Provisioner profile** — `docker/docker-compose.yaml` 的 `provisioner` 标 `profiles: ["provisioner"]` (与 `compose-dev.yaml:27` 对齐),K8s 命令:`docker compose -f docker/docker-compose.yaml --profile provisioner up -d --build`。本地沙箱 (默认) 不构建也不启动。
+
+### 如何升级
+
+```bash
+cd deerfllow-BY
+git fetch origin
+git checkout v1.6.3
+docker compose -f docker/docker-compose.yaml down
+docker compose -f docker/docker-compose.yaml up -d --build
+```
+
+或者用 dev override (秒级 bind-mount + uv sync 生效):
+
+```bash
+git checkout v1.6.3
+docker compose -f docker/docker-compose.yaml -f docker/docker-compose.dev.yaml up -d --build
+```
+
+> **注意:** v1.6.3 要求 `.env` 中**必须**设置 `MICX_ADMIN_SECRET_KEY` 或 `BETTER_AUTH_SECRET`(否则 gateway fail-fast 退出),新部署请先在模板里补齐。
+
+详细变更见 [CHANGELOG.md](./CHANGELOG.md),本次发布说明见 [docs/releases/v1.6.3.md](./docs/releases/v1.6.3.md)。
+
+---
+
 ## 🎉 v1.5.5 已发布 (2026-07-01)
 
 ### 本版本核心变更
@@ -43,6 +86,12 @@ docker compose -f docker/docker-compose.yaml -f docker/docker-compose.dev.yaml u
 docker compose -f docker/docker-compose.yaml down gateway
 docker compose -f docker/docker-compose.yaml up -d --build gateway
 ```
+
+> **Kubernetes / provisioner 模式用户注意**：`docker/docker-compose.yaml` 中 `provisioner` 服务声明了 `profiles: ["provisioner"]`，本地沙箱用户（默认）不会构建或启动 provisioner 容器。脚本层的 service 白名单（`scripts/deploy.sh` / `scripts/docker.sh`）会在 `sandbox.provisioner_url` 配置存在时自动加入 `provisioner`；也可直接通过 `--profile provisioner` 启用（注意 `--profile` 须置于 subcommand 之前）：
+>
+> ```bash
+> docker compose -f docker/docker-compose.yaml --profile provisioner up -d --build
+> ```
 
 详细变更见 [CHANGELOG.md](./CHANGELOG.md)。
 
@@ -101,6 +150,13 @@ docker compose -f docker/docker-compose.yaml up -d --build gateway
 | **Backend dev 镜像 + bind-mount (uv sync 秒级生效)** | ❌ | ✅ **v1.5.5 基础设施** |
 | **voice_config.py 模块丢失修复** | ❌ | ✅ **v1.5.5 修复** |
 | **真实部署端到端 smoke 测试 7/7 通过** | ❌ | ✅ **v1.5.5 验证** |
+| **Owner-only admin secrets vault (Fernet 加密 vault + 4 端点)** | ❌ | ✅ **v1.6.3 新增** |
+| **Cross-process rotate 锁 + audit.jsonl 表面 + 密钥白名单** | ❌ | ✅ **v1.6.3 新增** |
+| **Vendor-aware model catalog (Anthropic/Google/DeepSeek/Qwen 专属字段)** | ❌ | ✅ **v1.6.3 新增** |
+| **Drift recovery helper (`scripts/reset_owner_password.py`)** | ❌ | ✅ **v1.6.3 工具** |
+| **Security pentest V01–V11 (fail-fast secret + owner 守卫 + XSS/扩展名/cookie)** | ❌ | ✅ **v1.6.3 加固** |
+| **CI secret scanning (gitleaks-action v3, pin)** | ❌ | ✅ **v1.6.3 CI** |
+| **Env template (`BETTER_AUTH_SECRET` + `MICX_ADMIN_SECRET_KEY` placeholders)** | ❌ | ✅ **v1.6.3 部署** |
 | **改密码 UI 在 SettingsDialog 内** | ❌ | ✅ **v1.5.3 修复** |
 | **凭据泄露修复 + Git 历史清理** | ❌ | ✅ **v1.5.3 安全** |
 | **后端异步化 (memory/sandbox/community)** | ❌ | ✅ **v1.5.3 性能** |
