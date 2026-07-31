@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 计划中
+### Fixed
 
-暂未启动。
+- Fixed frontend development mode so unmatched `/api/*` requests fall back to the Gateway while Next.js-owned `/api/auth/*` and `/api/memory/*` handlers remain local.
 
 ## [1.6.3] - 2026-07-22
 

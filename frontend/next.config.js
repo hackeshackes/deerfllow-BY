@@ -17,7 +17,8 @@ function getInternalServiceURL(envKey, fallbackURL) {
 const config = {
   devIndicators: false,
   async rewrites() {
-    const rewrites = [];
+    const beforeFiles = [];
+    const fallback = [];
     const langgraphURL = getInternalServiceURL(
       "DEER_FLOW_INTERNAL_LANGGRAPH_BASE_URL",
       "http://127.0.0.1:2024",
@@ -28,28 +29,28 @@ const config = {
     );
 
     if (!process.env.NEXT_PUBLIC_LANGGRAPH_BASE_URL) {
-      rewrites.push({
+      beforeFiles.push({
         source: "/api/langgraph",
         destination: langgraphURL,
       });
-      rewrites.push({
+      beforeFiles.push({
         source: "/api/langgraph/:path*",
         destination: `${langgraphURL}/:path*`,
       });
     }
 
     if (!process.env.NEXT_PUBLIC_BACKEND_BASE_URL) {
-      rewrites.push({
-        source: "/api/agents",
-        destination: `${gatewayURL}/api/agents`,
-      });
-      rewrites.push({
-        source: "/api/agents/:path*",
-        destination: `${gatewayURL}/api/agents/:path*`,
+      fallback.push({
+        source: "/api/:path*",
+        destination: `${gatewayURL}/api/:path*`,
       });
     }
 
-    return rewrites;
+    return {
+      beforeFiles,
+      afterFiles: [],
+      fallback,
+    };
   },
 };
 
