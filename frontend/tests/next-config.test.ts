@@ -39,10 +39,10 @@ async function loadRewrites(
     }
   }
 
-  const module = (await import("../next.config.js")) as {
+  const nextConfig = (await import("../next.config.js")) as {
     default: NextConfigUnderTest;
   };
-  return module.default.rewrites();
+  return nextConfig.default.rewrites();
 }
 
 afterEach(() => {
