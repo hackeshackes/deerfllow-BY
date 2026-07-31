@@ -115,7 +115,9 @@ describe("Next.js API rewrites", () => {
   it("keeps frontend-owned API route handlers in the filesystem", () => {
     // happy-dom replaces the URL constructor used in `new URL("..", import.meta.url)`,
     // so resolve the directory through path.dirname + fileURLToPath explicitly.
-    const frontendRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+    const frontendRoot = path.dirname(
+      path.dirname(fileURLToPath(import.meta.url)),
+    );
     const localRouteHandlers = [
       "src/app/api/auth/[...all]/route.ts",
       "src/app/api/memory/route.ts",
