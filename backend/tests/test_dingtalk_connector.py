@@ -72,6 +72,39 @@ async def test_dingtalk_token_error(connector):
     assert resp.success is False
 
 
+@respx.mock
+@pytest.mark.asyncio
+async def test_dingtalk_refetches_token_on_401(connector):
+    """A 401 from the send API invalidates the cached token and retries once.
+
+    The first send returns 401 (token revoked). The connector must drop the
+    cached token, fetch a fresh one, and retry — netting two token fetches and
+    two send attempts, with the retry succeeding.
+    """
+    token_route = respx.post(f"{DINGTALK_BASE}/v1.0/oauth2/accessToken").mock(
+        side_effect=[
+            Response(200, json={"accessToken": "at-old", "expireIn": 7200}),
+            Response(200, json={"accessToken": "at-new", "expireIn": 7200}),
+        ]
+    )
+    send_route = respx.post(f"{DINGTALK_BASE}/v1.0/robot/groupMessages/send").mock(
+        side_effect=[
+            Response(401, json={"errmsg": "token expired"}),
+            Response(200, json={"processQueryKey": "pqk-ok"}),
+        ]
+    )
+
+    resp = await connector.send(
+        ConnectorMessage(text="hi", target={"chat_id": "c1"})
+    )
+
+    assert resp.success is True
+    assert resp.external_id == "pqk-ok"
+    # Token was invalidated and refetched (2 fetches), and the send retried.
+    assert token_route.call_count == 2
+    assert send_route.call_count == 2
+
+
 @pytest.mark.asyncio
 async def test_dingtalk_webhook_message_returns_text():
     c = DingTalkConnector(client_id="cid", client_secret="sec")

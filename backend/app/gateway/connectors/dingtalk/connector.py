@@ -4,9 +4,8 @@ Implements `BaseConnector` against the DingTalk Open Platform:
 - Outbound: send group message via the robot webhook
 - Inbound: receive event-callback webhook
 
-The access token is cached for the process lifetime; the response does not
-include an `expireIn` we can rely on, so the next 401 from the API will
-trigger a re-fetch (TODO — not yet implemented in this MVP).
+The access token is cached for the process lifetime; a 401 from the send API
+triggers an invalidate() + refetch and a single retry.
 """
 from __future__ import annotations
 
@@ -54,27 +53,21 @@ class DingTalkConnector(BaseConnector):
 
     async def send(self, message: ConnectorMessage) -> ConnectorResponse:
         try:
-            token = await self._get_token()
             chat_id = message.target.get("chat_id", "")
             if not chat_id:
                 return ConnectorResponse(
                     success=False, error="dingtalk send requires chat_id"
                 )
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.post(
-                    f"{DINGTALK_BASE}/v1.0/robot/groupMessages/send",
-                    headers={
-                        "x-acs-dingtalk-access-token": token,
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "msgParam": json.dumps({"text": {"content": message.text}}),
-                        "msgKey": "sampleText",
-                        "robotCode": self._client_id,
-                        "openConversationId": chat_id,
-                    },
-                )
-            data = resp.json()
+
+            # A 401 from the send API means the cached token was revoked;
+            # invalidate() forces the next get() to re-fetch, then retry once.
+            token = await self._get_token()
+            resp, data = await self._post_send(token, chat_id, message.text)
+            if resp.status_code == 401 and self._token_cache is not None:
+                self._token_cache.invalidate()
+                token = await self._get_token()
+                resp, data = await self._post_send(token, chat_id, message.text)
+
             if "processQueryKey" in data:
                 return ConnectorResponse(
                     success=True, external_id=data["processQueryKey"], raw=data
@@ -83,6 +76,26 @@ class DingTalkConnector(BaseConnector):
             return ConnectorResponse(success=False, error=f"dingtalk api error: {err}")
         except Exception as e:  # noqa: BLE001
             return ConnectorResponse(success=False, error=str(e))
+
+    async def _post_send(
+        self, token: str, chat_id: str, text: str
+    ) -> tuple[httpx.Response, dict]:
+        """POST a group message, returning ``(response, json_body)``."""
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.post(
+                f"{DINGTALK_BASE}/v1.0/robot/groupMessages/send",
+                headers={
+                    "x-acs-dingtalk-access-token": token,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "msgParam": json.dumps({"text": {"content": text}}),
+                    "msgKey": "sampleText",
+                    "robotCode": self._client_id,
+                    "openConversationId": chat_id,
+                },
+            )
+        return resp, resp.json()
 
     async def receive_webhook(self, payload: dict) -> list[ConnectorMessage]:
         text_obj = payload.get("text")

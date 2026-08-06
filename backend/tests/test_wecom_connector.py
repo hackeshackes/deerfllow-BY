@@ -63,6 +63,38 @@ async def test_wecom_token_cached(connector):
 
 @respx.mock
 @pytest.mark.asyncio
+async def test_wecom_refetches_token_on_invalid_token(connector):
+    """errcode 40014 (invalid/expired access_token) triggers a refetch + retry.
+
+    The first send returns WeCom's documented invalid-token error. The
+    connector must invalidate the cached token, fetch a fresh one, and retry —
+    netting two token fetches and two sends, with the retry succeeding.
+    """
+    token_route = respx.get(f"{WECOM_BASE}/gettoken").mock(
+        side_effect=[
+            Response(200, json={"access_token": "at-old", "expires_in": 7200}),
+            Response(200, json={"access_token": "at-new", "expires_in": 7200}),
+        ]
+    )
+    send_route = respx.post(f"{WECOM_BASE}/message/send").mock(
+        side_effect=[
+            Response(200, json={"errcode": 40014, "errmsg": "invalid access_token"}),
+            Response(200, json={"errcode": 0, "errmsg": "ok"}),
+        ]
+    )
+
+    resp = await connector.send(
+        ConnectorMessage(text="hi", target={"user_id": "u-1"})
+    )
+
+    assert resp.success is True
+    # Token invalidated and refetched (2), and the send retried.
+    assert token_route.call_count == 2
+    assert send_route.call_count == 2
+
+
+@respx.mock
+@pytest.mark.asyncio
 async def test_wecom_token_fetch_error(connector):
     respx.get(f"{WECOM_BASE}/gettoken").mock(
         return_value=Response(200, json={"errcode": 40013, "errmsg": "invalid corpid"})

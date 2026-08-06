@@ -4,9 +4,9 @@ Implements `BaseConnector` against the WeCom OpenAPI:
 - Outbound: send application text message to a user
 - Inbound: receive text callback event
 
-The access token is cached for the process lifetime. The expires_in field is
-returned by the API but not currently used to refresh proactively — the next
-401 from the API will trigger a re-fetch (TODO).
+The access token is cached for the process lifetime. A send response with
+``errcode == 40014`` (invalid/expired access_token) triggers an invalidate()
++ refetch and a single retry.
 """
 from __future__ import annotations
 
@@ -62,18 +62,14 @@ class WeComConnector(BaseConnector):
                     success=False, error="wecom send requires user_id"
                 )
             token = await self._get_token()
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.post(
-                    f"{WECOM_BASE}/message/send",
-                    params={"access_token": token},
-                    json={
-                        "touser": user_id,
-                        "msgtype": "text",
-                        "agentid": 0,
-                        "text": {"content": message.text},
-                    },
-                )
-            data = resp.json()
+            data = await self._post_send(token, user_id, message.text)
+            # WeCom reports a revoked/expired token as errcode 40014. Drop the
+            # cached token, re-fetch, and retry once.
+            if data.get("errcode") == 40014 and self._token_cache is not None:
+                self._token_cache.invalidate()
+                token = await self._get_token()
+                data = await self._post_send(token, user_id, message.text)
+
             if data.get("errcode") == 0:
                 return ConnectorResponse(success=True, raw=data)
             return ConnectorResponse(
@@ -82,6 +78,21 @@ class WeComConnector(BaseConnector):
             )
         except Exception as e:  # noqa: BLE001
             return ConnectorResponse(success=False, error=str(e))
+
+    async def _post_send(self, token: str, user_id: str, text: str) -> dict:
+        """POST an application message, returning the JSON body."""
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.post(
+                f"{WECOM_BASE}/message/send",
+                params={"access_token": token},
+                json={
+                    "touser": user_id,
+                    "msgtype": "text",
+                    "agentid": 0,
+                    "text": {"content": text},
+                },
+            )
+        return resp.json()
 
     async def receive_webhook(self, payload: dict) -> list[ConnectorMessage]:
         text = payload.get("Content")
