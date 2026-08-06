@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from app.gateway.auth import list_users, require_owner_user
+from app.gateway.abac.deps import require_abac
+from app.gateway.auth import AuthUser, list_users
 from deerflow.admin.token_usage import get_token_usage_store
 
 router = APIRouter(prefix="/api/admin/token-usage", tags=["admin-token-usage"])
@@ -46,10 +47,9 @@ class TokenUsageResponse(BaseModel):
 
 @router.get("", response_model=TokenUsageResponse)
 async def get_token_usage(
-    request: Request,
+    user: AuthUser = Depends(require_abac("read", "admin-token-usage")),
     days: int = Query(default=7, ge=1, le=90, description="Number of days to include"),
 ) -> TokenUsageResponse:
-    require_owner_user(request)
     store = get_token_usage_store()
     since = datetime.now(UTC) - timedelta(days=days)
     since_iso = since.isoformat()
