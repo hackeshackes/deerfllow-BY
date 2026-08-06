@@ -17,6 +17,7 @@ from .evaluator import (
     evaluate,
 )
 from .policies import OwnerOnlyPolicy, WorkspaceMemberPolicy
+from .policies_file import PoliciesCache, load_policies_file, resolve_policies
 
 __all__ = [
     "AbacDecision",
@@ -24,8 +25,11 @@ __all__ = [
     "AttributePolicy",
     "Operator",
     "OwnerOnlyPolicy",
+    "PoliciesCache",
     "Resource",
     "Subject",
     "WorkspaceMemberPolicy",
     "evaluate",
+    "load_policies_file",
+    "resolve_policies",
 ]
