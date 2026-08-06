@@ -20,7 +20,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.gateway.auth import AuthUser, require_user
+from app.gateway.auth import AuthUser
 from app.gateway.collaboration.publish import (
     PUBLISH_HISTORY_MAX,
     PublishService,
@@ -177,6 +177,9 @@ def test_router_post_publish_and_history_via_fake_store():
         reset_for_tests,
     )
     from app.gateway.collaboration.routers.publish import (
+        require_user as router_require_user,
+    )
+    from app.gateway.collaboration.routers.publish import (
         router as publish_router,
     )
 
@@ -187,7 +190,14 @@ def test_router_post_publish_and_history_via_fake_store():
     try:
         app = FastAPI()
         app.include_router(publish_router)
-        app.dependency_overrides[require_user] = _override_user
+        # Key the override on the dependency the ROUTER module actually binds
+        # (``router_require_user``), not this test module's import-time
+        # reference. A prior file (e.g. test_auth_secret_fail_fast) that
+        # reloads ``app.gateway.auth`` re-creates ``require_user``, but the
+        # router holds the identity captured when ``publish`` was imported.
+        # Matching on the router's own binding keeps the override accurate
+        # regardless of any auth-module reload earlier in the suite.
+        app.dependency_overrides[router_require_user] = _override_user
 
         with TestClient(app) as client:
             resp = client.post(
@@ -219,6 +229,9 @@ def test_router_404_when_source_thread_missing():
         reset_for_tests,
     )
     from app.gateway.collaboration.routers.publish import (
+        require_user as router_require_user,
+    )
+    from app.gateway.collaboration.routers.publish import (
         router as publish_router,
     )
 
@@ -228,7 +241,7 @@ def test_router_404_when_source_thread_missing():
     try:
         app = FastAPI()
         app.include_router(publish_router)
-        app.dependency_overrides[require_user] = _override_user
+        app.dependency_overrides[router_require_user] = _override_user
 
         with TestClient(app) as client:
             resp = client.post(
@@ -244,6 +257,9 @@ def test_router_404_when_source_thread_missing():
 def test_router_503_when_service_not_configured():
     """Calling without configure() returns 503 — proves wiring is required."""
     from app.gateway.collaboration.routers.publish import (
+        require_user as router_require_user,
+    )
+    from app.gateway.collaboration.routers.publish import (
         reset_for_tests,
     )
     from app.gateway.collaboration.routers.publish import (
@@ -253,7 +269,7 @@ def test_router_503_when_service_not_configured():
     reset_for_tests()
     app = FastAPI()
     app.include_router(publish_router)
-    app.dependency_overrides[require_user] = _override_user
+    app.dependency_overrides[router_require_user] = _override_user
 
     with TestClient(app) as client:
         resp = client.post(
@@ -269,6 +285,9 @@ def test_router_abac_denies_member_when_workspace_membership_empty():
     from app.gateway.collaboration.routers.publish import (
         configure,
         reset_for_tests,
+    )
+    from app.gateway.collaboration.routers.publish import (
+        require_user as router_require_user,
     )
     from app.gateway.collaboration.routers.publish import (
         router as publish_router,
@@ -292,7 +311,7 @@ def test_router_abac_denies_member_when_workspace_membership_empty():
     try:
         app = FastAPI()
         app.include_router(publish_router)
-        app.dependency_overrides[require_user] = member_no_workspaces
+        app.dependency_overrides[router_require_user] = member_no_workspaces
 
         with TestClient(app) as client:
             resp = client.post(
