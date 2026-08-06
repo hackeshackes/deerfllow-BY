@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from typing import Any, Literal
 
 from deerflow.runtime.serialization import serialize
@@ -29,6 +30,47 @@ logger = logging.getLogger(__name__)
 
 # Valid stream_mode values for LangGraph's graph.astream()
 _VALID_LG_MODES = {"values", "updates", "checkpoints", "tasks", "debug", "messages", "custom"}
+
+
+async def _rollback_checkpoint(
+    checkpointer: Any,
+    *,
+    thread_id: str,
+    pre_checkpoint_id: str | None,
+) -> None:
+    """Rewind *thread_id* to the checkpoint captured before a run started.
+
+    Loads the pre-run checkpoint tuple and re-writes it as the thread's new tip
+    under a fresh checkpoint id that sorts highest among the thread's stored
+    checkpoints. The very next ``aget_tuple`` on the thread therefore returns
+    the pre-run state, discarding any intermediate checkpoints the run wrote.
+    The pre-run ``channel_versions`` are reused as the ``new_versions`` map, so
+    ``aput`` re-blobs the pre-run channel values under their existing version
+    keys.
+
+    ``checkpointer`` may be ``None`` (no persistence) and ``pre_checkpoint_id``
+    may be ``None`` (the thread had no prior checkpoint); both are no-ops.
+    """
+    if checkpointer is None or pre_checkpoint_id is None:
+        return
+
+    target = await checkpointer.aget_tuple(
+        {"configurable": {"thread_id": thread_id, "checkpoint_id": pre_checkpoint_id}}
+    )
+    if target is None or getattr(target, "checkpoint", None) is None:
+        return
+
+    checkpoint = dict(target.checkpoint)
+    # A fresh, monotonically-incrementing id guarantees this becomes the thread's
+    # new tip while carrying the pre-run state.
+    checkpoint["id"] = str(uuid.uuid1())
+
+    await checkpointer.aput(
+        {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
+        checkpoint,
+        target.metadata,
+        checkpoint.get("channel_versions") or {},
+    )
 
 
 async def run_agent(
@@ -172,14 +214,10 @@ async def run_agent(
             action = record.abort_action
             if action == "rollback":
                 await run_manager.set_status(run_id, RunStatus.error, error="Rolled back by user")
-                # TODO(Phase 2): Implement full checkpoint rollback.
-                # Use pre_run_checkpoint_id to revert the thread's checkpoint
-                # to the state before this run started. Requires a
-                # checkpointer.adelete() or equivalent API.
                 try:
-                    if checkpointer is not None and pre_run_checkpoint_id is not None:
-                        # Phase 2: roll back to pre_run_checkpoint_id
-                        pass
+                    await _rollback_checkpoint(
+                        checkpointer, thread_id=thread_id, pre_checkpoint_id=pre_run_checkpoint_id
+                    )
                     logger.info("Run %s rolled back", run_id)
                 except Exception:
                     logger.warning("Failed to rollback checkpoint for run %s", run_id)
