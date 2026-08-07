@@ -9,10 +9,10 @@ column on UsageRecord). Workspace-level breakdown is a v1.6.0 item.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.gateway.auth import require_user
+from app.gateway.auth import AuthUser, require_user
 from app.gateway.multitenancy.cost_dashboard import (
     CostBreakdown,
     aggregate_costs,
@@ -42,7 +42,7 @@ def configure(
     _quota_service = quota_service
 
 
-def _require_admin(user: "AuthUser" = Depends(require_user)) -> "AuthUser":
+def _require_admin(user: AuthUser = Depends(require_user)) -> AuthUser:
     """Only owners/admins can read or mutate multitenancy state."""
     # require_user returns AuthUser dataclass; role is attribute not key.
     role = getattr(user, "role", "")
@@ -94,7 +94,7 @@ def _to_quotadecision_out(b: CostBreakdown) -> CostBreakdownOut:
 @router.get("/cost/summary", response_model=UsageSummary)
 async def cost_summary(
     tenant_id: str,
-    user: "AuthUser" = Depends(_require_admin),
+    user: AuthUser = Depends(_require_admin),
 ) -> UsageSummary:
     """Aggregate usage for a tenant across all 3 group_by dimensions."""
     if _tracker is None:
@@ -123,16 +123,59 @@ async def cost_summary(
 @router.get("/usage/{tenant_id}", response_model=UsageSummary)
 async def usage_summary(
     tenant_id: str,
-    user: "AuthUser" = Depends(_require_admin),
+    user: AuthUser = Depends(_require_admin),
 ) -> UsageSummary:
     """Alias for /cost/summary?tenant_id=X for client convenience."""
     return await cost_summary(tenant_id=tenant_id, user=user)
 
 
+class QuotaUsageRow(BaseModel):
+    id: str
+    tokens: int = 0
+    executions: int = 0
+    last_active_at: float | None = None
+
+
+class QuotaUsageResponse(BaseModel):
+    group_by: str
+    rows: list[QuotaUsageRow]
+    next_cursor: int | None = None
+    total: int
+
+
+@router.get("/quota/usage", response_model=QuotaUsageResponse)
+async def quota_usage(
+    group_by: str = Query("user", pattern="^(user|workspace)$"),
+    since: float | None = Query(None, description="unix seconds; default 30d ago"),
+    until: float | None = Query(None, description="unix seconds; default now"),
+    limit: int = Query(25, ge=1, le=100),
+    cursor: int = Query(0, ge=0, description="row offset cursor"),
+    user: AuthUser = Depends(_require_admin),
+) -> QuotaUsageResponse:
+    """Per-user / per-workspace usage breakdown with pagination + date range."""
+    if _tracker is None:
+        raise HTTPException(status_code=503, detail="multitenancy not configured")
+
+    import time
+
+    now = time.time()
+    since_f = since if since is not None else now - 30 * 24 * 3600
+    until_f = until if until is not None else now
+
+    rows = await _tracker.aggregate(group_by, since=since_f, until=until_f)
+    page = rows[cursor : cursor + limit]
+    return QuotaUsageResponse(
+        group_by=group_by,
+        rows=[QuotaUsageRow(**r) for r in page],
+        total=len(rows),
+        next_cursor=(cursor + len(page)) if cursor + len(page) < len(rows) else None,
+    )
+
+
 @router.get("/quota/{tenant_id}", response_model=QuotaOut)
 async def get_quota(
     tenant_id: str,
-    user: "AuthUser" = Depends(_require_admin),
+    user: AuthUser = Depends(_require_admin),
 ) -> QuotaOut:
     """Read the current ResourceQuota for a tenant.
 
@@ -165,7 +208,7 @@ async def get_quota(
 async def set_quota(
     tenant_id: str,
     payload: QuotaIn,
-    user: "AuthUser" = Depends(_require_admin),
+    user: AuthUser = Depends(_require_admin),
 ) -> QuotaOut:
     if _quota_service is None:
         raise HTTPException(status_code=503, detail="multitenancy not configured")
@@ -190,3 +233,4 @@ async def set_quota(
     # on the service object (not on the quota).
     _quota_service._quota = new_quota  # type: ignore[attr-defined]
     return await get_quota(tenant_id, user=user)  # type: ignore[arg-type]
+

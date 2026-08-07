@@ -199,3 +199,41 @@ class InMemoryUsageTracker:
     async def all_records(self) -> list[UsageRecord]:
         async with self._lock:
             return list(self._records)
+
+    async def aggregate(
+        self,
+        by: str,
+        since: float,
+        until: float,
+    ) -> list[dict]:
+        """Aggregate usage per dimension over a time window.
+
+        ``by`` is ``"user"`` (groups ``UsageRecord.user_id``) or
+        ``"workspace"`` (groups ``UsageRecord.tenant_id``). Rows are sorted by
+        tokens descending, newest ``last_active_at`` tiebreak, and shaped as::
+
+            {"id", "tokens", "executions", "last_active_at"}
+
+        The tracker stores a single combined ``tokens`` figure (no separate
+        in/out split), so ``tokens`` is the total. Empty windows return ``[]``.
+        """
+        field = "user_id" if by == "user" else "tenant_id"
+
+        async with self._lock:
+            buckets: dict[str, dict] = {}
+            for r in self._records:
+                if not (since <= r.timestamp < until):
+                    continue
+                key = getattr(r, field)
+                b = buckets.setdefault(key, {"tokens": 0, "executions": 0, "last_active_at": None})
+                b["tokens"] += r.tokens
+                b["executions"] += 1
+                b["last_active_at"] = max(b["last_active_at"] or 0.0, r.timestamp)
+
+        return sorted(
+            (
+                {"id": k, **v}
+                for k, v in buckets.items()
+            ),
+            key=lambda row: (-row["tokens"], -row["last_active_at"]),
+        )
