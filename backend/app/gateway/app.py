@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -18,6 +19,7 @@ from app.gateway.routers import (
     admin_knowledge,
     admin_memory,
     admin_monitoring,
+    admin_policies,
     admin_secrets,
     admin_token_usage,
     agents,
@@ -188,6 +190,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 logger.info("Collaboration publish router mounted")
             else:
                 logger.warning("Store unavailable at lifespan; publish router not mounted")
+
+            # Point the admin ABAC policies API at the operator file (built-in
+            # presets when absent). Reuses the M2.2 loader's fallback.
+            from app.gateway.routers.admin_policies import configure_policies_file
+
+            configure_policies_file(str(Path.cwd() / ".deer-flow" / "policies.json"))
 
             logger.info("Multitenancy admin router mounted")
         except Exception:
@@ -363,6 +371,7 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     app.include_router(admin_knowledge.router)
     app.include_router(admin_memory.router)
     app.include_router(admin_monitoring.router)
+    app.include_router(admin_policies.router)
     app.include_router(admin_secrets.router)
     app.include_router(admin_token_usage.router)
 
