@@ -1088,6 +1088,21 @@ export interface Translations {
       subject: string;
       action: string;
     };
+    quotaUsage: {
+      title: string;
+      description: string;
+      groupByUser: string;
+      groupByWorkspace: string;
+      id: string;
+      tokens: string;
+      executions: string;
+      lastActive: string;
+      loading: string;
+      empty: string;
+      prev: string;
+      next: string;
+      loadFailed: string;
+    };
     users: {
       title: string;
       description: string;

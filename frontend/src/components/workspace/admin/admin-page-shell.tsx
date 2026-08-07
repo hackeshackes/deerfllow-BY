@@ -26,6 +26,7 @@ export function AdminPageShell({
     { href: "/workspace/admin/config", label: t.workspace.configCenter, icon: Settings2Icon },
     { href: "/workspace/admin/monitoring", label: t.workspace.monitoringCenter, icon: ActivityIcon },
     { href: "/workspace/admin/token-usage", label: t.workspace.tokenStatistics, icon: CoinsIcon },
+    { href: "/workspace/admin/quota-usage", label: t.admin.quotaUsage.title, icon: CoinsIcon },
     { href: "/workspace/admin/skills", label: t.workspace.skillsManagement, icon: BlocksIcon },
     { href: "/workspace/admin/users", label: t.workspace.userManagement, icon: ShieldCheckIcon },
     { href: "/workspace/admin/workspaces", label: t.workspace.workspaceManagement, icon: ShieldCheckIcon },
