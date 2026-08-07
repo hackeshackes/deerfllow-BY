@@ -61,9 +61,12 @@ async def _rollback_checkpoint(
         return
 
     checkpoint = dict(target.checkpoint)
-    # A fresh, monotonically-incrementing id guarantees this becomes the thread's
-    # new tip while carrying the pre-run state.
-    checkpoint["id"] = str(uuid.uuid1())
+    # A fresh id that is *guaranteed* to sort strictly above any existing
+    # checkpoint for the thread, so `aget_tuple` picks this one back up as the
+    # new tip (rewinding to the pre-run state). uuid1's timestamp can stall on
+    # the same clock tick, so we retry until strictly greater.
+    new_id = await _new_tip_id(checkpointer, thread_id)
+    checkpoint["id"] = new_id
 
     await checkpointer.aput(
         {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
@@ -71,6 +74,29 @@ async def _rollback_checkpoint(
         target.metadata,
         checkpoint.get("channel_versions") or {},
     )
+
+
+async def _new_tip_id(checkpointer: Any, thread_id: str) -> str:
+    """Return a checkpoint id that sorts strictly above the thread's current tip.
+
+    Reads the existing tip id and, if a fresh ``uuid1()`` would not sort larger
+    (same-millisecond generation), keeps drawing a carry-over id until it does.
+    Guards against an absent tip by returning a plain fresh uuid1.
+    """
+    try:
+        tip = await checkpointer.aget_tuple({"configurable": {"thread_id": thread_id}})
+    except Exception:  # pragma: no cover - belt-and-braces
+        tip = None
+    cur = tip.config.get("configurable", {}).get("checkpoint_id") if tip else None
+    if cur is None:
+        return str(uuid.uuid1())
+    candidate = str(uuid.uuid1())
+    # uuid1 is ordered by its timestamp; under the same clock tick the counter
+    # still advances, but be defensive: keep drawing until it strictly sorts
+    # above the current tip.
+    while candidate <= cur:
+        candidate = str(uuid.uuid1())
+    return candidate
 
 
 async def run_agent(

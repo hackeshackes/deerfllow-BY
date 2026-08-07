@@ -49,8 +49,20 @@ class SlackChannel(Channel):
         bot_token = self.config.get("bot_token", "")
         app_token = self.config.get("app_token", "")
 
+        # channels.slack.mode: "socket" (default when app_token present) or
+        # "webhook" to opt out of Socket Mode (backward-compatible).
+        mode = self.config.get("mode", "socket")
+
+        if mode == "webhook":
+            logger.info("Slack channel in webhook mode; socket mode disabled")
+            self._web_client = WebClient(token=bot_token) if bot_token else None
+            self._socket_client = None
+            self._running = True
+            self.bus.subscribe_outbound(self._on_outbound)
+            return
+
         if not bot_token or not app_token:
-            logger.error("Slack channel requires bot_token and app_token")
+            logger.error("Slack channel requires bot_token and app_token (or mode=webhook)")
             return
 
         self._web_client = WebClient(token=bot_token)
