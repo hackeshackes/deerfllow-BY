@@ -37,6 +37,7 @@ export function AdminPageShell({
     { href: "/workspace/admin/memory", label: t.workspace.memoryManagement, icon: BrainIcon },
     { href: "/workspace/admin/voice", label: t.workspace.voiceConfig, icon: MicIcon },
     { href: "/workspace/admin/secrets", label: t.admin.secrets.title, icon: KeyRoundIcon },
+    { href: "/workspace/admin/policies", label: t.admin.policies.title, icon: ShieldCheckIcon },
   ];
 
   return (

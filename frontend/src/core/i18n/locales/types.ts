@@ -1066,6 +1066,28 @@ export interface Translations {
       rotate: string;
       submitting: string;
     };
+    policies: {
+      title: string;
+      description: string;
+      tabView: string;
+      tabEdit: string;
+      tabAudit: string;
+      viewTitle: string;
+      editTitle: string;
+      auditTitle: string;
+      loading: string;
+      empty: string;
+      save: string;
+      saving: string;
+      saved: string;
+      cancel: string;
+      error: string;
+      saveFailed: string;
+      policyId: string;
+      effect: string;
+      subject: string;
+      action: string;
+    };
     users: {
       title: string;
       description: string;
