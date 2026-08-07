@@ -4,6 +4,14 @@ from .audit import (
     read_admin_audit_records,
 )
 from .config_store import AdminConfig, AdminConfigUpdate, get_admin_config, reload_admin_config, save_admin_config
+from .replication import (
+    ConflictError,
+    EnvelopeKMS,
+    ReplicationManager,
+    SecretReplicator,
+    unwrap_envelope,
+    wrap_envelope,
+)
 from .secrets import (
     KNOWN_SECRET_KEYS,
     KNOWN_VAULT_KEYS,
@@ -47,6 +55,10 @@ __all__ = [
     "KNOWN_VAULT_KEYS",
     "SECRETS_VAULT_ROUTABLE",
     "SECRET_REF_PREFIX",
+    "ConflictError",
+    "EnvelopeKMS",
+    "ReplicationManager",
+    "SecretReplicator",
     "SkillRating",
     "SkillShare",
     "UserSkillConfig",
@@ -76,7 +88,9 @@ __all__ = [
     "save_admin_config",
     "save_skill_share",
     "save_user_skill_config",
+    "unwrap_envelope",
     "upsert_skill_metadata",
     "upsert_secret",
     "user_is_in_workspace",
+    "wrap_envelope",
 ]
