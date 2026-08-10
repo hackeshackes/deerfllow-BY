@@ -205,6 +205,20 @@ def _require_single_workflow(
     return wf
 
 
+def _require_can_list_workspace(user: AuthUser, workspace_id: str) -> None:
+    """Enforce that a member may only list workflows from their own workspace.
+
+    ``GET /api/workflows`` takes ``workspace_id`` as a query param; without this
+    check a member who belongs to one workspace could enumerate another's
+    workflows by passing a foreign id. Owners may list any workspace.
+    """
+    if user.role == "owner":
+        return
+    memberships = {m.workspace_id for m in list_workspaces_for_user(user.id)}
+    if workspace_id not in memberships:
+        raise HTTPException(status_code=403, detail="not a member of this workspace")
+
+
 # ---- Routes ----
 
 
@@ -214,6 +228,7 @@ def list_workflows(
     user: AuthUser = Depends(require_user),
     store: WorkflowStore = Depends(_dep_store),
 ):
+    _require_can_list_workspace(user, workspace_id)
     items = store.list_by_workspace(workspace_id)
     return {"workflows": [_to_response(w) for w in items]}
 

@@ -15,7 +15,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.gateway.auth import AuthUser, require_user
+import app.gateway.canvas.routers.workflows as wfmod
+from app.gateway.auth import AuthUser
 from app.gateway.canvas.routers.workflows import (
     configure,
     reset_for_tests,
@@ -75,7 +76,7 @@ def client(monkeypatch):
     )
     app = FastAPI()
     app.include_router(canvas_router)
-    app.dependency_overrides[require_user] = _owner
+    app.dependency_overrides[wfmod.require_user] = _owner
     with TestClient(app) as tc:
         yield tc
     reset_for_tests()
@@ -98,7 +99,7 @@ def _create_wf(client: TestClient) -> str:
 
 
 def _as_member(client: TestClient) -> None:
-    client.app.dependency_overrides[require_user] = _member
+    client.app.dependency_overrides[wfmod.require_user] = _member
 
 
 def test_create_denied_for_member(client: TestClient):
