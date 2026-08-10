@@ -5,6 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.gateway.auth import AuthUser, require_user
 from app.gateway.connectors.routers.connectors import router
 
 
@@ -12,6 +13,19 @@ from app.gateway.connectors.routers.connectors import router
 def client():
     app = FastAPI()
     app.include_router(router)
+    # v1.7 M2 C: the read/delete endpoints are owner-gated via require_abac.
+    # Test with an owner so these fixture-level functional checks stay focused
+    # on the router logic; unauthenticated/member denial is covered by
+    # test_connectors_abac.py.
+    app.dependency_overrides[require_user] = lambda: AuthUser(
+        id="owner",
+        email="o@x.com",
+        role="owner",
+        name="O",
+        status="active",
+        password_hash="x",
+        salt="y",
+    )
     return TestClient(app)
 
 

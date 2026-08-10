@@ -11,7 +11,12 @@ production will wire them through DI so that tests can isolate state.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.gateway.abac.deps import require_abac
+from app.gateway.auth import AuthUser
 
 from ..dlq import InMemoryDLQStore
 from ..registry import get_registry
@@ -23,6 +28,13 @@ router = APIRouter(prefix="/api/connectors", tags=["connectors"])
 _dlq = InMemoryDLQStore()
 _bridge = WebhookBridge()
 
+ReadConnector = Annotated[
+    AuthUser, Depends(require_abac("read", "connector"))
+]
+WriteConnector = Annotated[
+    AuthUser, Depends(require_abac("write", "connector"))
+]
+
 
 def get_dlq_store() -> InMemoryDLQStore:
     return _dlq
@@ -33,7 +45,7 @@ def get_webhook_bridge() -> WebhookBridge:
 
 
 @router.get("")
-async def list_connectors() -> dict:
+async def list_connectors(_user: ReadConnector) -> dict:
     reg = get_registry()
     return {
         "connectors": [
@@ -44,12 +56,15 @@ async def list_connectors() -> dict:
 
 
 @router.get("/dlq")
-async def list_dlq(limit: int = Query(default=100, le=500, ge=1)) -> dict:
+async def list_dlq(
+    _user: ReadConnector,
+    limit: int = Query(default=100, le=500, ge=1),
+) -> dict:
     return {"items": _dlq.list_all(limit=limit)}
 
 
 @router.delete("/dlq/{item_id}", status_code=204)
-async def delete_dlq(item_id: str) -> None:
+async def delete_dlq(_user: WriteConnector, item_id: str) -> None:
     if not _dlq.delete(item_id):
         raise HTTPException(status_code=404, detail="dlq entry not found")
 
