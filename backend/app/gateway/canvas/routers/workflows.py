@@ -15,11 +15,11 @@ from app.gateway.abac import (
     Subject,
     WorkspaceMemberPolicy,
     evaluate,
+    require_abac,
 )
 from app.gateway.auth import (
     AuthUser,
     list_workspaces_for_user,
-    require_owner_user,
     require_user,
 )
 from app.gateway.canvas.executor import WorkflowExecutor
@@ -168,6 +168,43 @@ def _workflow_from_create(body: WorkflowCreate, wf_id: str) -> Workflow:
     )
 
 
+def _authorize_workflow(user: AuthUser, verb: str, wf: Workflow) -> bool:
+    """Return whether ``user`` may perform ``verb`` on ``wf`` (ABAC).
+
+    Mirrors the execute route's inline ABAC (OwnerOnlyPolicy +
+    WorkspaceMemberPolicy) so every single-resource workflow route is
+    workspace-isolated, not just execute. Owner is always allowed; a member
+    is allowed only when the workflow's ``workspace_id`` is in the subject's
+    workspace list.
+    """
+    subject = Subject(
+        id=user.id,
+        role=user.role,
+        attrs={"workspaces": [m.workspace_id for m in list_workspaces_for_user(user.id)]},
+    )
+    resource = Resource(type="workflow", id=wf.id, attrs={"workspace_id": wf.workspace_id})
+    decision = evaluate(
+        subject=subject,
+        resource=resource,
+        action=Action(verb=verb),
+        policies=(
+            OwnerOnlyPolicy(verbs=(verb,)),
+            WorkspaceMemberPolicy(verbs=(verb,)),
+        ),
+    )
+    return decision.allowed
+
+
+def _require_single_workflow(
+    store: WorkflowStore, user: AuthUser, workflow_id: str, verb: str
+) -> Workflow:
+    """Fetch a workflow or 404, then enforce ABAC access (hide on deny)."""
+    wf = store.get(workflow_id)
+    if wf is None or not _authorize_workflow(user, verb, wf):
+        raise HTTPException(status_code=404, detail="workflow not found")
+    return wf
+
+
 # ---- Routes ----
 
 
@@ -184,7 +221,7 @@ def list_workflows(
 @router.post("", response_model=WorkflowResponse, status_code=200)
 def create_workflow(
     body: WorkflowCreate,
-    user: AuthUser = Depends(require_owner_user),
+    user: AuthUser = Depends(require_abac("write", "workflow")),
     store: WorkflowStore = Depends(_dep_store),
     versions: VersionManager = Depends(_dep_versions),
 ):
@@ -204,9 +241,7 @@ def get_workflow(
     user: AuthUser = Depends(require_user),
     store: WorkflowStore = Depends(_dep_store),
 ):
-    wf = store.get(workflow_id)
-    if wf is None:
-        raise HTTPException(status_code=404, detail="workflow not found")
+    wf = _require_single_workflow(store, user, workflow_id, "read")
     return _to_response(wf)
 
 
@@ -218,9 +253,7 @@ def update_workflow(
     store: WorkflowStore = Depends(_dep_store),
     versions: VersionManager = Depends(_dep_versions),
 ):
-    current = store.get(workflow_id)
-    if current is None:
-        raise HTTPException(status_code=404, detail="workflow not found")
+    current = _require_single_workflow(store, user, workflow_id, "write")
     new_name = body.name if body.name is not None else current.name
     new_status = body.status if body.status is not None else current.status
     new_nodes = _nodes_from_schema(body.nodes) if body.nodes is not None else current.nodes
@@ -247,6 +280,7 @@ def delete_workflow(
     user: AuthUser = Depends(require_user),
     store: WorkflowStore = Depends(_dep_store),
 ):
+    _require_single_workflow(store, user, workflow_id, "delete")
     store.delete(workflow_id)
     return {"success": True}
 
@@ -258,8 +292,7 @@ def list_versions(
     store: WorkflowStore = Depends(_dep_store),
     versions: VersionManager = Depends(_dep_versions),
 ):
-    if store.get(workflow_id) is None:
-        raise HTTPException(status_code=404, detail="workflow not found")
+    _require_single_workflow(store, user, workflow_id, "read")
     return {
         "versions": [
             {
@@ -279,7 +312,9 @@ def rollback(
     version: int,
     user: AuthUser = Depends(require_user),
     versions: VersionManager = Depends(_dep_versions),
+    store: WorkflowStore = Depends(_dep_store),
 ):
+    _require_single_workflow(store, user, workflow_id, "rollback")
     try:
         restored = versions.rollback(workflow_id, version)
     except LookupError as exc:
@@ -318,16 +353,12 @@ async def list_executions(
 ):
     """Return the most recent executions for a workflow.
 
-    Read-only endpoint that surfaces the ``workflow_executions``
-    SQLite table (v1.6.1 follow-up). Best-effort, never 5xx: when
-    the executions table doesn't exist (memory backend, or pre-v1.6.1
-    database without the schema migration) the endpoint returns ``[]``
-    rather than failing the request — consistent with how the rest
-    of the canvas surfaces degrade gracefully without the optional
-    store.
+    Read-only endpoint that surfaces the ``workflow_executions`` SQLite table
+    (v1.6.1 follow-up). Best-effort, never 5xx: when the table doesn't exist
+    (memory backend, or pre v1.6.1 database without the migration) it returns
+    ``[]`` rather than failing — like the rest of the canvas surfaces.
     """
-    if store.get(workflow_id) is None:
-        raise HTTPException(status_code=404, detail="workflow not found")
+    _require_single_workflow(store, user, workflow_id, "read")
     exec_store = getattr(request.app.state, "canvas_execution_store", None)
     if exec_store is None:
         return {"executions": []}
