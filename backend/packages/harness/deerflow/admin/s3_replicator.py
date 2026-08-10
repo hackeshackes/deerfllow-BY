@@ -76,7 +76,8 @@ class S3Replicator(SecretReplicator):
         Exposed as a small pure function so tests can assert determinism and
         an operator can verify a known AWS test vector without a live server.
         """
-        credential_scope = f"{amz_date}/{self.region}/{_SERVICE}/aws4_request"
+        plan_date = amz_date[:8]  # credential scope + signing key use YYYYMMDD only
+        credential_scope = f"{plan_date}/{self.region}/{_SERVICE}/aws4_request"
 
         canonical_headers = "".join(
             f"{k.lower()}:{headers[k].strip()}\n" for k in sorted(headers)
@@ -97,7 +98,7 @@ class S3Replicator(SecretReplicator):
             ]
         )
 
-        signing_key = _derive_signing_key(self.secret_key, amz_date, self.region, _SERVICE)
+        signing_key = _derive_signing_key(self.secret_key, plan_date, self.region, _SERVICE)
         signature = hmac.new(signing_key, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
         return signature
 
@@ -130,7 +131,7 @@ class S3Replicator(SecretReplicator):
         amz_date: str,
     ) -> str:
         signature = self.sign(method, path, query, headers, body, amz_date)
-        scope = f"{amz_date}/{self.region}/{_SERVICE}/aws4_request"
+        scope = f"{amz_date[:8]}/{self.region}/{_SERVICE}/aws4_request"
         signed = ";".join(k.lower() for k in sorted(headers))
         return (
             f"{_ALGORITHM} Credential={self.access_key}/{scope}, "

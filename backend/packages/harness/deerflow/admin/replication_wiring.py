@@ -109,15 +109,19 @@ async def push_local_to_replica(
     Called after a rotate / upsert. The pushed plaintext is the vault's JSON
     dict; the manager wraps it in a KMS-envelope before storage, so the
     object-store blob is never cleartext.
+
+    Never raises: a corrupt vault read (``_read_secret_map`` failing) or a
+    transport/KMS failure is swallowed and audited as ``ok=false``, so the
+    underlying write's response is never turned into an error.
     """
     if not config.enabled or not config.remote:
         return
     mgr = manager or _manager_for(config)
     if mgr is None:
         return
-    data = _read_secret_map()
-    plaintext = json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
     try:
+        data = _read_secret_map()
+        plaintext = json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
         await mgr.push(config.remote, plaintext)
     except Exception as exc:  # noqa: BLE001 — replication failure is non-critical
         logger.warning("secret replication push failed for %s: %s", config.remote, exc)

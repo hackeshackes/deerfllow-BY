@@ -67,11 +67,12 @@ class KMSEnvelope(EnvelopeKMS):
         return _hmac(k_service, b"aws4_request")
 
     def _signature(self, amz_date: str, canonical_request: bytes) -> str:
-        scope = f"{amz_date}/{self.region}/{_SERVICE}/aws4_request"
+        plan_date = amz_date[:8]  # scope + signing-key date use YYYYMMDD only
+        scope = f"{plan_date}/{self.region}/{_SERVICE}/aws4_request"
         string_to_sign = "\n".join(
             [_ALGORITHM, amz_date, scope, hashlib.sha256(canonical_request).hexdigest()]
         )
-        key = self._derive_signing_key(amz_date)
+        key = self._derive_signing_key(plan_date)
         return hmac.new(key, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def _headers(self, amz_date: str, payload_hash: str, target: str) -> dict[str, str]:
@@ -87,7 +88,7 @@ class KMSEnvelope(EnvelopeKMS):
         }
 
     def _authorization(self, headers: dict[str, str], amz_date: str) -> str:
-        scope = f"{amz_date}/{self.region}/{_SERVICE}/aws4_request"
+        scope = f"{amz_date[:8]}/{self.region}/{_SERVICE}/aws4_request"
         signed = ";".join(k.lower() for k in sorted(headers))
         payload_hash = headers["x-amz-content-sha256"]
         canonical_headers = "".join(f"{k.lower()}:{headers[k].strip()}\n" for k in sorted(headers))
