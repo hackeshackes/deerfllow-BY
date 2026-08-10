@@ -206,9 +206,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             # Point the admin ABAC policies API at the operator file (built-in
             # presets when absent). Reuses the M2.2 loader's fallback.
+            from app.gateway.abac.deps import configure_abac_policies_path
             from app.gateway.routers.admin_policies import configure_policies_file
 
-            configure_policies_file(str(Path.cwd() / ".deer-flow" / "policies.json"))
+            policies_path = str(Path.cwd() / ".deer-flow" / "policies.json")
+            configure_policies_file(policies_path)
+            # v1.7 M2 A: make the require_abac gate read the SAME operator file
+            # the /api/admin/policies editor writes, so an operator edit takes
+            # effect on every ABAC-gated route immediately (previously the gate
+            # used only the built-in presets and ignored the edited file).
+            configure_abac_policies_path(policies_path)
 
             logger.info("Multitenancy admin router mounted")
         except Exception:
