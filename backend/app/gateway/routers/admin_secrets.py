@@ -42,6 +42,27 @@ from deerflow.admin.secrets import _acquire_rotate_lock, _read_secret_map
 router = APIRouter(prefix="/api/admin", tags=["admin-secrets"])
 
 
+async def _replicate_after_write(actor_id: str) -> None:
+    """Best-effort propagate the local vault to the remote replica after a write.
+
+    Uses the resolved replication config; disabled config → no-op. Never raises:
+    a replication failure must not change the write's response or audit.
+    """
+    try:
+        from deerflow.admin.replication_config import load_replication_config
+        from deerflow.admin.replication_wiring import push_local_to_replica
+
+        await push_local_to_replica(
+            load_replication_config(), actor_id=actor_id
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "secret replication push after write failed (non-fatal)"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Pydantic request / response models
 # ---------------------------------------------------------------------------
@@ -256,6 +277,7 @@ async def upsert_secret_endpoint(body: SecretUpsertRequest, request: Request) ->
                 target=f"secret://{body.key}",
                 details={"key": body.key, "reference": None},
             )
+        await _replicate_after_write(user.id)
         return SecretUpsertResponse(key=body.key, reference=None, status="deleted")
 
     reference = upsert_secret(body.key, body.value)
@@ -265,6 +287,7 @@ async def upsert_secret_endpoint(body: SecretUpsertRequest, request: Request) ->
         target=reference or body.key,
         details={"key": body.key, "value_length": len(body.value), "reference": reference},
     )
+    await _replicate_after_write(user.id)
     return SecretUpsertResponse(key=body.key, reference=reference, status="upserted")
 
 
@@ -315,6 +338,8 @@ async def rotate_secret_endpoint(body: SecretRotateRequest, request: Request) ->
             "password_verified": True,
         },
     )
+
+    await _replicate_after_write(user.id)
 
     return SecretRotateResponse(
         key=body.key,

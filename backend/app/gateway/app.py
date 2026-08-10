@@ -124,6 +124,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception:
             logger.exception("No IM channels configured or channel service failed to start")
 
+        # v1.7 M4 — seed the local secrets vault from the remote replica at
+        # cold start. Best-effort and non-fatal: with replication disabled or
+        # a transient remote error, the existing degrade-to-empty vault read
+        # path is left untouched.
+        try:
+            from deerflow.admin.replication_config import load_replication_config
+            from deerflow.admin.replication_wiring import pull_replica_to_cache
+
+            await pull_replica_to_cache(load_replication_config())
+            logger.info("Secret replication cold-start pull complete")
+        except Exception:
+            logger.exception("Secret replication cold-start pull failed (non-fatal)")
+
         try:
             from app.gateway.scheduler import load_scheduled_tasks_from_db, start_scheduler
 

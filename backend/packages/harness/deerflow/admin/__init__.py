@@ -3,6 +3,7 @@ from .audit import (
     filter_admin_audit_records,
     read_admin_audit_records,
 )
+from .aws_kms import KMSEnvelope
 from .config_store import AdminConfig, AdminConfigUpdate, get_admin_config, reload_admin_config, save_admin_config
 from .replication import (
     ConflictError,
@@ -12,6 +13,13 @@ from .replication import (
     unwrap_envelope,
     wrap_envelope,
 )
+from .replication_config import ReplicationConfig, load_replication_config
+from .replication_wiring import (
+    build_rep_manager,
+    pull_replica_to_cache,
+    push_local_to_replica,
+)
+from .s3_replicator import S3Replicator
 from .secrets import (
     KNOWN_SECRET_KEYS,
     KNOWN_VAULT_KEYS,
@@ -51,12 +59,15 @@ __all__ = [
     "AdminConfig",
     "AdminConfigUpdate",
     "DEFAULT_SKILL_METADATA_ZH",
+    "KMSEnvelope",
     "KNOWN_SECRET_KEYS",
     "KNOWN_VAULT_KEYS",
+    "S3Replicator",
     "SECRETS_VAULT_ROUTABLE",
     "SECRET_REF_PREFIX",
     "ConflictError",
     "EnvelopeKMS",
+    "ReplicationConfig",
     "ReplicationManager",
     "SecretReplicator",
     "SkillRating",
@@ -65,6 +76,7 @@ __all__ = [
     "UserSkillConfigStore",
     "add_skill_rating",
     "append_admin_audit_record",
+    "build_rep_manager",
     "delete_secret",
     "delete_skill_share",
     "filter_admin_audit_records",
@@ -78,7 +90,10 @@ __all__ = [
     "get_visible_skills_for_user",
     "is_placeholder_value",
     "is_secret_ref",
+    "load_replication_config",
     "mask_secret_value",
+    "pull_replica_to_cache",
+    "push_local_to_replica",
     "read_admin_audit_records",
     "read_skill_metadata",
     "reload_admin_config",
