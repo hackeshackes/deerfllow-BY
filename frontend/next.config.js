@@ -16,6 +16,10 @@ function getInternalServiceURL(envKey, fallbackURL) {
 /** @type {import("next").NextConfig} */
 const config = {
   devIndicators: false,
+  // Allow dev-origin access to Next.js dev resources from both localhost and
+  // 127.0.0.1. Without this, Next 16 blocks the JS chunks for the 127.0.0.1
+  // host, which silently kills the login animation and client-side UI.
+  allowedDevOrigins: ["localhost", "127.0.0.1"],
   async rewrites() {
     const beforeFiles = [];
     const fallback = [];

@@ -12,35 +12,54 @@ type Props = {
 };
 
 /**
- * PublishButton — opens a dialog that prompts the user to pick a target
- * workspace, then POSTs to /api/threads/{threadId}/publish with the
- * selection. Filters out the current workspace from the list.
+ * PublishButton — cross-workspace publish of the current thread.
+ *
+ * On mount it fetches the workspace list once to decide whether the button is
+ * even useful: if there are no OTHER workspaces to publish into (nothing but
+ * the current one), the button is hidden entirely — a single-workspace or
+ * personal deployment gets no empty dead-end dialog.
+ *
+ * When shown, opening the dialog reuses the already-fetched list (no second
+ * fetch); the user picks a target and we POST /api/threads/{id}/publish.
  */
 export function PublishButton({ threadId, currentWorkspaceId }: Props) {
   const [open, setOpen] = React.useState(false);
   const [workspaces, setWorkspaces] = React.useState<Workspace[]>([]);
+  const [loaded, setLoaded] = React.useState(false);
   const [target, setTarget] = React.useState("");
   const [status, setStatus] = React.useState<Status>("idle");
   const submittingRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (!open) return;
     let cancelled = false;
-    setStatus("loading");
     listWorkspaces()
       .then((ws) => {
         if (cancelled) return;
-        setWorkspaces(ws.filter((w) => w.id !== currentWorkspaceId));
-        setStatus("idle");
+        setWorkspaces(ws);
+        setLoaded(true);
       })
       .catch(() => {
         if (cancelled) return;
-        setStatus("err");
+        // Dereference on error: hide the button rather than show a broken
+        // feature the user can't act on.
+        setLoaded(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [open, currentWorkspaceId]);
+  }, []);
+
+  const targets = workspaces.filter((w) => w.id !== currentWorkspaceId);
+
+  // Wait for the workspace prefetch; avoid a flash of the button that then
+  // disappears once we know there is nowhere to publish to.
+  if (!loaded) {
+    return null;
+  }
+  if (targets.length === 0) {
+    // Only the current workspace exists — publishing is a no-op here.
+    return null;
+  }
 
   const submit = async () => {
     if (submittingRef.current) return;
@@ -75,7 +94,7 @@ export function PublishButton({ threadId, currentWorkspaceId }: Props) {
             onChange={(event) => setTarget(event.target.value)}
           >
             <option value="">Select workspace</option>
-            {workspaces.map((w) => (
+            {targets.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.name}
               </option>

@@ -24,32 +24,58 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("PublishButton", () => {
-  it("renders a publish trigger button", () => {
+function mockSpaces(workspaces: { id: string; name: string }[]) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ workspaces }),
+  } as Response);
+}
+
+describe("PublishButton — visibility gating", () => {
+  it("renders the trigger when there is a target workspace to publish into", async () => {
+    mockSpaces([{ id: "ws-b", name: "Sales" }]);
     render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
 
     expect(
-      screen.getByRole("button", { name: /publish/i }),
+      await screen.findByRole("button", { name: /publish/i }),
     ).toBeInTheDocument();
   });
 
-  it("opens the dialog and fetches workspaces on click", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        workspaces: [
-          { id: "ws-b", name: "Sales" },
-          { id: "ws-c", name: "Marketing" },
-        ],
-      }),
-    } as Response);
-
+  it("hides the button when only the current workspace exists", async () => {
+    mockSpaces([{ id: "ws-a", name: "Self" }]);
     render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
+    // Wait for the prefetch to settle (no button should ever appear).
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    expect(
+      screen.queryByRole("button", { name: /publish/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides when the prefetch fails (dereference, don't show broken UI)", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("network"));
+    render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    expect(
+      screen.queryByRole("button", { name: /publish/i }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("PublishButton — dialog flow (list prefetched on mount)", () => {
+  it("opens a dialog with the prefetched target workspaces", async () => {
+    mockSpaces([
+      { id: "ws-b", name: "Sales" },
+      { id: "ws-c", name: "Marketing" },
+    ]);
+    render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /publish/i }),
+    );
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-
     await waitFor(() => {
       expect(
         screen.getByRole("option", { name: /Sales/i }),
@@ -58,22 +84,19 @@ describe("PublishButton", () => {
         screen.getByRole("option", { name: /Marketing/i }),
       ).toBeInTheDocument();
     });
+    // No second fetch when opening (list is reused).
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("filters out the current workspace from the list", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        workspaces: [
-          { id: "ws-a", name: "Self" },
-          { id: "ws-b", name: "Other" },
-        ],
-      }),
-    } as Response);
-
+    mockSpaces([
+      { id: "ws-a", name: "Self" },
+      { id: "ws-b", name: "Other" },
+    ]);
     render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /publish/i }));
+    await screen.findByRole("dialog");
 
     await waitFor(() => {
       expect(
@@ -86,28 +109,22 @@ describe("PublishButton", () => {
   });
 
   it("submits the publish and shows the success status", async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          workspaces: [{ id: "ws-b", name: "Sales" }],
-        }),
-      } as Response) // GET /api/spaces
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          new_thread_id: "T",
-          source_thread_id: "A",
-          target_workspace_id: "ws-b",
-          original_thread_id: "A",
-          published_at: "2026-07-06T00:00:00Z",
-        }),
-      } as Response); // POST /api/threads/A/publish
+    // 1 x GET /api/spaces (mount) + 1 x POST /api/threads/A/publish.
+    mockSpaces([{ id: "ws-b", name: "Sales" }]);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        new_thread_id: "T",
+        source_thread_id: "A",
+        target_workspace_id: "ws-b",
+        original_thread_id: "A",
+        published_at: "2026-07-06T00:00:00Z",
+      }),
+    } as Response);
 
     render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
-
+    fireEvent.click(await screen.findByRole("button", { name: /publish/i }));
     await screen.findByRole("dialog");
 
     const select = await screen.findByRole("combobox");
@@ -117,11 +134,9 @@ describe("PublishButton", () => {
       ).toBeInTheDocument();
     });
     fireEvent.change(select, { target: { value: "ws-b" } });
-
     fireEvent.click(screen.getByRole("button", { name: /confirm/i }));
 
     expect(await screen.findByText(/published/i)).toBeInTheDocument();
-    // POST payload: { target_workspace_id: "ws-b" }
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const [, postInit] = mockFetch.mock.calls[1] as [
       string,
@@ -134,22 +149,16 @@ describe("PublishButton", () => {
   });
 
   it("shows Failed status when publish returns non-OK", async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          workspaces: [{ id: "ws-b", name: "Sales" }],
-        }),
-      } as Response) // GET /api/spaces
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({ detail: "not found" }),
-      } as Response); // POST /api/threads/A/publish -> 404
+    mockSpaces([{ id: "ws-b", name: "Sales" }]);
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({ detail: "not found" }),
+    } as Response);
 
     render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /publish/i }));
     await screen.findByRole("dialog");
 
     const select = await screen.findByRole("combobox");
@@ -166,25 +175,18 @@ describe("PublishButton", () => {
   });
 
   it("disables Confirm button while publish is in flight", async () => {
-    // Use a fetch that never resolves during the click; we'll resolve later.
+    mockSpaces([{ id: "ws-b", name: "Sales" }]);
     let resolvePublish!: (value: unknown) => void;
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          workspaces: [{ id: "ws-b", name: "Sales" }],
+    mockFetch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePublish = resolve;
         }),
-      } as Response) // GET /api/spaces
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolvePublish = resolve;
-          }),
-      ); // POST /api/threads/A/publish (pending)
+    ); // POST (pending)
 
     render(<PublishButton threadId="A" currentWorkspaceId="ws-a" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /publish/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /publish/i }));
     await screen.findByRole("dialog");
 
     const select = await screen.findByRole("combobox");
@@ -198,14 +200,9 @@ describe("PublishButton", () => {
     const confirm = screen.getByRole("button", { name: /confirm/i });
     fireEvent.click(confirm);
 
-    // After click but before promise resolves, Confirm should be disabled.
     expect(confirm).toBeDisabled();
 
-    // Resolve the pending publish to clean up.
-    resolvePublish({
-      ok: true,
-      json: async () => ({ new_thread_id: "T" }),
-    });
+    resolvePublish({ ok: true, json: async () => ({ new_thread_id: "t" }) });
     expect(await screen.findByText(/published/i)).toBeInTheDocument();
   });
 });
