@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.gateway.auth import require_owner_user
+from app.gateway.abac.deps import require_abac
+from app.gateway.auth import AuthUser
 from deerflow.agents.memory.updater import get_memory_data
 
 router = APIRouter(prefix="/api/admin/memory", tags=["admin-memory"])
@@ -19,9 +20,10 @@ class AdminMemoryListResponse(BaseModel):
 
 
 @router.get("/users/{user_id}", response_model=AdminMemoryResponse)
-async def admin_get_user_memory(user_id: str, request: Request) -> AdminMemoryResponse:
-    require_owner_user(request)
-
+async def admin_get_user_memory(
+    user_id: str,
+    _owner: AuthUser = Depends(require_abac("read", "admin-memory")),
+) -> AdminMemoryResponse:
     try:
         memory_data = get_memory_data(user_id=user_id)
     except Exception as exc:

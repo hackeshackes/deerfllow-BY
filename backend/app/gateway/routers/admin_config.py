@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.gateway.auth import require_owner_user
+from app.gateway.abac.deps import require_abac
+from app.gateway.auth import AuthUser
 from deerflow.admin import append_admin_audit_record, get_admin_config, read_admin_audit_records, save_admin_config
 from deerflow.admin.config_store import (
     AdminBrandingConfig,
@@ -189,14 +190,17 @@ async def get_public_branding() -> AdminBrandingResponse:
 
 
 @router.get("/config", response_model=AdminConfigResponse)
-async def get_admin_configuration(request: Request) -> AdminConfigResponse:
-    require_owner_user(request)
+async def get_admin_configuration(
+    _owner: AuthUser = Depends(require_abac("read", "admin-config")),
+) -> AdminConfigResponse:
     return _to_response()
 
 
 @router.put("/config", response_model=AdminConfigResponse)
-async def update_admin_configuration(body: AdminConfigUpdateRequest, request: Request) -> AdminConfigResponse:
-    user = require_owner_user(request)
+async def update_admin_configuration(
+    body: AdminConfigUpdateRequest,
+    user: AuthUser = Depends(require_abac("write", "admin-config")),
+) -> AdminConfigResponse:
 
     current_config = get_admin_config()
 
@@ -219,8 +223,9 @@ async def update_admin_configuration(body: AdminConfigUpdateRequest, request: Re
 
 
 @router.get("/config/schema", response_model=dict)
-async def get_config_schema(request: Request) -> dict:
-    require_owner_user(request)
+async def get_config_schema(
+    _owner: AuthUser = Depends(require_abac("read", "admin-config")),
+) -> dict:
     return {
         "system": AdminSystemResponse.model_json_schema(),
         "tracing": AdminTracingResponse.model_json_schema(),
@@ -235,8 +240,10 @@ async def get_config_schema(request: Request) -> dict:
 
 
 @router.post("/config/validate", response_model=dict)
-async def validate_config(body: AdminConfigUpdateRequest, request: Request) -> dict:
-    require_owner_user(request)
+async def validate_config(
+    body: AdminConfigUpdateRequest,
+    _owner: AuthUser = Depends(require_abac("write", "admin-config")),
+) -> dict:
     errors = []
 
     if body.models is not None:
@@ -260,6 +267,7 @@ async def validate_config(body: AdminConfigUpdateRequest, request: Request) -> d
 
 
 @router.get("/audit", response_model=AdminAuditListResponse)
-async def get_admin_audit(request: Request) -> AdminAuditListResponse:
-    require_owner_user(request)
+async def get_admin_audit(
+    _owner: AuthUser = Depends(require_abac("read", "admin-config")),
+) -> AdminAuditListResponse:
     return AdminAuditListResponse(records=read_admin_audit_records())

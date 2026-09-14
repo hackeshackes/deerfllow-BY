@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **ABAC coverage extended to all admin routers (v1.7 M2.8).** `admin_config` `/api/admin/config`, `/config/schema`, `/validate`, `/audit`; `admin_knowledge` `/knowledge` list/update/delete; `admin_memory` `/memory/users/{id}`; `admin_monitoring` `/monitoring/overview`; and `admin_secrets` `/secrets/upsert|rotate|status|audit-events` were converted from the imperative `require_owner_user(request)` check to the `require_abac(verb, resource_type)` dependency (`admin-config` / `admin-knowledge` / `admin-memory` / `admin-monitoring` / `admin-secrets`; GET→`read`, PUT/POST/DELETE→`write`). `GET /api/admin/public/branding` stays public. `admin_secrets.rotate` keeps its `current_admin_password` re-auth, per-IP rate limit, and `SECRETS_VAULT_ROUTABLE` allow-list on top of the ABAC gate. Behavior stays owner-only with no policy file (admin routes carry an empty `workspace_id`, so only the built-in owner branch matches); an operator file written via the `/api/admin/policies` editor can now shape admin access per-verb. Verified: new `tests/test_admin_abac_coverage.py` (29 cases); full backend suite green except the 2 known `client_e2e` failures.
+
 ### Fixed
 
 - Fixed frontend development mode so unmatched `/api/*` requests fall back to the Gateway while Next.js-owned `/api/auth/*` and `/api/memory/*` handlers remain local.

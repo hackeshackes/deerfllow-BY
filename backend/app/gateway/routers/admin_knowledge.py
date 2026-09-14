@@ -4,10 +4,11 @@ import sqlite3
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.gateway.auth import require_owner_user
+from app.gateway.abac.deps import require_abac
+from app.gateway.auth import AuthUser
 
 router = APIRouter(prefix="/api/admin/knowledge", tags=["admin-knowledge"])
 
@@ -41,9 +42,9 @@ class AdminKnowledgeListResponse(BaseModel):
 
 
 @router.get("", response_model=AdminKnowledgeListResponse)
-async def admin_list_knowledge_bases(request: Request) -> AdminKnowledgeListResponse:
-    require_owner_user(request)
-
+async def admin_list_knowledge_bases(
+    _owner: AuthUser = Depends(require_abac("read", "admin-knowledge")),
+) -> AdminKnowledgeListResponse:
     conn = _get_db()
     try:
         cursor = conn.execute("""
@@ -83,9 +84,11 @@ class AdminKnowledgeUpdateRequest(BaseModel):
 
 
 @router.put("/{kb_id}", response_model=AdminKnowledgeBaseResponse)
-async def admin_update_knowledge_base(kb_id: str, request: Request, body: AdminKnowledgeUpdateRequest) -> AdminKnowledgeBaseResponse:
-    require_owner_user(request)
-
+async def admin_update_knowledge_base(
+    kb_id: str,
+    body: AdminKnowledgeUpdateRequest,
+    _owner: AuthUser = Depends(require_abac("write", "admin-knowledge")),
+) -> AdminKnowledgeBaseResponse:
     conn = _get_db()
     try:
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))
@@ -140,9 +143,10 @@ async def admin_update_knowledge_base(kb_id: str, request: Request, body: AdminK
 
 
 @router.delete("/{kb_id}")
-async def admin_delete_knowledge_base(kb_id: str, request: Request) -> dict:
-    require_owner_user(request)
-
+async def admin_delete_knowledge_base(
+    kb_id: str,
+    _owner: AuthUser = Depends(require_abac("write", "admin-knowledge")),
+) -> dict:
     conn = _get_db()
     try:
         cursor = conn.execute("SELECT * FROM knowledge_bases WHERE id = ?", (kb_id,))

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from app.gateway.auth import list_users, list_workspaces, require_owner_user
+from app.gateway.abac.deps import require_abac
+from app.gateway.auth import AuthUser, list_users, list_workspaces
 from deerflow.admin import get_admin_config, read_admin_audit_records
 from deerflow.config import get_app_config, get_enabled_tracing_providers, get_explicitly_enabled_tracing_providers, get_paths, get_tracing_config
 from deerflow.skills import load_skills
@@ -96,8 +97,10 @@ def _collect_filesystem_metrics() -> MonitoringMetricsResponse:
 
 
 @router.get("/overview", response_model=MonitoringOverviewResponse)
-async def get_monitoring_overview(request: Request) -> MonitoringOverviewResponse:
-    require_owner_user(request)
+async def get_monitoring_overview(
+    request: Request,
+    _owner: AuthUser = Depends(require_abac("read", "admin-monitoring")),
+) -> MonitoringOverviewResponse:
     tracing_config = get_tracing_config()
     metrics = _collect_filesystem_metrics()
 

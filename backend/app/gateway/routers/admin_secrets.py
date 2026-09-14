@@ -1,14 +1,19 @@
 """Owner-only admin endpoints for the encrypted secrets vault.
 
-Three endpoints:
+Four endpoints:
 - ``POST /api/admin/secrets/upsert`` — create or replace a vault entry.
 - ``POST /api/admin/secrets/rotate`` — atomic env + vault rewrite, gated by
   ``current_admin_password`` for keys that affect auth or the vault cipher.
 - ``GET /api/admin/secrets/status`` — report placeholder / fresh / missing for
   every catalog key.
+- ``GET /api/admin/secrets/audit-events`` — read back ``admin_secret.*`` audit
+  events from on-disk JSONL.
 
-All three mirror the imperative ``require_owner_user(request)`` pattern used
-by ``admin_config.py`` so existing tests continue to apply without rewriting.
+All four are gated by ``require_abac`` (``admin-secrets`` resource; ``read``/
+``write``) instead of the imperative ``require_owner_user(request)``. The
+``rotate`` endpoint keeps its layered ``current_admin_password`` re-auth, per-IP
+rate limit, and ``SECRETS_VAULT_ROUTABLE`` allow-list *in addition to* the ABAC
+gate.
 """
 
 from __future__ import annotations
@@ -18,10 +23,11 @@ import time
 from collections import deque
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.gateway.auth import authenticate_user, require_owner_user
+from app.gateway.abac.deps import require_abac
+from app.gateway.auth import AuthUser, authenticate_user
 from deerflow.admin import (
     KNOWN_SECRET_KEYS,
     KNOWN_VAULT_KEYS,
@@ -264,10 +270,11 @@ def _check_rotate_rate_limit(ip: str) -> None:
 
 
 @router.post("/secrets/upsert", response_model=SecretUpsertResponse)
-async def upsert_secret_endpoint(body: SecretUpsertRequest, request: Request) -> SecretUpsertResponse:
+async def upsert_secret_endpoint(
+    body: SecretUpsertRequest,
+    user: AuthUser = Depends(require_abac("write", "admin-secrets")),
+) -> SecretUpsertResponse:
     """Create or replace a vault entry. ``value=null`` deletes the entry."""
-    user = require_owner_user(request)
-
     if body.value is None:
         deleted = delete_secret(body.key)
         if deleted:
@@ -292,7 +299,11 @@ async def upsert_secret_endpoint(body: SecretUpsertRequest, request: Request) ->
 
 
 @router.post("/secrets/rotate", response_model=SecretRotateResponse)
-async def rotate_secret_endpoint(body: SecretRotateRequest, request: Request) -> SecretRotateResponse:
+async def rotate_secret_endpoint(
+    body: SecretRotateRequest,
+    request: Request,
+    user: AuthUser = Depends(require_abac("write", "admin-secrets")),
+) -> SecretRotateResponse:
     """Atomic rotation of an env-routable secret or vault entry.
 
     Requires ``current_admin_password`` to prevent session-hijack self-lockout.
@@ -301,7 +312,6 @@ async def rotate_secret_endpoint(body: SecretRotateRequest, request: Request) ->
     exclusive cross-process lock so two gateway replicas pointing at the same
     vault serialize instead of racing the cipher swap.
     """
-    user = require_owner_user(request)
     client_ip = request.client.host if request.client else "unknown"
     _check_rotate_rate_limit(client_ip)
 
@@ -351,7 +361,7 @@ async def rotate_secret_endpoint(body: SecretRotateRequest, request: Request) ->
 
 @router.get("/secrets/status", response_model=SecretStatusResponse)
 async def secrets_status_endpoint(
-    request: Request,
+    _owner: AuthUser = Depends(require_abac("read", "admin-secrets")),
     include_all: bool = False,
 ) -> SecretStatusResponse:
     """Report the current state of every catalog secret.
@@ -360,8 +370,6 @@ async def secrets_status_endpoint(
     (i.e. the operator-visible set). Pass ``?include_all=true`` to also see
     env-only keys (``OPENAI_API_KEY``, ``TAVILY_API_KEY``, ...).
     """
-    require_owner_user(request)
-
     vault_data = _read_secret_map()
     keys: list[str] = list(KNOWN_VAULT_KEYS)
     if include_all:
@@ -383,7 +391,7 @@ async def secrets_status_endpoint(
 
 @router.get("/secrets/audit-events", response_model=AdminAuditResponse)
 async def admin_audit_events_endpoint(
-    request: Request,
+    _owner: AuthUser = Depends(require_abac("read", "admin-secrets")),
     action_prefix: str | None = None,
     actor_id: str | None = None,
     limit: int = 200,
@@ -395,8 +403,6 @@ async def admin_audit_events_endpoint(
     by the owner who triggered the action. ``limit`` caps the read; the
     underlying file is the truth, so we read the tail and slice.
     """
-    require_owner_user(request)
-
     records = read_admin_audit_records(limit=limit)
     filtered = filter_admin_audit_records(
         records, action_prefix=action_prefix, actor_id=actor_id,

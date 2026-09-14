@@ -14,7 +14,6 @@ import json
 import os
 import secrets as _pysecrets
 from collections import deque
-from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -23,7 +22,6 @@ from fastapi.testclient import TestClient
 from app.gateway.auth import AuthUser, decode_session_token
 from app.gateway.routers import admin_secrets
 from deerflow.config.paths import Paths
-
 
 # ---------------------------------------------------------------------------
 # Fixtures + helpers
@@ -176,7 +174,9 @@ def test_upsert_rejects_non_owner(client, vault_env):
             json={"key": "models/x/api_key", "value": _gen_str(20)},
         )
     assert r.status_code == 403
-    assert r.json()["detail"] == "仅拥有者可执行此操作"
+    # Assert status only: the ABAC gate phrases the 403 differently from the
+    # legacy owner check, and this repo deliberately keeps tests independent
+    # of i18n message wording (see test_admin_routers_require_owner.py).
 
 
 def test_rotate_rejects_non_owner(client, vault_env):
