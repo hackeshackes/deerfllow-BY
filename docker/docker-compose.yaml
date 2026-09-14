@@ -165,6 +165,8 @@ services:
       - DEER_FLOW_HOST_BASE_DIR=${DEER_FLOW_HOME}
       - DEER_FLOW_HOST_SKILLS_PATH=${DEER_FLOW_REPO_ROOT}/skills
       - DEER_FLOW_SANDBOX_HOST=host.docker.internal
+      - MICX_CANVAS_STORE=${MICX_CANVAS_STORE:-sqlite}
+      - MICX_CANVAS_DB=${MICX_CANVAS_DB:-/app/backend/.deer-flow/canvas.db}
     env_file:
       - ../.env
     extra_hosts:
