@@ -13,7 +13,6 @@ import type { Model } from "@/core/models/types";
 import { useI18n } from "@/core/i18n/hooks";
 
 import { AdminPageShell } from "./admin-page-shell";
-import { ModelDiscoveryPanel, type DiscoveredItem } from "./model-discovery-panel";
 
 type FormState = {
   originalName?: string;
@@ -228,38 +227,72 @@ export function ModelsAdminPage() {
     }
   }
 
-  function addDiscovered(context: {
-    provider: string;
-    base_url: string;
-    api_key: string;
-    model: DiscoveredItem;
+  // --- 自动发现可用模型（填好 base_url + api_key 后触发） ---------------------------------
+  const [discBusy, setDiscBusy] = useState(false);
+  const [discError, setDiscError] = useState<string | null>(null);
+  const [discovered, setDiscovered] = useState<
+    { id: string; display_name: string; supports_vision: boolean; supports_thinking: boolean }[]
+  >([]);
+
+  function detectProvider(baseUrl: string): string {
+    const b = (baseUrl || "").toLowerCase();
+    if (b.includes("anthropic")) return "anthropic";
+    if (b.includes("generativelanguage") || b.includes("googleapis")) return "gemini";
+    return "openai";
+  }
+
+  async function fetchDiscovered() {
+    setDiscBusy(true);
+    setDiscError(null);
+    setDiscovered([]);
+    try {
+      const provider = detectProvider(form.base_url);
+      const r = await fetch("/api/admin/models/inspect", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          base_url: form.base_url || undefined,
+          api_key: form.api_key || undefined,
+        }),
+      });
+      if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { detail?: string };
+        throw new Error(d.detail ?? `获取失败 (${r.status})`);
+      }
+      const data = (await r.json()) as {
+        discovered: boolean;
+        models: { id: string; display_name: string; supports_vision: boolean; supports_thinking: boolean }[];
+        error_message?: string | null;
+      };
+      if (!data.discovered) throw new Error(data.error_message || "未发现可用模型");
+      setDiscovered(data.models);
+    } catch (err) {
+      setDiscError(err instanceof Error ? err.message : "获取失败");
+    } finally {
+      setDiscBusy(false);
+    }
+  }
+
+  function applyDiscoveredModel(m: {
+    id: string;
+    display_name: string;
+    supports_vision: boolean;
+    supports_thinking: boolean;
   }) {
-    const providerName = context.provider.toLowerCase().replace(".", "").replace(" ", "_");
-    setForm({
-      originalName: undefined,
-      name: `${providerName}-${context.model.id.replace(/[^a-z0-9-_.]+/gi, "-").toLowerCase()}`,
-      display_name: context.model.display_name || context.model.id,
-      description: `Auto-discovered from ${context.base_url || context.provider}`,
+    const providerName = detectProvider(form.base_url);
+    setForm((current) => ({
+      ...current,
+      name: `${providerName}-${m.id.replace(/[^a-z0-9-_.]+/gi, "-").toLowerCase()}`,
+      display_name: m.display_name || m.id,
+      model: m.id,
       use: "langchain_openai:ChatOpenAI",
-      model: context.model.id,
-      base_url: context.base_url || "",
-      api_key: context.api_key || "",
-      request_timeout: 120,
-      max_retries: 3,
-      max_tokens: 8192,
-      temperature: "0.7",
-      supports_thinking: context.model.supports_thinking,
-      supports_reasoning_effort: context.model.supports_thinking,
-      supports_vision: context.model.supports_vision,
-      use_responses_api: false,
-      output_version: "",
-      thinking: "",
-      when_thinking_enabled: "",
-      enabled: true,
-      is_default: models.length === 0,
-      capabilities: ["text"],
-    });
-    setDialogOpen(true);
+      supports_vision: m.supports_vision,
+      supports_thinking: m.supports_thinking,
+      supports_reasoning_effort: m.supports_thinking,
+    }));
+    setDiscovered([]);
   }
 
   return (
@@ -322,8 +355,6 @@ export function ModelsAdminPage() {
         </CardContent>
       </Card>
 
-      <ModelDiscoveryPanel onPick={addDiscovered} />
-
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -359,6 +390,37 @@ export function ModelsAdminPage() {
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
               <div className="text-sm font-medium">{t.admin.models.apiKey}</div>
               <Input value={form.api_key} onChange={(event) => setForm((current) => ({ ...current, api_key: event.target.value }))} placeholder="可直接填 key，或填写 $ENV_VAR" />
+            </div>
+
+            {/* 自动获取可用模型：填好 base_url + api_key 后点击，下拉选择即填好各参数 */}
+            <div className="space-y-2 md:col-span-2 lg:col-span-3 rounded-xl border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">自动获取可用模型</span>
+                <span className="text-muted-foreground text-xs">
+                  协议：{detectProvider(form.base_url)}
+                </span>
+                <Button type="button" size="sm" variant="outline" onClick={fetchDiscovered} disabled={discBusy}>
+                  {discBusy ? "获取中…" : "获取模型列表"}
+                </Button>
+              </div>
+              {discError && <p className="text-sm text-rose-600">{discError}</p>}
+              {discovered.length > 0 && (
+                <div className="grid gap-1 md:grid-cols-2">
+                  {discovered.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => applyDiscoveredModel(m)}
+                      className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-left text-sm hover:bg-slate-50"
+                    >
+                      <span className="truncate">{m.display_name || m.id}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {[m.supports_vision && "视觉", m.supports_thinking && "思考"].filter(Boolean).join(" · ") || "—"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <div className="text-sm font-medium">{t.admin.models.requestTimeout}</div>
