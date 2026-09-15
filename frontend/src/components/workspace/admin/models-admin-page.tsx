@@ -13,6 +13,7 @@ import type { Model } from "@/core/models/types";
 import { useI18n } from "@/core/i18n/hooks";
 
 import { AdminPageShell } from "./admin-page-shell";
+import { ModelDiscoveryPanel, type DiscoveredItem } from "./model-discovery-panel";
 
 type FormState = {
   originalName?: string;
@@ -227,6 +228,40 @@ export function ModelsAdminPage() {
     }
   }
 
+  function addDiscovered(context: {
+    provider: string;
+    base_url: string;
+    api_key: string;
+    model: DiscoveredItem;
+  }) {
+    const providerName = context.provider.toLowerCase().replace(".", "").replace(" ", "_");
+    setForm({
+      originalName: undefined,
+      name: `${providerName}-${context.model.id.replace(/[^a-z0-9-_.]+/gi, "-").toLowerCase()}`,
+      display_name: context.model.display_name || context.model.id,
+      description: `Auto-discovered from ${context.base_url || context.provider}`,
+      use: "langchain_openai:ChatOpenAI",
+      model: context.model.id,
+      base_url: context.base_url || "",
+      api_key: context.api_key || "",
+      request_timeout: 120,
+      max_retries: 3,
+      max_tokens: 8192,
+      temperature: "0.7",
+      supports_thinking: context.model.supports_thinking,
+      supports_reasoning_effort: context.model.supports_thinking,
+      supports_vision: context.model.supports_vision,
+      use_responses_api: false,
+      output_version: "",
+      thinking: "",
+      when_thinking_enabled: "",
+      enabled: true,
+      is_default: models.length === 0,
+      capabilities: ["text"],
+    });
+    setDialogOpen(true);
+  }
+
   return (
     <AdminPageShell title={t.admin.models.title} description={t.admin.models.description}>
       <Card>
@@ -286,6 +321,8 @@ export function ModelsAdminPage() {
           {testResult && <p className="text-sm text-sky-700">{testResult}</p>}
         </CardContent>
       </Card>
+
+      <ModelDiscoveryPanel onPick={addDiscovered} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
