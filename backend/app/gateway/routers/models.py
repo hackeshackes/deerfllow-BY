@@ -277,3 +277,50 @@ async def delete_admin_model(model_name: str, request: Request) -> ModelDeleteRe
     _persist_and_reload(data)
     append_admin_audit_record("model.deleted", actor_id=user.id, target=model_name)
     return ModelDeleteResponse(success=True, message=f"模型 {model_name} 已删除")
+
+
+class ModelInspectRequest(BaseModel):
+    provider: str = Field(..., description="openai | anthropic | gemini")
+    api_key: str | None = Field(default=None, description="Provider API key or $ENV/secret:// ref")
+    base_url: str | None = Field(default=None, description="Provider-compatible base URL")
+
+    model_config = {"extra": "forbid"}
+
+
+class ModelInspectResponse(BaseModel):
+    provider: str
+    base_url: str | None
+    discovered: bool
+    fallback_presets: bool
+    error_message: str | None = None
+    models: list[dict[str, Any]] = Field(default_factory=list, description="[{id, display_name, supports_vision, supports_thinking}]")
+
+
+@router.post("/admin/models/inspect", response_model=ModelInspectResponse)
+async def inspect_admin_models_available(payload: ModelInspectRequest, request: Request) -> ModelInspectResponse:
+    """Probe a provider base URL for the models it currently exposes (closing M2)."""
+    require_owner_user(request)
+    from deerflow.models.discovery import DiscoveryResult
+
+    # Never echo a raw key back; the discovery call only uses it as a header.
+    result = await DiscoveryResult.from_provider(
+        provider=payload.provider,
+        api_key=payload.api_key or "",
+        base_url=payload.base_url,
+    )
+    return ModelInspectResponse(
+        provider=result.provider,
+        base_url=result.base_url,
+        discovered=result.discovered,
+        fallback_presets=result.fallback_presets,
+        error_message=result.error_message,
+        models=[
+            {
+                "id": m.id,
+                "display_name": m.display_name or m.id,
+                "supports_vision": m.supports_vision,
+                "supports_thinking": m.supports_thinking,
+            }
+            for m in result.models
+        ],
+    )
