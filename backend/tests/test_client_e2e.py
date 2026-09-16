@@ -566,11 +566,11 @@ class TestSkillInstallation:
             c.install_skill(archive)
 
     def test_install_skill_invalid_extension(self, e2e_env, tmp_path):
-        """A file without .skill extension is rejected."""
-        bad_file = tmp_path / "not_a_skill.zip"
-        bad_file.write_bytes(b"PK\x03\x04")  # ZIP magic bytes
+        """A file with an unsupported extension is rejected by extension check."""
+        bad_file = tmp_path / "not_a_skill.exe"  # suffix not in allowed set
+        bad_file.write_bytes(b"PK\x03\x04")
         c = DeerFlowClient(checkpointer=None, thinking_enabled=False)
-        with pytest.raises(ValueError, match=".skill extension"):
+        with pytest.raises(ValueError, match="extension"):
             c.install_skill(bad_file)
 
     def test_install_skill_missing_frontmatter(self, e2e_env, tmp_path):
@@ -649,10 +649,18 @@ class TestConfigManagement:
         c = DeerFlowClient(checkpointer=None, thinking_enabled=False)
         assert c.get_skill("nonexistent-skill-xyz") is None
 
-    def test_get_mcp_config_returns_dict(self, e2e_env):
+    def test_get_mcp_config_returns_dict(self, e2e_env, tmp_path, monkeypatch):
         """get_mcp_config() returns a dict with 'mcp_servers' key."""
-        c = DeerFlowClient(checkpointer=None, thinking_enabled=False)
-        result = c.get_mcp_config()
+        # Isolate the extensions_config file so the loader doesn't hit the
+        # container's /app path (mirrors the update test below).
+        config_file = tmp_path / "extensions_config.json"
+        config_file.write_text(json.dumps({"mcpServers": {}, "skills": {}}))
+        monkeypatch.setenv("DEER_FLOW_EXTENSIONS_CONFIG_PATH", str(config_file))
+        from deerflow.config.extensions_config import reload_extensions_config
+
+        reload_extensions_config()
+
+        result = DeerFlowClient(checkpointer=None, thinking_enabled=False).get_mcp_config()
         assert "mcp_servers" in result
         assert isinstance(result["mcp_servers"], dict)
 
