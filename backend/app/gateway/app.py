@@ -513,9 +513,28 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     # router would 503 on the first create/rollback attempt.
     from app.gateway.canvas.versions import VersionManager
 
-    configure_canvas(wstore, VersionManager(wstore, vstore))
+    # Executor (Task A7) — was previously NOT wired, so POST /execute returned
+    # 503 "executor not configured". Register the no-external-dependency node
+    # kinds (prompt/branch/loop). AGENT/TOOL executors require a deerflow
+    # embedded client / tool registry and are wired only when those are
+    # instantiated alongside the canvas runtime.
+    from app.gateway.canvas.executor import WorkflowExecutor
+    from app.gateway.canvas.models import NodeKind
+    from app.gateway.canvas.nodes.branch import BranchNode
+    from app.gateway.canvas.nodes.loop import LoopNode
+    from app.gateway.canvas.nodes.prompt import PromptNode
+
+    canvas_executor = WorkflowExecutor(
+        node_executors={
+            NodeKind.PROMPT: PromptNode(),
+            NodeKind.BRANCH: BranchNode(),
+            NodeKind.LOOP: LoopNode(),
+        }
+    )
+    configure_canvas(wstore, VersionManager(wstore, vstore), executor=canvas_executor)
     app.include_router(canvas_router)
     app.state.canvas_store = wstore
+    app.state.canvas_executor = canvas_executor
     # v1.6.1 follow-up: execution-history store. None under memory
     # backend; the canvas router degrades to "executions: []" if
     # the attr is missing.
