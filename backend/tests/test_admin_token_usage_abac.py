@@ -61,7 +61,10 @@ def test_owner_allowed(client: TestClient, monkeypatch):
         def aggregate_by_model(self, since):  # noqa: ANN001
             return {}
 
-    monkeypatch.setattr("deerflow.admin.token_usage.get_token_usage_store", lambda: FakeStore())
+    # Patch the name as the router binds it (router does
+    # `from deerflow.admin.token_usage import get_token_usage_store`, so the
+    # module-level patch target is a no-op and the handler read the REAL store).
+    monkeypatch.setattr("app.gateway.routers.admin_token_usage.get_token_usage_store", lambda: FakeStore())
     resp = client.get("/api/admin/token-usage")
     assert resp.status_code == 200
     assert resp.json()["total"] == {
