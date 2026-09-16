@@ -13,6 +13,20 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 
 > **注意**: 本项目已与原版 DeerFlow 有显著差异，请勿直接使用原版文档参考本项目。
 
+## 🎉 v1.7.0 已发布 (2026-09-16)
+
+### 本版本核心变更
+
+v1.7.0 是一次 **minor 迭代**：完整落地 ABAC 全面覆盖（含跨 admin/资源策略化）、Canvas 持久化、多区域密钥复制、Slack Socket Mode、模型管理加强（自动发现 + 主流供应商全域），并修复 owner 登录与测试基线（后端全量测试首次 0 失败）。
+
+- **🧩 ABAC 全覆盖 (v1.7 M2.8)** — 所有 admin 路由从 owner-gate 升级为策略化 `require_abac`；policy 文件（经 `/api/admin/policies` 编辑器写入）可按 verb 塑造管理权限，无策略文件时行为保持 owner-only。
+- **🖌️ 模型自动发现** — 新增模型对话框填 `base_url + api_key` 即可拉取该网关可用模型并自动填好参数（OpenAI / Anthropic / Gemini 三协议，内置 SSRF 防护）。
+- **🏭 主流供应商预置 (15 家)** — OpenAI、Claude、Gemini、GLM、Qwen、Minimax、Groq、DeepSeek、Cohere、xAI、Moonshot/Kimi、豆包、01.AI、Mistral、Azure + 本地 Ollama/vLLM/LM Studio。
+- **💾 Canvas 持久化** — 工作流改存 sqlite，多 worker 一致、重启不丢。
+- **✅ 全量测试转绿** — 后端 2528 通过 / 0 失败；owner 登录（`BETTER_AUTH_SECRET` 对齐）修复。
+
+详细变更见 [CHANGELOG.md](./CHANGELOG.md)。
+
 ## 🎉 v1.6.3 已发布 (2026-07-22)
 
 ### 本版本核心变更

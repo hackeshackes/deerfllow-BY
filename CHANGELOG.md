@@ -7,12 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-16
+
+> **范围:** v1.7 里程碑（ABAC、quota、多区域密钥、Slack Socket Mode）+ 收尾增量（模型自动发现、主流供应商预置、部署加固）。Tag 指向发布 HEAD。
+
+### Added
+
+- **Model auto-discovery (closing M2).** `POST /api/admin/models/inspect` (owner-only) enumerates a gateway's available models from a provider base_url + api_key across **OpenAI-compatible / Anthropic / Gemini** protocols, with an SSRF guard and capability inference. The 新增模型 dialog fetches models + fills parameters on demand. (`deerflow/models/discovery.py`, `tests/test_model_inspect.py` 28 用例)
+- **Mainstream provider presets (closing M1).** Provider picker spans 15 families: OpenAI, Anthropic, Gemini, GLM, Qwen, Minimax, Groq, DeepSeek, Cohere, xAI + Moonshot/Kimi, Volcengine/豆包, 01.AI, Mistral, Azure, and local gateways (Ollama / vLLM / LM Studio).
+
 ### Changed
 
-- **ABAC coverage extended to all admin routers (v1.7 M2.8).** `admin_config` `/api/admin/config`, `/config/schema`, `/validate`, `/audit`; `admin_knowledge` `/knowledge` list/update/delete; `admin_memory` `/memory/users/{id}`; `admin_monitoring` `/monitoring/overview`; and `admin_secrets` `/secrets/upsert|rotate|status|audit-events` were converted from the imperative `require_owner_user(request)` check to the `require_abac(verb, resource_type)` dependency (`admin-config` / `admin-knowledge` / `admin-memory` / `admin-monitoring` / `admin-secrets`; GET→`read`, PUT/POST/DELETE→`write`). `GET /api/admin/public/branding` stays public. `admin_secrets.rotate` keeps its `current_admin_password` re-auth, per-IP rate limit, and `SECRETS_VAULT_ROUTABLE` allow-list on top of the ABAC gate. Behavior stays owner-only with no policy file (admin routes carry an empty `workspace_id`, so only the built-in owner branch matches); an operator file written via the `/api/admin/policies` editor can now shape admin access per-verb. Verified: new `tests/test_admin_abac_coverage.py` (29 cases); full backend suite green except the 2 known `client_e2e` failures.
+- **ABAC coverage extended to all admin routers (v1.7 M2.8).**
+- **Canvas workflows persist.** Gateway compose sets `MICX_CANVAS_STORE=sqlite`, so a workflow created on one uvicorn worker is visible and durable across workers/restarts.
+- **nginx:** `/api/workflows`, `/api/assistants`, `/api/runs` now proxy to the gateway (were falling through to the frontend → 500).
+
+### Fixed `admin_config` `/api/admin/config`, `/config/schema`, `/validate`, `/audit`; `admin_knowledge` `/knowledge` list/update/delete; `admin_memory` `/memory/users/{id}`; `admin_monitoring` `/monitoring/overview`; and `admin_secrets` `/secrets/upsert|rotate|status|audit-events` were converted from the imperative `require_owner_user(request)` check to the `require_abac(verb, resource_type)` dependency (`admin-config` / `admin-knowledge` / `admin-memory` / `admin-monitoring` / `admin-secrets`; GET→`read`, PUT/POST/DELETE→`write`). `GET /api/admin/public/branding` stays public. `admin_secrets.rotate` keeps its `current_admin_password` re-auth, per-IP rate limit, and `SECRETS_VAULT_ROUTABLE` allow-list on top of the ABAC gate. Behavior stays owner-only with no policy file (admin routes carry an empty `workspace_id`, so only the built-in owner branch matches); an operator file written via the `/api/admin/policies` editor can now shape admin access per-verb. Verified: new `tests/test_admin_abac_coverage.py` (29 cases); full backend suite green except the 2 known `client_e2e` failures.
 
 ### Fixed
 
+- **Owner login works again.** Root cause was a `BETTER_AUTH_SECRET` drift between the gateway and frontend containers (frontend's runtime secret no longer matched the backend's, so `by_session` cookies were rejected and users bounced back to sign-in). Recreating both containers with the same secret resolves it.
+- **Full backend suite is now green (0 known failures).** Fixed the 2 long-known `client_e2e` failures — both were stale test expectations, not product bugs (`.zip` is now an accepted extension; the mcp-config test lacked extension-config isolation).
 - Fixed frontend development mode so unmatched `/api/*` requests fall back to the Gateway while Next.js-owned `/api/auth/*` and `/api/memory/*` handlers remain local.
 
 ## [1.6.3] - 2026-07-22
