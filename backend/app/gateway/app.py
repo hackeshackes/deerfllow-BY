@@ -524,11 +524,45 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     from app.gateway.canvas.nodes.loop import LoopNode
     from app.gateway.canvas.nodes.prompt import PromptNode
 
+    # Canvas executors (Task A7) — prompt/branch/loop are dependency-free;
+    # agent/tool get real wiring below. These were previously NOT wired to the
+    # router at all (POST /execute returned 503 "executor not configured");
+    # wiring them here makes every node kind executable.
+    # Canvas AGENT/TOOL node executors (real dependency wiring).
+    # agent: uses the embedded DeerFlowClient.chat (sync) — builds the agent
+    #        on demand from the configured default model.
+    # tool:  a sync registry over get_available_tools(). Langchain tools are
+    #        async (ainvoke), which the sync registry.call contract cannot
+    #        await, so async-only tools surface as explicit step errors —
+    #        sync tools (if any) execute.
+    from app.gateway.canvas.nodes.agent import AgentNode
+    from app.gateway.canvas.nodes.tool import ToolNode
+    from deerflow.client import DeerFlowClient
+
+    _deer_client = DeerFlowClient()  # lightweight; agent built lazily on chat
+
+    class _CanvasToolRegistry:
+        def __init__(self) -> None:
+            from deerflow.tools import get_available_tools
+
+            self._tools = {t.name: t for t in get_available_tools(groups=[], include_mcp=False)}
+
+        def call(self, name: str, **kwargs):
+            tool = self._tools.get(name)
+            if tool is None:
+                raise KeyError(name)
+            # BaseTool is async; the ToolNode registry contract is sync.
+            if not hasattr(tool, "invoke"):
+                raise NotImplementedError(f"tool {name} has no sync invoke")
+            return tool.invoke(kwargs)
+
     canvas_executor = WorkflowExecutor(
         node_executors={
             NodeKind.PROMPT: PromptNode(),
             NodeKind.BRANCH: BranchNode(),
             NodeKind.LOOP: LoopNode(),
+            NodeKind.AGENT: AgentNode(_deer_client, "canvas-agent"),
+            NodeKind.TOOL: ToolNode(_CanvasToolRegistry()),
         }
     )
     configure_canvas(wstore, VersionManager(wstore, vstore), executor=canvas_executor)
