@@ -163,3 +163,44 @@ def test_create_summarization_middleware_uses_configured_model_alias(monkeypatch
     assert captured["name"] == "model-masswork"
     assert captured["thinking_enabled"] is False
     assert middleware["model"] is fake_model
+
+
+def test_make_lead_agent_falls_back_to_default_when_requested_model_missing(monkeypatch):
+    """A requested model_name that is not in the current config must fall back
+    to the default model instead of raising 'No chat model could be resolved'."""
+    app_config = _make_app_config(
+        [
+            _make_model("default-model", supports_thinking=False),
+            _make_model("other-model", supports_thinking=True),
+        ]
+    )
+
+    import deerflow.tools as tools_module
+
+    monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
+    monkeypatch.setattr(tools_module, "get_available_tools", lambda **kwargs: [])
+    monkeypatch.setattr(lead_agent_module, "_build_middlewares", lambda config, model_name, agent_name=None: [])
+
+    captured: dict[str, object] = {}
+
+    def _fake_create_chat_model(*, name, thinking_enabled, reasoning_effort=None):
+        captured["name"] = name
+        captured["thinking_enabled"] = thinking_enabled
+        return object()
+
+    monkeypatch.setattr(lead_agent_module, "create_chat_model", _fake_create_chat_model)
+    monkeypatch.setattr(lead_agent_module, "create_agent", lambda **kwargs: kwargs)
+
+    result = lead_agent_module.make_lead_agent(
+        {
+            "configurable": {
+                "model_name": "stale-model-that-was-removed",
+                "thinking_enabled": True,
+                "is_plan_mode": False,
+                "subagent_enabled": False,
+            }
+        }
+    )
+
+    assert captured["name"] == "default-model"
+    assert result["model"] is not None
