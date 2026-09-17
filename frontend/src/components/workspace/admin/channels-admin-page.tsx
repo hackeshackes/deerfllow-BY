@@ -28,6 +28,7 @@ type EditingChannel = {
   id: string;
   name: string;
   enabled: boolean;
+  mode?: string;
   app_id?: string;
   app_secret?: string;
   bot_token?: string;
@@ -60,6 +61,7 @@ const channelInfo = [
     fields: [
       { key: "bot_token", label: "Bot Token", placeholder: "xoxb-your-bot-token", isPassword: true },
       { key: "app_token", label: "App Token (Socket Mode)", placeholder: "xapp-your-app-token", isPassword: true },
+      { key: "mode", label: "运行模式", placeholder: "socket / webhook" },
     ],
   },
   {
@@ -186,6 +188,7 @@ export function ChannelsAdminPage() {
       id: channelId,
       name: channel.name,
       enabled: (channelConfig.enabled as boolean | undefined) ?? false,
+      mode: (channelConfig.mode as string | undefined) ?? "",
       app_id: (channelConfig.app_id as string | undefined) ?? "",
       app_secret: (channelConfig.app_secret as string | undefined) ?? "",
       bot_token: (channelConfig.bot_token as string | undefined) ?? "",
@@ -208,6 +211,7 @@ export function ChannelsAdminPage() {
       const payload: Record<string, string | boolean> = {
         enabled: editingChannel.enabled,
       };
+      if (editingChannel.mode) payload.mode = editingChannel.mode;
       if (editingChannel.app_id) payload.app_id = editingChannel.app_id;
       if (editingChannel.app_secret) payload.app_secret = editingChannel.app_secret;
       if (editingChannel.bot_token) payload.bot_token = editingChannel.bot_token;

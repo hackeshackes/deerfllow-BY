@@ -338,3 +338,100 @@ async def update_channel_thread(thread_id: str, body: ChannelThreadUpdateRequest
     logger.info(f"Channel thread {thread_id} updated: micx_user_id={body.micx_user_id}, micx_workspace_id={body.micx_workspace_id}")
     assert result is not None
     return result
+
+
+class ChannelConfigUpdate(BaseModel):
+    """M3 — per-platform channel configuration to save (tokens / enabled /
+    Slack socket-mode), owner-only."""
+    feishu: dict[str, Any] | None = None
+    slack: dict[str, Any] | None = None
+    telegram: dict[str, Any] | None = None
+    wecom: dict[str, Any] | None = None
+    dingtalk: dict[str, Any] | None = None
+
+    model_config = {"extra": "forbid"}
+
+
+class ChannelConfigUpdateResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.post("/config", response_model=ChannelConfigUpdateResponse)
+async def update_channel_config(
+    payload: ChannelConfigUpdate, request: Request
+) -> ChannelConfigUpdateResponse:
+    """Save IM channel configuration (tokens / enabled / slack socket-mode) back
+    to config.yaml's ``channels`` section and restart affected channels.
+
+    Only the provided fields are merged; omitted platforms are left unchanged.
+    Adding ``slack.mode: socket`` (with an ``app_token``) enables Socket Mode;
+    ``mode: webhook`` disables it.
+    """
+    require_owner_user(request)
+    current = _load_channels_from_yaml()
+    changed = payload.model_dump(exclude_none=True)
+    for name, cfg in changed.items():
+        merged = dict(current.get(name) or {})
+        if isinstance(cfg, dict):
+            for k, v in cfg.items():
+                if v is not None:
+                    merged[k] = v
+        current[name] = merged
+    _save_channels_to_yaml(current)
+
+    restarted: list[str] = []
+    from app.channels.service import get_channel_service
+
+    service = get_channel_service()
+    if service is not None:
+        for name, cfg in current.items():
+            if isinstance(cfg, dict) and cfg.get("enabled"):
+                try:
+                    if await service.restart_channel(name):
+                        restarted.append(name)
+                except Exception:  # noqa: BLE001
+                    logger.warning("channel %s restart failed", name)
+    return ChannelConfigUpdateResponse(
+        success=True,
+        message=f"channels config saved; restarted={restarted or 'none'}",
+    )
+
+
+@router.put("/{channel_name}", response_model=ChannelConfigUpdateResponse)
+async def update_channel_config_entry(
+    channel_name: str, payload: dict[str, Any], request: Request
+) -> ChannelConfigUpdateResponse:
+    """Update a single platform's channel config (enabled / tokens / slack
+    socket-mode) in config.yaml and restart it if it becomes enabled.
+
+    Matches the frontend save flow: PUT /api/channels/{id} with the platform's
+    editable fields (enabled, app_id, app_secret, bot_token, app_token, ...).
+    """
+    require_owner_user(request)
+    known = {"feishu", "slack", "telegram", "wecom", "dingtalk"}
+    if channel_name not in known:
+        raise HTTPException(status_code=422, detail=f"unknown channel '{channel_name}'")
+    current = _load_channels_from_yaml()
+    merged = dict(current.get(channel_name) or {})
+    for k, v in payload.items():
+        if v is not None:
+            merged[k] = v
+    current[channel_name] = merged
+    _save_channels_to_yaml(current)
+
+    restarted: list[str] = []
+    if merged.get("enabled"):
+        from app.channels.service import get_channel_service
+
+        service = get_channel_service()
+        if service is not None:
+            try:
+                if await service.restart_channel(channel_name):
+                    restarted.append(channel_name)
+            except Exception:  # noqa: BLE001
+                logger.warning("channel %s restart failed", channel_name)
+    return ChannelConfigUpdateResponse(
+        success=True,
+        message=f"{channel_name} config saved; restarted={','.join(restarted) or 'none'}",
+    )
