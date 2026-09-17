@@ -214,3 +214,43 @@ async def test_loop_repeats_downstream_subgraph_iterations_times():
         {"text": "X"},
         {"text": "X"},
     ]
+
+
+def test_tool_node_upserts_async_registry_acall():
+    """ToolNode must prefer an async registry.acall over sync call, so real
+    (async) langchain tools can execute inside the async executor."""
+    import asyncio
+
+    from app.gateway.canvas.nodes.tool import ToolNode
+
+    class _AsyncReg:
+        def __init__(self) -> None:
+            self.named_call = None
+
+        async def acall(self, name: str, **kw):
+            self.named_call = (name, kw)
+            return "done"
+
+        def call(self, name: str, **kw):  # pragma: no cover — must NOT be used
+            raise AssertionError("sync call should not be used")
+
+    reg = _AsyncReg()
+    node = ToolNode(reg)
+    out = asyncio.run(node.execute({"tool_name": "bash", "args": {"command": "echo hi"}}, {"x": "y"}))
+    assert reg.named_call is not None
+    assert out.error is None
+    assert out.outputs == {"value": "done"}
+
+
+def test_tool_node_sync_registry_still_works():
+    """Registry exposing only sync call keeps working (backward compat)."""
+    import asyncio
+
+    from app.gateway.canvas.nodes.tool import ToolNode
+
+    class _SyncReg:
+        def call(self, name: str, **kw):
+            return {"ok": name}
+
+    out = asyncio.run(ToolNode(_SyncReg()).execute({"tool_name": "t", "args": {}}, {}))
+    assert out.outputs == {"ok": "t"}

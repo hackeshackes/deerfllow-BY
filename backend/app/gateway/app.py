@@ -511,8 +511,6 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     wstore, vstore = get_canvas_store_and_versions()
     # VersionManager wraps both stores; without wiring it here, the
     # router would 503 on the first create/rollback attempt.
-    from app.gateway.canvas.versions import VersionManager
-
     # Executor (Task A7) — was previously NOT wired, so POST /execute returned
     # 503 "executor not configured". Register the no-external-dependency node
     # kinds (prompt/branch/loop). AGENT/TOOL executors require a deerflow
@@ -520,9 +518,6 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     # instantiated alongside the canvas runtime.
     from app.gateway.canvas.executor import WorkflowExecutor
     from app.gateway.canvas.models import NodeKind
-    from app.gateway.canvas.nodes.branch import BranchNode
-    from app.gateway.canvas.nodes.loop import LoopNode
-    from app.gateway.canvas.nodes.prompt import PromptNode
 
     # Canvas executors (Task A7) — prompt/branch/loop are dependency-free;
     # agent/tool get real wiring below. These were previously NOT wired to the
@@ -536,7 +531,11 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     #        await, so async-only tools surface as explicit step errors —
     #        sync tools (if any) execute.
     from app.gateway.canvas.nodes.agent import AgentNode
+    from app.gateway.canvas.nodes.branch import BranchNode
+    from app.gateway.canvas.nodes.loop import LoopNode
+    from app.gateway.canvas.nodes.prompt import PromptNode
     from app.gateway.canvas.nodes.tool import ToolNode
+    from app.gateway.canvas.versions import VersionManager
     from deerflow.client import DeerFlowClient
 
     _deer_client = DeerFlowClient()  # lightweight; agent built lazily on chat
@@ -545,13 +544,19 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
         def __init__(self) -> None:
             from deerflow.tools import get_available_tools
 
-            self._tools = {t.name: t for t in get_available_tools(groups=[], include_mcp=False)}
+            # groups=None -> every configured tool group (not just none).
+            self._tools = {t.name: t for t in get_available_tools(groups=None, include_mcp=False)}
+
+        async def acall(self, name: str, **kwargs):
+            tool = self._tools.get(name)
+            if tool is None:
+                raise KeyError(name)
+            return await tool.ainvoke(kwargs)
 
         def call(self, name: str, **kwargs):
             tool = self._tools.get(name)
             if tool is None:
                 raise KeyError(name)
-            # BaseTool is async; the ToolNode registry contract is sync.
             if not hasattr(tool, "invoke"):
                 raise NotImplementedError(f"tool {name} has no sync invoke")
             return tool.invoke(kwargs)

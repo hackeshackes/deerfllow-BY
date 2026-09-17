@@ -45,7 +45,13 @@ class ToolNode:
         for k, v in inputs.items():
             args[k] = v
         try:
-            result = self._registry.call(name, **args)
+            # Prefer an async registry (real langchain tools are async); fall
+            # back to the synchronous `call` for sync-only registries.
+            acall = getattr(self._registry, "acall", None)
+            if acall is not None:
+                result = await acall(name, **args)
+            else:
+                result = self._registry.call(name, **args)
         except KeyError:
             return NodeOutput(outputs={}, error=f"unknown tool: {name}")
         except Exception as exc:  # noqa: BLE001 — surface as NodeOutput.error
