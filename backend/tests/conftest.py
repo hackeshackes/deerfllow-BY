@@ -11,6 +11,31 @@ from unittest.mock import MagicMock
 # Make 'app' and 'deerflow' importable from any working directory
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Host test runs: the repo `.env` sets DEER_FLOW_CONFIG_PATH /
+# DEER_FLOW_EXTENSIONS_CONFIG_PATH to Docker-only absolute paths
+# (/app/config.yaml, /app/extensions_config.json). When the configured path
+# doesn't exist on disk (i.e. we're on the host, not in a container), fall back
+# to the repo-root files so `make test` works without manual env overrides.
+import os
+
+_REPO_ROOT = Path(__file__).parent.parent.parent
+
+
+def _fallback_missing_deer_paths() -> None:
+    for name, rel in (
+        ("DEER_FLOW_CONFIG_PATH", "config.yaml"),
+        ("DEER_FLOW_EXTENSIONS_CONFIG_PATH", "extensions_config.json"),
+    ):
+        p = os.environ.get(name)
+        missing = (not p) or (os.path.isabs(p) and not os.path.exists(p))
+        if missing:
+            cand = _REPO_ROOT / rel
+            if cand.exists():
+                os.environ[name] = str(cand)
+
+
+_fallback_missing_deer_paths()
+
 # Break the circular import chain that exists in production code:
 #   deerflow.subagents.__init__
 #     -> .executor (SubagentExecutor, SubagentResult)
