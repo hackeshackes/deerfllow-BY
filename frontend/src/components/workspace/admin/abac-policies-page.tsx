@@ -85,6 +85,7 @@ export function AbacPoliciesPage() {
         <TabsList>
           <TabsTrigger value="view">{t.admin.policies.tabView}</TabsTrigger>
           <TabsTrigger value="edit">{t.admin.policies.tabEdit}</TabsTrigger>
+          <TabsTrigger value="audit">{t.admin.policies.tabAudit ?? "审计"}</TabsTrigger>
         </TabsList>
 
         {error ? <div className="mt-2 text-sm text-destructive">{error}</div> : null}
@@ -148,8 +149,51 @@ export function AbacPoliciesPage() {
               </div>
             </CardContent>
           </Card>
+        <TabsContent value="audit">
+          <PoliciesAuditList />
         </TabsContent>
+</TabsContent>
       </Tabs>
     </AdminPageShell>
+  );
+}
+
+function PoliciesAuditList() {
+  const { t } = useI18n();
+  const [records, setRecords] = useState<Array<{ ts: string; action: string; actor_id?: string | null; target?: string | null; details?: Record<string, unknown> | null }>>([]);
+  useEffect(() => {
+    void fetch("/api/admin/policies/audit", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { records: [] }))
+      .then((d) => setRecords(Array.isArray(d.records) ? d.records : []))
+      .catch(() => setRecords([]));
+  }, []);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t.admin.policies.auditTitle ?? "发布审计"}</CardTitle>
+        <CardDescription>"发布记录"</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {records.length === 0 ? (
+          <p className="text-sm text-muted-foreground">暂无发布记录。</p>
+        ) : (
+          <div className="space-y-2">
+            {records.map((e, i) => (
+              <div key={i} className="rounded-lg border px-3 py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs text-muted-foreground">{e.ts}</span>
+                  <Badge variant="outline">{e.action}</Badge>
+                </div>
+                <div className="mt-1 text-xs">
+                  <span className="text-muted-foreground">actor:</span> {e.actor_id ?? "-"}
+                  {" · "}<span className="text-muted-foreground">target:</span> {e.target ?? "-"}
+                  {" · "}<span className="text-muted-foreground">details:</span> {JSON.stringify(e.details ?? {})}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
