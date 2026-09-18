@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **自定义技能创建**：安全扫描 moderation 模型指到可达模型 + `skills/custom` 可写挂载。
 - **Canvas `execute` 503** 已修复；**test 全量归零**：修复 2 个 `client_e2e` 陈旧断言 + token-usage 测试隔离 + conftest 宿主 env 兜底 → 后端 `2541 passed / 0 failed`。
 
+### Verified (live regression)
+
+针对本地部署系统的运行时功能回归：读矩阵 30/30 OK；知识库/工作流(含 execute/versions/rollback)/自定义技能/跨区发布/策略 publish+audit/模型 inspect 全部 green；4 容器健康、`/health` 200、近 30m 无 Traceback。详见 [`docs/releases/v1.8.0.md`](./docs/releases/v1.8.0.md)。
+
 ## [1.7.0] - 2026-09-16
 
 > **范围:** v1.7 里程碑（ABAC、quota、多区域密钥、Slack Socket Mode）+ 收尾增量（模型自动发现、主流供应商预置、部署加固）。Tag 指向发布 HEAD。
