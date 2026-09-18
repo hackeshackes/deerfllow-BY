@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-18
+
+> **范围:** v1.8.0 收尾 —— 模型管理加强（自动发现+主流供应商）、IM 频道配置保存、策略发布/审计、多区域密钥复制适配器（GCS/Aliyun）、测试零失败。Tag 指向发布 HEAD。
+
+### Added
+
+- **模型自动发现 (M2).** `POST /api/admin/models/inspect` 从 provider base_url + key 枚举可用模型（OpenAI 兼容 / Anthropic / Gemini），SSRF 防护 + 能力推断；新增模型对话框内即可「获取模型列表→一键填参数」。
+- **主流供应商预置 (M1).** provider 选择覆盖 15 家：OpenAI/Claude/Gemini/GLM/Qwen/Minimax/Groq/DeepSeek/Cohere/xAI + Moonshot(Kimi)·豆包·01.AI·Mistral·Azure·本地(Ollama/vLLM/LM Studio)。
+- **IM 频道配置可保存 (M3).** `PUT /api/channels/{type}` 写回 `config.yaml` 的 channels 并重启受影响频道；Slack 填 `mode: socket|webhook` 切换 Socket Mode（前端「运行模式」字段）。
+- **策略发布 + 审计 (M4.3).** `POST /api/admin/policies/publish`（校验+落盘+审计）；`GET /api/admin/policies/audit`；策略编辑器「审计」tab。
+- **多区域复制适配器 (M4.2).** `gcs_replicator.GCSReplicator`（XML SigV4）与 `aliyun_oss_replicator.AliyunOSSReplicator`（HMAC-SHA1），实现 `SecretReplicator`（get/put/exists/readonly）。
+
+### Changed
+
+- **Canvas 执行器全节点可用.** app 启动接线 `WorkflowExecutor`（prompt/branch/loop/agent/tool），`POST /execute` 从 503 修复为可执行；agent 用嵌入式 client 真实回复。默认模型调至网关可连的 DeepSeek。
+- **nginx** 对 `/api/workflows|assistants|runs` 转发到 gateway 上游；gateway `config.yaml` 挂载可写以支持频道配置写回。
+
+### Fixed
+
+- **owner 登录 / 聊天 401**：`BETTER_AUTH_SECRET` 跨 gateway·frontend·langgraph 容器对齐（vault 解析、会话校验）。
+- **自定义技能创建**：安全扫描 moderation 模型指到可达模型 + `skills/custom` 可写挂载。
+- **Canvas `execute` 503** 已修复；**test 全量归零**：修复 2 个 `client_e2e` 陈旧断言 + token-usage 测试隔离 + conftest 宿主 env 兜底 → 后端 `2541 passed / 0 failed`。
+
 ## [1.7.0] - 2026-09-16
 
 > **范围:** v1.7 里程碑（ABAC、quota、多区域密钥、Slack Socket Mode）+ 收尾增量（模型自动发现、主流供应商预置、部署加固）。Tag 指向发布 HEAD。

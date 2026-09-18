@@ -13,6 +13,20 @@ MicX 是基于 [DeerFlow](https://github.com/HACKESHACKES/deerflow) 的增强版
 
 > **注意**: 本项目已与原版 DeerFlow 有显著差异，请勿直接使用原版文档参考本项目。
 
+## 🎉 v1.8.0 已发布 (2026-09-18)
+
+### 本版本核心变更
+
+v1.8.0 是一次 **minor 收尾**：模型管理加强、IM 频道配置保存、策略发布/审计、多区域复制适配器，并把测试归零。
+
+- **🖌️ 模型自动发现** — 新增模型对话框填 `base_url + api_key` 即自动拉取可用模型并填好参数（OpenAI/Anthropic/Gemini，内置 SSRF 防护）；主流供应商预置扩到 **15 家**（含本地 Ollama/vLLM/LM Studio）。
+- **💬 IM 频道配置可保存** — `PUT /api/channels/{type}` 写回配置并重启；Slack 支持 `socket|webhook` 模式切换。
+- **🧪 策略发布 + 审计** — `POST /api/admin/policies/publish` + 审计 tab。
+- **☁️ 多区域复制** — 新增 **GCS + Aliyun OSS** 复用 `SecretReplicator` 适配器，连同 S3 覆盖主流对象存储。
+- **✅ 测试归零** — 后端 `2541 passed / 0 failed`；修复 owner 登录/BETTER_AUTH 跨容器、聊天 401、Canvas execute 503。
+
+详细变更见 [CHANGELOG.md](./CHANGELOG.md)。
+
 ## 🎉 v1.7.0 已发布 (2026-09-16)
 
 ### 本版本核心变更
