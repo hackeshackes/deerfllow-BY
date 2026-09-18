@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.gateway.abac.deps import require_abac
 from app.gateway.abac.policies_file import validate_policy_dict
@@ -95,3 +95,77 @@ def put_policies(
 
 
 __all__ = ["configure_policies_file", "router"]
+
+class PoliciesAuditEntry(BaseModel):
+    ts: str
+    action: str
+    actor_id: str | None = None
+    target: str | None = None
+    details: dict[str, Any] | None = None
+
+
+class PoliciesAuditResponse(BaseModel):
+    records: list[PoliciesAuditEntry] = Field(default_factory=list)
+
+
+def _persist_policies(body: PoliciesResponse, actor_id: str) -> None:
+    """Validate and write the operator policies file (shared by PUT/POST)."""
+    if not _POLICY_FILE:
+        raise HTTPException(status_code=503, detail="policies file not configured")
+    if not body.policies:
+        raise HTTPException(status_code=400, detail="at least one policy required")
+    try:
+        for pol in body.policies:
+            validate_policy_dict(pol)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    path = Path(_POLICY_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"version": body.version, "policies": body.policies}, indent=2),
+        encoding="utf-8",
+    )
+    from deerflow.admin import append_admin_audit_record
+
+    append_admin_audit_record(
+        "admin_policies.published",
+        actor_id=actor_id,
+        target=_POLICY_FILE,
+        details={"version": body.version, "policy_count": len(body.policies)},
+    )
+
+
+@router.post("/publish", response_model=PoliciesResponse)
+def publish_policies(
+    body: PoliciesResponse,
+    actor: AuthUser = Depends(require_abac("write", "admin-policies")),
+):
+    """Validate a policy set, persist it, and record an
+    ``admin_policies.published`` audit entry (M4.3)."""
+    _persist_policies(body, actor.id)
+    return PoliciesResponse(version=body.version, policies=body.policies)
+
+
+@router.get("/audit", response_model=PoliciesAuditResponse)
+def get_policies_audit(
+    _owner: AuthUser = Depends(require_abac("read", "admin-policies")),
+    limit: int = 100,
+):
+    """Return recent ``admin_policies.*`` audit events for the policy editor."""
+    from deerflow.admin import filter_admin_audit_records, read_admin_audit_records
+
+    records = read_admin_audit_records(limit=limit)
+    events = filter_admin_audit_records(records, action_prefix="admin_policies.")
+    return PoliciesAuditResponse(
+        records=[
+            PoliciesAuditEntry(
+                ts=str(e.get("ts", "")),
+                action=str(e.get("action", "")),
+                actor_id=e.get("actor_id"),
+                target=e.get("target"),
+                details=e.get("details") if isinstance(e.get("details"), dict) else None,
+            )
+            for e in events
+        ]
+    )
